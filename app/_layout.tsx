@@ -6,6 +6,7 @@ export default function RootLayout() {
     <RoutineDataProvider>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="routine/add-diaper" />
         <Stack.Screen name="routine/add-meal" />
       </Stack>
     </RoutineDataProvider>

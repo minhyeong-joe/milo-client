@@ -1,4 +1,12 @@
-import type { MealEvent, MealType, RoutineDay, RoutineEvent } from "@/data/homeData";
+import type {
+	DiaperColor,
+	DiaperEvent,
+	DiaperType,
+	MealEvent,
+	MealType,
+	RoutineDay,
+	RoutineEvent,
+} from "@/data/homeData";
 import { homeMockApiResponse } from "@/data/mockAPI/homeAPI";
 import { getDateKeyStartMs, getLocalDateKey, getRoutineEventTime } from "@/utils/routineDisplay";
 import { createContext, PropsWithChildren, useContext, useMemo, useState } from "react";
@@ -12,9 +20,18 @@ export type AddMealInput = {
 	type: MealType;
 };
 
+export type AddDiaperInput = {
+	color?: DiaperColor;
+	notes?: string;
+	time: string;
+	type: DiaperType;
+};
+
 type RoutineDataContextValue = {
+	addDiaper: (input: AddDiaperInput) => void;
 	addMeal: (input: AddMealInput) => void;
 	dailyLogs: RoutineDay[];
+	getLatestDiaper: () => DiaperEvent | undefined;
 	getLatestMeal: () => MealEvent | undefined;
 };
 
@@ -84,6 +101,19 @@ function applyMealToSummary(day: RoutineDay, meal: MealEvent): RoutineDay["summa
 	};
 }
 
+function applyDiaperToSummary(day: RoutineDay, diaper: DiaperEvent): RoutineDay["summary"] {
+	return {
+		...day.summary,
+		diapers: {
+			byType: {
+				...day.summary.diapers.byType,
+				[diaper.type]: day.summary.diapers.byType[diaper.type] + 1,
+			},
+			totalChanges: day.summary.diapers.totalChanges + 1,
+		},
+	};
+}
+
 function sortDaysDescending(a: RoutineDay, b: RoutineDay) {
 	return getDateKeyStartMs(b.date) - getDateKeyStartMs(a.date);
 }
@@ -100,6 +130,12 @@ export function RoutineDataProvider({ children }: PropsWithChildren) {
 			dailyLogs
 				.flatMap((day) => day.timeline)
 				.filter((event): event is MealEvent => event.kind === "meal")
+				.sort(sortEventsDescending)[0];
+
+		const getLatestDiaper = () =>
+			dailyLogs
+				.flatMap((day) => day.timeline)
+				.filter((event): event is DiaperEvent => event.kind === "diaper")
 				.sort(sortEventsDescending)[0];
 
 		const addMeal = (input: AddMealInput) => {
@@ -135,9 +171,42 @@ export function RoutineDataProvider({ children }: PropsWithChildren) {
 			});
 		};
 
+		const addDiaper = (input: AddDiaperInput) => {
+			const diaper: DiaperEvent = {
+				color: input.type === "dirty" || input.type === "both" ? input.color : undefined,
+				id: `diaper-${Date.now()}`,
+				kind: "diaper",
+				notes: input.notes?.trim() ? input.notes.trim() : undefined,
+				time: input.time,
+				type: input.type,
+			};
+			const diaperDate = getEventDate(diaper);
+
+			setDailyLogs((currentLogs) => {
+				const hasDay = currentLogs.some((day) => day.date === diaperDate);
+				const logs = hasDay ? currentLogs : [createEmptyRoutineDay(diaperDate), ...currentLogs];
+
+				return logs
+					.map((day) => {
+						if (day.date !== diaperDate) {
+							return day;
+						}
+
+						return {
+							...day,
+							summary: applyDiaperToSummary(day, diaper),
+							timeline: [...day.timeline, diaper].sort(sortEventsDescending),
+						};
+					})
+					.sort(sortDaysDescending);
+			});
+		};
+
 		return {
+			addDiaper,
 			addMeal,
 			dailyLogs,
+			getLatestDiaper,
 			getLatestMeal,
 		};
 	}, [dailyLogs]);

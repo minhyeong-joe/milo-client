@@ -31,6 +31,8 @@ export default function HomeScreen() {
 	const handleQuickActionPress = (kind: RoutineKind) => {
 		if (kind === "meal") {
 			router.push("/routine/add-meal");
+		} else if (kind === "diaper") {
+			router.push("/routine/add-diaper");
 		}
 	};
 
