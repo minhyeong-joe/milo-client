@@ -65,6 +65,9 @@ type RoutineDataContextValue = {
 	updateDiaper: (input: UpdateDiaperInput) => void;
 	updateMeal: (input: UpdateMealInput) => void;
 	updateSleep: (input: UpdateSleepInput) => void;
+	removeDiaper: (diaperId: string) => void;
+	removeMeal: (mealId: string) => void;
+	removeSleep: (sleepId: string) => void;
 };
 
 const RoutineDataContext = createContext<RoutineDataContextValue | undefined>(undefined);
@@ -508,6 +511,90 @@ export function RoutineDataProvider({ children }: PropsWithChildren) {
 			});
 		};
 
+		const removeMeal = (mealId: string) => {
+			setDailyLogs((currentLogs) => {
+				const existingMeal = currentLogs
+					.flatMap((day) => day.timeline)
+					.find((event): event is MealEvent => event.kind === "meal" && event.id === mealId);
+
+				if (!existingMeal) {
+					return currentLogs;
+				}
+
+				const mealDate = getEventDate(existingMeal);
+
+				return currentLogs
+					.map((day) => {
+						if (day.date !== mealDate) {
+							return day;
+						}
+
+						return {
+							...day,
+							summary: removeMealFromSummary(day, existingMeal),
+							timeline: day.timeline.filter((event) => event.id !== existingMeal.id),
+						};
+					})
+					.sort(sortDaysDescending);
+			});
+		};
+
+		const removeDiaper = (diaperId: string) => {
+			setDailyLogs((currentLogs) => {
+				const existingDiaper = currentLogs
+					.flatMap((day) => day.timeline)
+					.find((event): event is DiaperEvent => event.kind === "diaper" && event.id === diaperId);
+
+				if (!existingDiaper) {
+					return currentLogs;
+				}
+
+				const diaperDate = getEventDate(existingDiaper);
+
+				return currentLogs
+					.map((day) => {
+						if (day.date !== diaperDate) {
+							return day;
+						}
+
+						return {
+							...day,
+							summary: removeDiaperFromSummary(day, existingDiaper),
+							timeline: day.timeline.filter((event) => event.id !== existingDiaper.id),
+						};
+					})
+					.sort(sortDaysDescending);
+			});
+		};
+
+		const removeSleep = (sleepId: string) => {
+			setDailyLogs((currentLogs) => {
+				const existingSleep = currentLogs
+					.flatMap((day) => day.timeline)
+					.find((event): event is SleepEvent => event.kind === "sleep" && event.id === sleepId);
+
+				if (!existingSleep) {
+					return currentLogs;
+				}
+
+				const sleepDate = getEventDate(existingSleep);
+
+				return currentLogs
+					.map((day) => {
+						if (day.date !== sleepDate) {
+							return day;
+						}
+
+						return {
+							...day,
+							summary: removeSleepFromSummary(day, existingSleep),
+							timeline: day.timeline.filter((event) => event.id !== existingSleep.id),
+						};
+					})
+					.sort(sortDaysDescending);
+			});
+		};
+
 		return {
 			addDiaper,
 			addMeal,
@@ -520,6 +607,9 @@ export function RoutineDataProvider({ children }: PropsWithChildren) {
 			updateDiaper,
 			updateMeal,
 			updateSleep,
+			removeDiaper,
+			removeMeal,
+			removeSleep,
 		};
 	}, [dailyLogs]);
 

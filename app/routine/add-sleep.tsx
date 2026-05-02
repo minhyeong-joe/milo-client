@@ -1,3 +1,4 @@
+import { ConfirmDeleteModal } from "@/components/routine/ConfirmDeleteModal";
 import { RoutineIcon } from "@/components/routine/RoutineIcon";
 import { useRoutineData } from "@/context/RoutineDataContext";
 import type { SleepEvent, SleepType } from "@/data/homeData";
@@ -62,7 +63,7 @@ function DateTimeRow({
 export default function AddSleepScreen() {
 	const router = useRouter();
 	const { sleepId } = useLocalSearchParams<{ sleepId?: string }>();
-	const { addSleep, dailyLogs, getLatestSleep, updateSleep } = useRoutineData();
+	const { addSleep, dailyLogs, getLatestSleep, removeSleep, updateSleep } = useRoutineData();
 	const sleepToEdit = dailyLogs
 		.flatMap((day) => day.timeline)
 		.find(
@@ -86,6 +87,7 @@ export default function AddSleepScreen() {
 		return sleepToEdit.endTime ? new Date(sleepToEdit.endTime) : new Date();
 	});
 	const [notes, setNotes] = useState(sleepToEdit?.notes ?? "");
+	const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
 
 	const errorMessage =
 		endTime && endTime.getTime() < startTime.getTime()
@@ -135,6 +137,14 @@ export default function AddSleepScreen() {
 		router.back();
 	};
 
+	const deleteSleep = () => {
+		if (!sleepToEdit) return;
+
+		removeSleep(sleepToEdit.id);
+		setIsDeleteModalVisible(false);
+		router.back();
+	};
+
 	return (
 		<SafeAreaView style={globalStyles.screen}>
 			<KeyboardAvoidingView
@@ -153,7 +163,17 @@ export default function AddSleepScreen() {
 						<RoutineIcon style={routineConfig.quickActions.sleep} size={30} />
 						<Text style={globalStyles.sectionTitleText}>Sleep</Text>
 					</View>
-					<View style={styles.headerSpacer} />
+					{sleepToEdit ? (
+						<Pressable
+							accessibilityRole="button"
+							onPress={() => setIsDeleteModalVisible(true)}
+							style={styles.headerButton}
+						>
+							<Ionicons name="trash-outline" size={24} style={styles.deleteIcon} />
+						</Pressable>
+					) : (
+						<View style={styles.headerSpacer} />
+					)}
 				</View>
 
 				<ScrollView
@@ -285,10 +305,18 @@ export default function AddSleepScreen() {
 						style={[styles.saveButton, errorMessage && styles.saveButtonDisabled]}
 					>
 						<Text style={styles.saveButtonText}>
-							{isEndMode ? "Save Sleep" : "Start Sleep"}
+							{isEndMode ? "Update Sleep" : "Start Sleep"}
 						</Text>
 					</Pressable>
 				</View>
+				<ConfirmDeleteModal
+					confirmLabel="Delete"
+					message="Are you sure you want to delete this sleep log permanently?"
+					onCancel={() => setIsDeleteModalVisible(false)}
+					onConfirm={deleteSleep}
+					title="Delete sleep entry?"
+					visible={isDeleteModalVisible}
+				/>
 			</KeyboardAvoidingView>
 		</SafeAreaView>
 	);
@@ -366,6 +394,10 @@ const styles = StyleSheet.create({
 	headerButton: {
 		minWidth: 72,
 		paddingVertical: spacing.sm,
+	},
+	deleteIcon: {
+		alignSelf: "flex-end",
+		color: colors.light.error,
 	},
 	headerSpacer: {
 		width: 72,

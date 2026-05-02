@@ -21,11 +21,10 @@ export default function HomeScreen() {
 	const { dailyLogs, getOngoingSleep } = useRoutineData();
 	const currentDate = useCurrentMinute();
 	const currentTime = currentDate.toISOString();
-	const [today] = dailyLogs;
-	const latestTimeline = today?.timeline ?? [];
+	const allTimelineEvents = dailyLogs.flatMap((day) => day.timeline);
 	const quickActions = (["meal", "diaper", "sleep"] as const).map((id) => ({
 		id,
-		lastActionLabel: getLastRoutineActionLabel(latestTimeline, id, currentTime),
+		lastActionLabel: getLastRoutineActionLabel(allTimelineEvents, id, currentTime),
 	}));
 
 	const handleQuickActionPress = (kind: RoutineKind) => {

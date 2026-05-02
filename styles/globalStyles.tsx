@@ -8,6 +8,7 @@ export const colors = {
 		surface: "#FFFFFF",
 		textPrimary: "#151827",
 		textSecondary: "#6B7280",
+		error: "#EF4444",
 	},
 	dark: {
 		background: "#11131A",
@@ -16,6 +17,7 @@ export const colors = {
 		surface: "#1A1D26",
 		textPrimary: "#F7F7FA",
 		textSecondary: "#A8ADBA",
+		error: "#EF4444",
 	},
 } as const;
 

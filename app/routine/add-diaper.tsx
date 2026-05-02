@@ -1,3 +1,4 @@
+import { ConfirmDeleteModal } from "@/components/routine/ConfirmDeleteModal";
 import { RoutineIcon } from "@/components/routine/RoutineIcon";
 import { useRoutineData } from "@/context/RoutineDataContext";
 import type { DiaperColor, DiaperEvent, DiaperType } from "@/data/homeData";
@@ -42,7 +43,7 @@ function needsColor(type: DiaperType) {
 export default function AddDiaperScreen() {
 	const router = useRouter();
 	const { diaperId } = useLocalSearchParams<{ diaperId?: string }>();
-	const { addDiaper, dailyLogs, getLatestDiaper, updateDiaper } = useRoutineData();
+	const { addDiaper, dailyLogs, getLatestDiaper, removeDiaper, updateDiaper } = useRoutineData();
 	const diaperToEdit = dailyLogs
 		.flatMap((day) => day.timeline)
 		.find(
@@ -65,6 +66,7 @@ export default function AddDiaperScreen() {
 		initialColor,
 	);
 	const [notes, setNotes] = useState("");
+	const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
 
 	const handlePickerChange = (
 		event: DateTimePickerEvent,
@@ -93,7 +95,6 @@ export default function AddDiaperScreen() {
 	};
 
 	const saveDiaper = () => {
-		// TODO: replace with form validation, proper error handling, and POST request
 		const input = {
 			color: needsColor(diaperType) ? diaperColor : undefined,
 			notes,
@@ -107,6 +108,14 @@ export default function AddDiaperScreen() {
 			addDiaper(input);
 		}
 
+		router.back();
+	};
+
+	const deleteDiaper = () => {
+		if (!diaperToEdit) return;
+
+		removeDiaper(diaperToEdit.id);
+		setIsDeleteModalVisible(false);
 		router.back();
 	};
 
@@ -128,7 +137,17 @@ export default function AddDiaperScreen() {
 						<RoutineIcon style={routineConfig.quickActions.diaper} size={30} />
 						<Text style={globalStyles.sectionTitleText}>Diaper</Text>
 					</View>
-					<View style={styles.headerSpacer} />
+					{diaperToEdit ? (
+						<Pressable
+							accessibilityRole="button"
+							onPress={() => setIsDeleteModalVisible(true)}
+							style={styles.headerButton}
+						>
+							<Ionicons name="trash-outline" size={24} style={styles.deleteIcon} />
+						</Pressable>
+					) : (
+						<View style={styles.headerSpacer} />
+					)}
 				</View>
 
 				<ScrollView
@@ -275,9 +294,17 @@ export default function AddDiaperScreen() {
 						onPress={saveDiaper}
 						style={styles.saveButton}
 					>
-						<Text style={styles.saveButtonText}>Save Diaper</Text>
+						<Text style={styles.saveButtonText}>{diaperToEdit ? "Update Diaper" : "Save Diaper"}</Text>
 					</Pressable>
 				</View>
+				<ConfirmDeleteModal
+					confirmLabel="Delete"
+					message="Are you sure you want to delete this diaper log permanently?"
+					onCancel={() => setIsDeleteModalVisible(false)}
+					onConfirm={deleteDiaper}
+					title="Delete diaper entry?"
+					visible={isDeleteModalVisible}
+				/>
 			</KeyboardAvoidingView>
 		</SafeAreaView>
 	);
@@ -362,6 +389,10 @@ const styles = StyleSheet.create({
 	headerButton: {
 		minWidth: 72,
 		paddingVertical: spacing.sm,
+	},
+	deleteIcon: {
+		alignSelf: "flex-end",
+		color: colors.light.error,
 	},
 	headerSpacer: {
 		width: 72,

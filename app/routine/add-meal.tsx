@@ -1,3 +1,4 @@
+import { ConfirmDeleteModal } from "@/components/routine/ConfirmDeleteModal";
 import type { MealEvent, MealType } from "@/data/homeData";
 import { routineConfig } from "@/data/homeData";
 import { useRoutineData } from "@/context/RoutineDataContext";
@@ -47,7 +48,7 @@ function formatDate(value: Date) {
 export default function AddMealScreen() {
 	const router = useRouter();
 	const { mealId } = useLocalSearchParams<{ mealId?: string }>();
-	const { addMeal, dailyLogs, getLatestMeal, updateMeal } = useRoutineData();
+	const { addMeal, dailyLogs, getLatestMeal, updateMeal, removeMeal } = useRoutineData();
 	const mealToEdit = dailyLogs
 	.flatMap((day) => day.timeline)
 	.find(
@@ -62,6 +63,7 @@ export default function AddMealScreen() {
 	const [durationMinutes, setDurationMinutes] = useState(mealToEdit?.durationMinutes ?? latestMeal?.durationMinutes ?? 15);
 	const [amountBowl, setAmountBowl] = useState(mealToEdit?.amountBowl ?? latestMeal?.amountBowl ?? 0.5);
 	const [notes, setNotes] = useState(mealToEdit?.notes ?? "");
+	const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
 
 	const decrementBottle = () => setAmountMl((value) => Math.max(BOTTLE_STEP_ML, value - BOTTLE_STEP_ML));
 	const incrementBottle = () => setAmountMl((value) => value + BOTTLE_STEP_ML);
@@ -82,7 +84,6 @@ export default function AddMealScreen() {
 	};
 
 	const saveMeal = () => {
-		// TODO: replace with form validation, proper error handling, and POST request
 		const input = {
 			amountBowl: mealType === "solid" ? amountBowl : undefined,
 			amountMl: isBottleMeal(mealType) ? amountMl : undefined,
@@ -101,6 +102,14 @@ export default function AddMealScreen() {
 		router.back();
 	};
 
+	const deleteMeal = () => {
+		if (!mealToEdit) return;
+		
+		removeMeal(mealToEdit.id);
+		setIsDeleteModalVisible(false);
+		router.back();
+	}
+
 	return (
 		<SafeAreaView style={globalStyles.screen}>
 			<KeyboardAvoidingView
@@ -115,7 +124,15 @@ export default function AddMealScreen() {
 						<RoutineIcon style={routineConfig.quickActions["meal"]} size={30} />
 						<Text style={globalStyles.sectionTitleText}>Meal</Text>
 					</View>
-					<View style={styles.headerSpacer} />
+					{mealToEdit? (
+						<Pressable
+							accessibilityRole="button"
+							onPress={() => setIsDeleteModalVisible(true)}
+							style={styles.headerButton}
+						>
+							<Ionicons name="trash-outline" size={24} style={styles.deleteIcon} />
+						</Pressable>
+					): (<View style={styles.headerSpacer} />)}
 				</View>
 
 				<ScrollView
@@ -245,9 +262,17 @@ export default function AddMealScreen() {
 
 				<View style={styles.footer}>
 					<Pressable accessibilityRole="button" onPress={saveMeal} style={styles.saveButton}>
-						<Text style={styles.saveButtonText}>Save Meal</Text>
+						<Text style={styles.saveButtonText}>{mealToEdit ? "Update Meal" : "Save Meal"}</Text>
 					</Pressable>
 				</View>
+				<ConfirmDeleteModal
+					confirmLabel="Delete"
+					message="Are you sure you want to delete this meal log permanently?"
+					onCancel={() => setIsDeleteModalVisible(false)}
+					onConfirm={deleteMeal}
+					title="Delete meal entry?"
+					visible={isDeleteModalVisible}
+				/>
 			</KeyboardAvoidingView>
 		</SafeAreaView>
 	);
@@ -316,6 +341,10 @@ const styles = StyleSheet.create({
 	headerButton: {
 		minWidth: 72,
 		paddingVertical: spacing.sm,
+	},
+	deleteIcon: {
+		color: colors.light.error,
+		alignSelf: "flex-end",
 	},
 	headerSpacer: {
 		width: 72,
