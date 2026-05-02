@@ -1,19 +1,25 @@
 import type { RoutineConfig, RoutineKind } from "@/data/homeData";
 import { colors, spacing, globalStyles } from "@/styles/globalStyles";
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { RoutineIcon } from "./RoutineIcon";
 
 function QuickActionButton({
 	action,
 	config,
+	onPress,
 }: {
 	action: { id: RoutineKind; lastActionLabel: string };
 	config: RoutineConfig;
+	onPress?: (kind: RoutineKind) => void;
 }) {
 	const style = config.quickActions[action.id];
 
 	return (
-		<View style={styles.quickAction}>
+		<Pressable
+			accessibilityRole="button"
+			onPress={() => onPress?.(action.id)}
+			style={styles.quickAction}
+		>
 			<View style={styles.quickIcon}>
 				<RoutineIcon size={56} style={style} />
 			</View>
@@ -21,21 +27,28 @@ function QuickActionButton({
 				{style.label}
 			</Text>
 			<Text style={styles.quickDetail}>{action.lastActionLabel}</Text>
-		</View>
+		</Pressable>
 	);
 }
 
 export function QuickActionGrid({
 	actions,
 	config,
+	onActionPress,
 }: {
 	actions: { id: RoutineKind; lastActionLabel: string }[];
 	config: RoutineConfig;
+	onActionPress?: (kind: RoutineKind) => void;
 }) {
 	return (
 		<View style={styles.quickGrid}>
 			{actions.map((action) => (
-				<QuickActionButton action={action} config={config} key={action.id} />
+				<QuickActionButton
+					action={action}
+					config={config}
+					key={action.id}
+					onPress={onActionPress}
+				/>
 			))}
 		</View>
 	);

@@ -2,6 +2,26 @@ import type { PreferredVolumeUnit, RoutineEvent, RoutineKind } from "@/data/home
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
+function padDatePart(value: number) {
+	return value.toString().padStart(2, "0");
+}
+
+export function getLocalDateKey(value: string | Date) {
+	const date = value instanceof Date ? value : new Date(value);
+
+	return `${date.getFullYear()}-${padDatePart(date.getMonth() + 1)}-${padDatePart(date.getDate())}`;
+}
+
+function parseDateKey(value: string) {
+	const [year, month, day] = value.split("-").map(Number);
+
+	return new Date(year, month - 1, day);
+}
+
+export function getDateKeyStartMs(value: string) {
+	return parseDateKey(value).getTime();
+}
+
 export function formatBabyAge(birthdate: string, today = new Date()) {
 	const born = new Date(`${birthdate}T00:00:00`);
 	let months =
@@ -55,10 +75,10 @@ export function formatClockTime(value: string) {
 }
 
 export function formatDayLabel(value: string, currentTime?: string) {
-	const date = new Date(`${value}T00:00:00`);
+	const date = parseDateKey(value);
 	const current = currentTime ? new Date(currentTime) : new Date();
 	const today = new Date(current.getFullYear(), current.getMonth(), current.getDate());
-	const target = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+	const target = parseDateKey(value);
 	const diffDays = Math.round((today.getTime() - target.getTime()) / MS_PER_DAY);
 	const formatted = new Intl.DateTimeFormat("en-US", {
 		day: "numeric",
@@ -120,4 +140,18 @@ export function getLastRoutineActionLabel(
 
 	const days = Math.floor(hours / 24);
 	return days === 1 ? "Last: yesterday" : `Last: ${days}d ago`;
+}
+
+export function formatBowlAmount(amount: number) {
+	const whole = Math.floor(amount);
+	const fraction = amount - whole;
+	let fractionLabel = "";
+	if (fraction === 0.25) {
+		fractionLabel = "¼";
+	} else if (fraction === 0.5) {
+		fractionLabel = "½";
+	} else if (fraction === 0.75) {
+		fractionLabel = "¾";
+	}
+	return whole > 0 ? `${whole} ${fractionLabel}` : fractionLabel;
 }

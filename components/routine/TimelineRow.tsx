@@ -1,16 +1,22 @@
-import type { RoutineConfig, RoutineEvent } from "@/data/homeData";
+import type { RoutineConfig, RoutineEvent, RoutineStyle } from "@/data/homeData";
 import { colors, globalStyles } from "@/styles/globalStyles";
 import {
+	formatBowlAmount,
 	formatClockTime,
 	formatDuration,
 	formatVolume,
 	getSleepDurationMinutes,
 } from "@/utils/routineDisplay";
 import { Ionicons } from "@expo/vector-icons";
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { RoutineIcon } from "./RoutineIcon";
+import { router } from "expo-router";
 
-function getEventDisplay(event: RoutineEvent, config: RoutineConfig, currentTime: string) {
+function getEventDisplay(
+	event: RoutineEvent,
+	config: RoutineConfig,
+	currentTime: string,
+): { detail: string; style: RoutineStyle; title: string } {
 	if (event.kind === "meal") {
 		const title = config.mealTypes[event.type];
 		const detail =
@@ -19,7 +25,7 @@ function getEventDisplay(event: RoutineEvent, config: RoutineConfig, currentTime
 				: event.amountMl
 					? formatVolume(event.amountMl, config.preferredVolumeUnit)
 					: event.amountBowl
-						? `${event.amountBowl} bowl`
+						? `${formatBowlAmount(event.amountBowl)} bowl`
 						: "";
 
 		return { detail, style: config.quickActions.meal, title };
@@ -43,6 +49,8 @@ function getEventDisplay(event: RoutineEvent, config: RoutineConfig, currentTime
 			title: `Diaper (${config.diaperTypes[event.type]})`,
 		};
 	}
+
+	throw new Error("Unsupported routine event");
 }
 
 export function TimelineRow({
@@ -59,6 +67,25 @@ export function TimelineRow({
 	const display = getEventDisplay(event, config, currentTime);
 	const isSleep = event.kind === "sleep";
 
+	const onEventClick = () => {
+		if (event.kind === "meal") {
+			router.push({
+				pathname: "/routine/add-meal",
+				params: { mealId: event.id},
+			});
+		} else if (event.kind === "diaper") {
+			router.push({
+				pathname: "/routine/add-diaper",
+				params: { diaperId: event.id},
+			});
+		} else if (event.kind === "sleep") {
+			router.push({
+				pathname: "/routine/add-sleep",
+				params: { sleepId: event.id},
+			});
+		}
+	}
+
 	return (
 		<View style={styles.timelineRow}>
 			{isSleep ? (
@@ -73,7 +100,11 @@ export function TimelineRow({
 				<View style={styles.timelineDot} />
 				{!isLast ? <View style={styles.timelineLine} /> : null}
 			</View>
-			<View style={[styles.timelineCard, isSleep && styles.sleepCard]}>
+			<Pressable
+				accessibilityRole="button" 
+				style={[styles.timelineCard, isSleep && styles.sleepCard]}
+				onPress={onEventClick}
+			>
 				<View style={styles.timelineIcon}>
 					<RoutineIcon size={40} style={display.style} />
 				</View>
@@ -88,7 +119,7 @@ export function TimelineRow({
 					name="chevron-forward"
 					size={20}
 				/>
-			</View>
+			</Pressable>
 		</View>
 	);
 }
