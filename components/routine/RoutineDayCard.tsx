@@ -25,37 +25,27 @@ export function RoutineDayCard({
 	const isTimeline = view === "timeline";
 	const dayLabel = formatDayLabel(day.date, currentTime);
 
+	const toggleView = () => {
+		setView((prev) => (prev === "timeline" ? "summary" : "timeline"));
+	}
+
 	return (
 		<RoutineCard>
-			<View style={[globalStyles.rowBetween, styles.cardHeader]}>
+			<Pressable 
+				style={[globalStyles.rowBetween, styles.cardHeader]}
+				accessibilityRole="button"
+				onPress={toggleView}
+			>
 				<View>
 					<Text style={styles.dayTitle}>{dayLabel.label}</Text>
 					<Text style={styles.dayDate}>{dayLabel.date}</Text>
 				</View>
-
-				{isTimeline ? (
-					<Pressable
-						accessibilityRole="button"
-						onPress={() => setView("summary")}
-						style={styles.summaryPill}
-					>
-						<Text style={styles.summaryPillText}>Summary</Text>
-					</Pressable>
+				{view === "timeline" ? (
+					<Ionicons name="chevron-up" size={24} color={colors.light.textSecondary} />
 				) : (
-					<Pressable
-						accessibilityLabel={`Show ${dayLabel.label} timeline`}
-						accessibilityRole="button"
-						onPress={() => setView("timeline")}
-						style={styles.chevronButton}
-					>
-						<Ionicons
-							color={colors.light.textSecondary}
-							name="chevron-down"
-							size={20}
-						/>
-					</Pressable>
+					<Ionicons name="chevron-down" size={24} color={colors.light.textSecondary} />
 				)}
-			</View>
+			</Pressable>
 
 			{isTimeline ? (
 				<Timeline config={config} currentTime={currentTime} events={day.timeline} />

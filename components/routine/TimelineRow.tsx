@@ -1,6 +1,7 @@
-import type { RoutineConfig, RoutineEvent } from "@/data/homeData";
+import type { RoutineConfig, RoutineEvent, RoutineStyle } from "@/data/homeData";
 import { colors, globalStyles } from "@/styles/globalStyles";
 import {
+	formatBowlAmount,
 	formatClockTime,
 	formatDuration,
 	formatVolume,
@@ -10,7 +11,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, Text, View } from "react-native";
 import { RoutineIcon } from "./RoutineIcon";
 
-function getEventDisplay(event: RoutineEvent, config: RoutineConfig, currentTime: string) {
+function getEventDisplay(
+	event: RoutineEvent,
+	config: RoutineConfig,
+	currentTime: string,
+): { detail: string; style: RoutineStyle; title: string } {
 	if (event.kind === "meal") {
 		const title = config.mealTypes[event.type];
 		const detail =
@@ -19,7 +24,7 @@ function getEventDisplay(event: RoutineEvent, config: RoutineConfig, currentTime
 				: event.amountMl
 					? formatVolume(event.amountMl, config.preferredVolumeUnit)
 					: event.amountBowl
-						? `${event.amountBowl} bowl`
+						? `${formatBowlAmount(event.amountBowl)} bowl`
 						: "";
 
 		return { detail, style: config.quickActions.meal, title };
@@ -43,6 +48,8 @@ function getEventDisplay(event: RoutineEvent, config: RoutineConfig, currentTime
 			title: `Diaper (${config.diaperTypes[event.type]})`,
 		};
 	}
+
+	throw new Error("Unsupported routine event");
 }
 
 export function TimelineRow({

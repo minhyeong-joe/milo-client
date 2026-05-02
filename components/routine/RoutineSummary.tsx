@@ -4,7 +4,7 @@ import type {
 	RoutineKind,
 } from "@/data/homeData";
 import { colors } from "@/styles/globalStyles";
-import { formatDuration, formatVolume } from "@/utils/routineDisplay";
+import { formatBowlAmount, formatDuration, formatVolume } from "@/utils/routineDisplay";
 import type { ReactNode } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { RoutineIcon } from "./RoutineIcon";
@@ -90,7 +90,7 @@ export function RoutineSummary({
 				{solid.count ? (
 					<DetailText>
 						{config.mealTypes.solid}: {solid.count}
-						{solid.totalBowls ? ` (${solid.totalBowls} bowl)` : ""}
+						{solid.totalBowls ? ` (${formatBowlAmount(solid.totalBowls)} bowl)` : ""}
 					</DetailText>
 				) : null}
 			</SummaryRow>
