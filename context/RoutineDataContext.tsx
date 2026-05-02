@@ -6,9 +6,16 @@ import type {
 	MealType,
 	RoutineDay,
 	RoutineEvent,
+	SleepEvent,
+	SleepType,
 } from "@/data/homeData";
 import { homeMockApiResponse } from "@/data/mockAPI/homeAPI";
-import { getDateKeyStartMs, getLocalDateKey, getRoutineEventTime } from "@/utils/routineDisplay";
+import {
+	getDateKeyStartMs,
+	getLocalDateKey,
+	getRoutineEventTime,
+	getSleepDurationMinutes,
+} from "@/utils/routineDisplay";
 import { createContext, PropsWithChildren, useContext, useMemo, useState } from "react";
 
 export type AddMealInput = {
@@ -27,12 +34,27 @@ export type AddDiaperInput = {
 	type: DiaperType;
 };
 
+export type AddSleepInput = {
+	endTime?: string;
+	notes?: string;
+	startTime: string;
+	type: SleepType;
+};
+
+export type UpdateSleepInput = AddSleepInput & {
+	id: string;
+};
+
 type RoutineDataContextValue = {
 	addDiaper: (input: AddDiaperInput) => void;
 	addMeal: (input: AddMealInput) => void;
+	addSleep: (input: AddSleepInput) => void;
 	dailyLogs: RoutineDay[];
 	getLatestDiaper: () => DiaperEvent | undefined;
 	getLatestMeal: () => MealEvent | undefined;
+	getLatestSleep: () => SleepEvent | undefined;
+	getOngoingSleep: () => SleepEvent | undefined;
+	updateSleep: (input: UpdateSleepInput) => void;
 };
 
 const RoutineDataContext = createContext<RoutineDataContextValue | undefined>(undefined);
@@ -114,6 +136,52 @@ function applyDiaperToSummary(day: RoutineDay, diaper: DiaperEvent): RoutineDay[
 	};
 }
 
+function getSleepDurationForSummary(sleep: SleepEvent) {
+	if (!sleep.endTime) {
+		return 0;
+	}
+
+	return getSleepDurationMinutes(sleep.startTime, sleep.endTime);
+}
+
+function applySleepToSummary(day: RoutineDay, sleep: SleepEvent): RoutineDay["summary"] {
+	const duration = getSleepDurationForSummary(sleep);
+
+	return {
+		...day.summary,
+		sleep: {
+			byType: {
+				...day.summary.sleep.byType,
+				[sleep.type]: {
+					count: day.summary.sleep.byType[sleep.type].count + 1,
+					totalMinutes: day.summary.sleep.byType[sleep.type].totalMinutes + duration,
+				},
+			},
+			totalMinutes: day.summary.sleep.totalMinutes + duration,
+			totalSessions: day.summary.sleep.totalSessions + 1,
+		},
+	};
+}
+
+function removeSleepFromSummary(day: RoutineDay, sleep: SleepEvent): RoutineDay["summary"] {
+	const duration = getSleepDurationForSummary(sleep);
+
+	return {
+		...day.summary,
+		sleep: {
+			byType: {
+				...day.summary.sleep.byType,
+				[sleep.type]: {
+					count: Math.max(0, day.summary.sleep.byType[sleep.type].count - 1),
+					totalMinutes: Math.max(0, day.summary.sleep.byType[sleep.type].totalMinutes - duration),
+				},
+			},
+			totalMinutes: Math.max(0, day.summary.sleep.totalMinutes - duration),
+			totalSessions: Math.max(0, day.summary.sleep.totalSessions - 1),
+		},
+	};
+}
+
 function sortDaysDescending(a: RoutineDay, b: RoutineDay) {
 	return getDateKeyStartMs(b.date) - getDateKeyStartMs(a.date);
 }
@@ -136,6 +204,18 @@ export function RoutineDataProvider({ children }: PropsWithChildren) {
 			dailyLogs
 				.flatMap((day) => day.timeline)
 				.filter((event): event is DiaperEvent => event.kind === "diaper")
+				.sort(sortEventsDescending)[0];
+
+		const getLatestSleep = () =>
+			dailyLogs
+				.flatMap((day) => day.timeline)
+				.filter((event): event is SleepEvent => event.kind === "sleep")
+				.sort(sortEventsDescending)[0];
+
+		const getOngoingSleep = () =>
+			dailyLogs
+				.flatMap((day) => day.timeline)
+				.filter((event): event is SleepEvent => event.kind === "sleep" && !event.endTime)
 				.sort(sortEventsDescending)[0];
 
 		const addMeal = (input: AddMealInput) => {
@@ -165,6 +245,37 @@ export function RoutineDataProvider({ children }: PropsWithChildren) {
 							...day,
 							summary: applyMealToSummary(day, meal),
 							timeline: [...day.timeline, meal].sort(sortEventsDescending),
+						};
+					})
+					.sort(sortDaysDescending);
+			});
+		};
+
+		const addSleep = (input: AddSleepInput) => {
+			const sleep: SleepEvent = {
+				endTime: input.endTime,
+				id: `sleep-${Date.now()}`,
+				kind: "sleep",
+				notes: input.notes?.trim() ? input.notes.trim() : undefined,
+				startTime: input.startTime,
+				type: input.type,
+			};
+			const sleepDate = getEventDate(sleep);
+
+			setDailyLogs((currentLogs) => {
+				const hasDay = currentLogs.some((day) => day.date === sleepDate);
+				const logs = hasDay ? currentLogs : [createEmptyRoutineDay(sleepDate), ...currentLogs];
+
+				return logs
+					.map((day) => {
+						if (day.date !== sleepDate) {
+							return day;
+						}
+
+						return {
+							...day,
+							summary: applySleepToSummary(day, sleep),
+							timeline: [...day.timeline, sleep].sort(sortEventsDescending),
 						};
 					})
 					.sort(sortDaysDescending);
@@ -202,12 +313,64 @@ export function RoutineDataProvider({ children }: PropsWithChildren) {
 			});
 		};
 
+		const updateSleep = (input: UpdateSleepInput) => {
+			setDailyLogs((currentLogs) => {
+				const existingSleep = currentLogs
+					.flatMap((day) => day.timeline)
+					.find((event): event is SleepEvent => event.kind === "sleep" && event.id === input.id);
+
+				if (!existingSleep) {
+					return currentLogs;
+				}
+
+				const updatedSleep: SleepEvent = {
+					...existingSleep,
+					endTime: input.endTime,
+					notes: input.notes?.trim() ? input.notes.trim() : undefined,
+					startTime: input.startTime,
+					type: input.type,
+				};
+				const previousDate = getEventDate(existingSleep);
+				const nextDate = getEventDate(updatedSleep);
+				const hasNextDay = currentLogs.some((day) => day.date === nextDate);
+				const logs = hasNextDay ? currentLogs : [createEmptyRoutineDay(nextDate), ...currentLogs];
+
+				return logs
+					.map((day) => {
+						let nextDay = day;
+
+						if (day.date === previousDate) {
+							nextDay = {
+								...nextDay,
+								summary: removeSleepFromSummary(nextDay, existingSleep),
+								timeline: nextDay.timeline.filter((event) => event.id !== existingSleep.id),
+							};
+						}
+
+						if (day.date === nextDate) {
+							nextDay = {
+								...nextDay,
+								summary: applySleepToSummary(nextDay, updatedSleep),
+								timeline: [...nextDay.timeline, updatedSleep].sort(sortEventsDescending),
+							};
+						}
+
+						return nextDay;
+					})
+					.sort(sortDaysDescending);
+			});
+		};
+
 		return {
 			addDiaper,
 			addMeal,
+			addSleep,
 			dailyLogs,
 			getLatestDiaper,
 			getLatestMeal,
+			getLatestSleep,
+			getOngoingSleep,
+			updateSleep,
 		};
 	}, [dailyLogs]);
 

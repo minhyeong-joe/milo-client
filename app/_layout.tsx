@@ -8,6 +8,7 @@ export default function RootLayout() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="routine/add-diaper" />
         <Stack.Screen name="routine/add-meal" />
+        <Stack.Screen name="routine/add-sleep" />
       </Stack>
     </RoutineDataProvider>
   );

@@ -40,10 +40,10 @@ export const homeMockApiResponse = {
                     byType: { wet: 2, dirty: 1, both: 0, dry: 0 },
                 },
                 sleep: {
-                    totalSessions: 2,
-                    totalMinutes: 640,
+                    totalSessions: 3,
+                    totalMinutes: 680,
                     byType: {
-                        nap: { count: 1, totalMinutes: 80 },
+                        nap: { count: 2, totalMinutes: 120 },
                         nighttime: { count: 1, totalMinutes: 560 },
                     },
                 },
@@ -54,6 +54,7 @@ export const homeMockApiResponse = {
                     kind: "sleep",
                     type: "nap",
                     startTime: "2026-05-01T12:45:00",
+                    endTime: "2026-05-01T13:25:00",
                 },
                 {
                     id: "meal-1230",

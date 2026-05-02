@@ -18,7 +18,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 export default function HomeScreen() {
 	const router = useRouter();
 	const { baby } = homeMockApiResponse; // TODO: replace with real data from context
-	const { dailyLogs } = useRoutineData();
+	const { dailyLogs, getOngoingSleep } = useRoutineData();
 	const currentDate = useCurrentMinute();
 	const currentTime = currentDate.toISOString();
 	const [today] = dailyLogs;
@@ -33,6 +33,12 @@ export default function HomeScreen() {
 			router.push("/routine/add-meal");
 		} else if (kind === "diaper") {
 			router.push("/routine/add-diaper");
+		} else if (kind === "sleep") {
+			const ongoingSleep = getOngoingSleep();
+			router.push({
+				pathname: "/routine/add-sleep",
+				params: ongoingSleep ? { sleepId: ongoingSleep.id } : undefined,
+			});
 		}
 	};
 
