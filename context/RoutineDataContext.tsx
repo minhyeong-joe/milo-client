@@ -34,6 +34,14 @@ export type AddDiaperInput = {
 	type: DiaperType;
 };
 
+export type UpdateMealInput = AddMealInput & {
+	id: string;
+};
+
+export type UpdateDiaperInput = AddDiaperInput & {
+	id: string;
+};
+
 export type AddSleepInput = {
 	endTime?: string;
 	notes?: string;
@@ -54,6 +62,8 @@ type RoutineDataContextValue = {
 	getLatestMeal: () => MealEvent | undefined;
 	getLatestSleep: () => SleepEvent | undefined;
 	getOngoingSleep: () => SleepEvent | undefined;
+	updateDiaper: (input: UpdateDiaperInput) => void;
+	updateMeal: (input: UpdateMealInput) => void;
 	updateSleep: (input: UpdateSleepInput) => void;
 };
 
@@ -123,6 +133,32 @@ function applyMealToSummary(day: RoutineDay, meal: MealEvent): RoutineDay["summa
 	};
 }
 
+function removeMealFromSummary(day: RoutineDay, meal: MealEvent): RoutineDay["summary"] {
+	const mealsByType = {
+		...day.summary.meals.byType,
+		[meal.type]: { ...day.summary.meals.byType[meal.type] },
+	};
+
+	const typeSummary = mealsByType[meal.type];
+	typeSummary.count = Math.max(0, typeSummary.count - 1);
+
+	if (meal.type === "breastfeed") {
+		typeSummary.totalMinutes = Math.max(0, (typeSummary.totalMinutes ?? 0) - (meal.durationMinutes ?? 0));
+	} else if (meal.type === "solid") {
+		typeSummary.totalBowls = Math.max(0, (typeSummary.totalBowls ?? 0) - (meal.amountBowl ?? 0));
+	} else {
+		typeSummary.totalAmountMl = Math.max(0, (typeSummary.totalAmountMl ?? 0) - (meal.amountMl ?? 0));
+	}
+
+	return {
+		...day.summary,
+		meals: {
+			byType: mealsByType,
+			totalCount: Math.max(0, day.summary.meals.totalCount - 1),
+		},
+	};
+}
+
 function applyDiaperToSummary(day: RoutineDay, diaper: DiaperEvent): RoutineDay["summary"] {
 	return {
 		...day.summary,
@@ -132,6 +168,19 @@ function applyDiaperToSummary(day: RoutineDay, diaper: DiaperEvent): RoutineDay[
 				[diaper.type]: day.summary.diapers.byType[diaper.type] + 1,
 			},
 			totalChanges: day.summary.diapers.totalChanges + 1,
+		},
+	};
+}
+
+function removeDiaperFromSummary(day: RoutineDay, diaper: DiaperEvent): RoutineDay["summary"] {
+	return {
+		...day.summary,
+		diapers: {
+			byType: {
+				...day.summary.diapers.byType,
+				[diaper.type]: Math.max(0, day.summary.diapers.byType[diaper.type] - 1),
+			},
+			totalChanges: Math.max(0, day.summary.diapers.totalChanges - 1),
 		},
 	};
 }
@@ -313,6 +362,104 @@ export function RoutineDataProvider({ children }: PropsWithChildren) {
 			});
 		};
 
+		const updateMeal = (input: UpdateMealInput) => {
+			setDailyLogs((currentLogs) => {
+				const existingMeal = currentLogs
+					.flatMap((day) => day.timeline)
+					.find((event): event is MealEvent => event.kind === "meal" && event.id === input.id);
+
+				if (!existingMeal) {
+					return currentLogs;
+				}
+
+				const updatedMeal: MealEvent = {
+					...existingMeal,
+					amountBowl: input.type === "solid" ? input.amountBowl : undefined,
+					amountMl: input.type === "breastMilk" || input.type === "formula" ? input.amountMl : undefined,
+					durationMinutes: input.type === "breastfeed" ? input.durationMinutes : undefined,
+					notes: input.notes?.trim() ? input.notes.trim() : undefined,
+					time: input.time,
+					type: input.type,
+				};
+				const previousDate = getEventDate(existingMeal);
+				const nextDate = getEventDate(updatedMeal);
+				const hasNextDay = currentLogs.some((day) => day.date === nextDate);
+				const logs = hasNextDay ? currentLogs : [createEmptyRoutineDay(nextDate), ...currentLogs];
+
+				return logs
+					.map((day) => {
+						let nextDay = day;
+
+						if (day.date === previousDate) {
+							nextDay = {
+								...nextDay,
+								summary: removeMealFromSummary(nextDay, existingMeal),
+								timeline: nextDay.timeline.filter((event) => event.id !== existingMeal.id),
+							};
+						}
+
+						if (day.date === nextDate) {
+							nextDay = {
+								...nextDay,
+								summary: applyMealToSummary(nextDay, updatedMeal),
+								timeline: [...nextDay.timeline, updatedMeal].sort(sortEventsDescending),
+							};
+						}
+
+						return nextDay;
+					})
+					.sort(sortDaysDescending);
+			});
+		};
+
+		const updateDiaper = (input: UpdateDiaperInput) => {
+			setDailyLogs((currentLogs) => {
+				const existingDiaper = currentLogs
+					.flatMap((day) => day.timeline)
+					.find((event): event is DiaperEvent => event.kind === "diaper" && event.id === input.id);
+
+				if (!existingDiaper) {
+					return currentLogs;
+				}
+
+				const updatedDiaper: DiaperEvent = {
+					...existingDiaper,
+					color: input.type === "dirty" || input.type === "both" ? input.color : undefined,
+					notes: input.notes?.trim() ? input.notes.trim() : undefined,
+					time: input.time,
+					type: input.type,
+				};
+				const previousDate = getEventDate(existingDiaper);
+				const nextDate = getEventDate(updatedDiaper);
+				const hasNextDay = currentLogs.some((day) => day.date === nextDate);
+				const logs = hasNextDay ? currentLogs : [createEmptyRoutineDay(nextDate), ...currentLogs];
+
+				return logs
+					.map((day) => {
+						let nextDay = day;
+
+						if (day.date === previousDate) {
+							nextDay = {
+								...nextDay,
+								summary: removeDiaperFromSummary(nextDay, existingDiaper),
+								timeline: nextDay.timeline.filter((event) => event.id !== existingDiaper.id),
+							};
+						}
+
+						if (day.date === nextDate) {
+							nextDay = {
+								...nextDay,
+								summary: applyDiaperToSummary(nextDay, updatedDiaper),
+								timeline: [...nextDay.timeline, updatedDiaper].sort(sortEventsDescending),
+							};
+						}
+
+						return nextDay;
+					})
+					.sort(sortDaysDescending);
+			});
+		};
+
 		const updateSleep = (input: UpdateSleepInput) => {
 			setDailyLogs((currentLogs) => {
 				const existingSleep = currentLogs
@@ -370,6 +517,8 @@ export function RoutineDataProvider({ children }: PropsWithChildren) {
 			getLatestMeal,
 			getLatestSleep,
 			getOngoingSleep,
+			updateDiaper,
+			updateMeal,
 			updateSleep,
 		};
 	}, [dailyLogs]);

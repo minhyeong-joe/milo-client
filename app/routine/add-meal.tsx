@@ -1,11 +1,11 @@
-import type { MealType } from "@/data/homeData";
+import type { MealEvent, MealType } from "@/data/homeData";
 import { routineConfig } from "@/data/homeData";
 import { useRoutineData } from "@/context/RoutineDataContext";
 import { colors, globalStyles, spacing } from "@/styles/globalStyles";
 import { formatClockTime } from "@/utils/routineDisplay";
 import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import {
 	KeyboardAvoidingView,
@@ -46,15 +46,22 @@ function formatDate(value: Date) {
 
 export default function AddMealScreen() {
 	const router = useRouter();
-	const { addMeal, getLatestMeal } = useRoutineData();
+	const { mealId } = useLocalSearchParams<{ mealId?: string }>();
+	const { addMeal, dailyLogs, getLatestMeal, updateMeal } = useRoutineData();
+	const mealToEdit = dailyLogs
+	.flatMap((day) => day.timeline)
+	.find(
+		(event): event is MealEvent =>
+			event.kind === "meal" && event.id === mealId,
+	);
 	const latestMeal = getLatestMeal();
-	const [mealTime, setMealTime] = useState(() => new Date());
+	const [mealTime, setMealTime] = useState(() => new Date(mealToEdit?.time ?? Date.now()));
 	const [activePicker, setActivePicker] = useState<"date" | "time" | null>(null);
-	const [mealType, setMealType] = useState<MealType>(latestMeal?.type ?? "formula");
-	const [amountMl, setAmountMl] = useState(latestMeal?.amountMl ?? 60);
-	const [durationMinutes, setDurationMinutes] = useState(latestMeal?.durationMinutes ?? 15);
-	const [amountBowl, setAmountBowl] = useState(latestMeal?.amountBowl ?? 0.5);
-	const [notes, setNotes] = useState("");
+	const [mealType, setMealType] = useState<MealType>(mealToEdit?.type?? latestMeal?.type ?? "formula");
+	const [amountMl, setAmountMl] = useState(mealToEdit?.amountMl ?? latestMeal?.amountMl ?? 60);
+	const [durationMinutes, setDurationMinutes] = useState(mealToEdit?.durationMinutes ?? latestMeal?.durationMinutes ?? 15);
+	const [amountBowl, setAmountBowl] = useState(mealToEdit?.amountBowl ?? latestMeal?.amountBowl ?? 0.5);
+	const [notes, setNotes] = useState(mealToEdit?.notes ?? "");
 
 	const decrementBottle = () => setAmountMl((value) => Math.max(BOTTLE_STEP_ML, value - BOTTLE_STEP_ML));
 	const incrementBottle = () => setAmountMl((value) => value + BOTTLE_STEP_ML);
@@ -76,14 +83,21 @@ export default function AddMealScreen() {
 
 	const saveMeal = () => {
 		// TODO: replace with form validation, proper error handling, and POST request
-		addMeal({
+		const input = {
 			amountBowl: mealType === "solid" ? amountBowl : undefined,
 			amountMl: isBottleMeal(mealType) ? amountMl : undefined,
 			durationMinutes: mealType === "breastfeed" ? durationMinutes : undefined,
 			notes,
 			time: mealTime.toISOString(),
 			type: mealType,
-		});
+		};
+
+		if (mealToEdit) {
+			updateMeal({ ...input, id: mealToEdit.id });
+		} else {
+			addMeal(input);
+		}
+
 		router.back();
 	};
 

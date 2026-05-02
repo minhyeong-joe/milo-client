@@ -8,8 +8,9 @@ import {
 	getSleepDurationMinutes,
 } from "@/utils/routineDisplay";
 import { Ionicons } from "@expo/vector-icons";
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { RoutineIcon } from "./RoutineIcon";
+import { router } from "expo-router";
 
 function getEventDisplay(
 	event: RoutineEvent,
@@ -66,6 +67,25 @@ export function TimelineRow({
 	const display = getEventDisplay(event, config, currentTime);
 	const isSleep = event.kind === "sleep";
 
+	const onEventClick = () => {
+		if (event.kind === "meal") {
+			router.push({
+				pathname: "/routine/add-meal",
+				params: { mealId: event.id},
+			});
+		} else if (event.kind === "diaper") {
+			router.push({
+				pathname: "/routine/add-diaper",
+				params: { diaperId: event.id},
+			});
+		} else if (event.kind === "sleep") {
+			router.push({
+				pathname: "/routine/add-sleep",
+				params: { sleepId: event.id},
+			});
+		}
+	}
+
 	return (
 		<View style={styles.timelineRow}>
 			{isSleep ? (
@@ -80,7 +100,11 @@ export function TimelineRow({
 				<View style={styles.timelineDot} />
 				{!isLast ? <View style={styles.timelineLine} /> : null}
 			</View>
-			<View style={[styles.timelineCard, isSleep && styles.sleepCard]}>
+			<Pressable
+				accessibilityRole="button" 
+				style={[styles.timelineCard, isSleep && styles.sleepCard]}
+				onPress={onEventClick}
+			>
 				<View style={styles.timelineIcon}>
 					<RoutineIcon size={40} style={display.style} />
 				</View>
@@ -95,7 +119,7 @@ export function TimelineRow({
 					name="chevron-forward"
 					size={20}
 				/>
-			</View>
+			</Pressable>
 		</View>
 	);
 }

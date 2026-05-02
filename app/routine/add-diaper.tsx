@@ -1,6 +1,6 @@
 import { RoutineIcon } from "@/components/routine/RoutineIcon";
 import { useRoutineData } from "@/context/RoutineDataContext";
-import type { DiaperColor, DiaperType } from "@/data/homeData";
+import type { DiaperColor, DiaperEvent, DiaperType } from "@/data/homeData";
 import { routineConfig } from "@/data/homeData";
 import { colors, globalStyles, spacing } from "@/styles/globalStyles";
 import { formatClockTime } from "@/utils/routineDisplay";
@@ -8,7 +8,7 @@ import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker, {
 	DateTimePickerEvent,
 } from "@react-native-community/datetimepicker";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import {
 	KeyboardAvoidingView,
@@ -41,11 +41,22 @@ function needsColor(type: DiaperType) {
 
 export default function AddDiaperScreen() {
 	const router = useRouter();
-	const { addDiaper, getLatestDiaper } = useRoutineData();
+	const { diaperId } = useLocalSearchParams<{ diaperId?: string }>();
+	const { addDiaper, dailyLogs, getLatestDiaper, updateDiaper } = useRoutineData();
+	const diaperToEdit = dailyLogs
+		.flatMap((day) => day.timeline)
+		.find(
+			(event): event is DiaperEvent =>
+				event.kind === "diaper" && event.id === diaperId,
+		);
 	const latestDiaper = getLatestDiaper();
-	const initialType = latestDiaper?.type ?? "wet";
-	const initialColor = needsColor(initialType) ? latestDiaper?.color : undefined;
-	const [diaperTime, setDiaperTime] = useState(() => new Date());
+	const initialType = diaperToEdit?.type ?? latestDiaper?.type ?? "wet";
+	const initialColor = needsColor(initialType)
+		? diaperToEdit?.color ?? latestDiaper?.color
+		: undefined;
+	const [diaperTime, setDiaperTime] = useState(
+		() => new Date(diaperToEdit?.time ?? Date.now()),
+	);
 	const [activePicker, setActivePicker] = useState<"date" | "time" | null>(
 		null,
 	);
@@ -83,12 +94,19 @@ export default function AddDiaperScreen() {
 
 	const saveDiaper = () => {
 		// TODO: replace with form validation, proper error handling, and POST request
-		addDiaper({
+		const input = {
 			color: needsColor(diaperType) ? diaperColor : undefined,
 			notes,
 			time: diaperTime.toISOString(),
 			type: diaperType,
-		});
+		};
+
+		if (diaperToEdit) {
+			updateDiaper({ ...input, id: diaperToEdit.id });
+		} else {
+			addDiaper(input);
+		}
+
 		router.back();
 	};
 
