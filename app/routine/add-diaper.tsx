@@ -65,7 +65,7 @@ export default function AddDiaperScreen() {
 	const [diaperColor, setDiaperColor] = useState<DiaperColor | undefined>(
 		initialColor,
 	);
-	const [notes, setNotes] = useState("");
+	const [notes, setNotes] = useState(diaperToEdit?.notes ?? "");
 	const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
 
 	const handlePickerChange = (
