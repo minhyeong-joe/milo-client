@@ -36,4 +36,5 @@ jobs:
       - name: Publish EAS Update
         env:
           APP_VARIANT: preview
-        run: eas update --channel preview --non-interactive --message "Preview update: ${{ github.sha }}"
+        run: |
+          eas update --channel preview --non-interactive --message "Preview update: ${{ github.sha }}"
