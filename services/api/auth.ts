@@ -43,10 +43,24 @@ export type SignUpResponse = {
 	emailConfirmationRequired: boolean;
 };
 
+export type RefreshSessionRequest = {
+	refreshToken: string;
+};
+
+export type RefreshSessionResponse = AuthSessionTokens & {
+	user: MiloUser;
+};
+
 export function signInUser(input: SignInRequest) {
 	return apiPost<SignInResponse, SignInRequest>("/auth/signin", input);
 }
 
 export function signUpUser(input: SignUpRequest) {
 	return apiPost<SignUpResponse, SignUpRequest>("/auth/signup", input);
+}
+
+export function refreshAuthSession(input: RefreshSessionRequest) {
+	return apiPost<RefreshSessionResponse, RefreshSessionRequest>("/auth/refresh", input, {
+		retryOnUnauthorized: false,
+	});
 }

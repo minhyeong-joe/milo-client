@@ -1,5 +1,5 @@
 import type { AuthSession, AuthSessionTokens, SignUpRequest } from "@/services/api/auth";
-import { signInUser, signUpUser } from "@/services/api/auth";
+import { refreshAuthSession, signInUser, signUpUser } from "@/services/api/auth";
 import type { BabyRole, BabySex, CreateBabyRequest } from "@/services/api/babies";
 import { createBaby } from "@/services/api/babies";
 import { configureApiClient } from "@/services/api/httpClient";
@@ -43,6 +43,7 @@ type AuthSessionContextValue = {
 };
 
 const AuthSessionContext = createContext<AuthSessionContextValue | null>(null);
+const REFRESH_BUFFER_SECONDS = 60;
 
 export function AuthSessionProvider({ children }: PropsWithChildren) {
 	const [session, setSession] = useState<AuthSession | null>(null);
@@ -53,6 +54,86 @@ export function AuthSessionProvider({ children }: PropsWithChildren) {
 	const [error, setError] = useState<string | null>(null);
 	const sessionRef = useRef<AuthSession | null>(null);
 	const pendingSignupSessionRef = useRef<AuthSession | null>(null);
+	const refreshPromiseRef = useRef<Promise<string | null> | null>(null);
+
+	function clearActiveSession() {
+		void clearStoredSession();
+		sessionRef.current = null;
+		pendingSignupSessionRef.current = null;
+		setSession(null);
+		setPendingSignupSession(null);
+	}
+
+	async function refreshAccessTokenForSession() {
+		if (refreshPromiseRef.current) {
+			return refreshPromiseRef.current;
+		}
+
+		const currentSession = sessionRef.current ?? pendingSignupSessionRef.current;
+
+		if (!currentSession?.refreshToken) {
+			return null;
+		}
+
+		const isPendingSignupRefresh = !sessionRef.current;
+		const refreshingRefreshToken = currentSession.refreshToken;
+
+		refreshPromiseRef.current = (async () => {
+			try {
+				const response = await refreshAuthSession({
+					refreshToken: currentSession.refreshToken,
+				});
+				const nextSession = normalizeSession(response, response.user);
+
+				if (isPendingSignupRefresh) {
+					if (pendingSignupSessionRef.current?.refreshToken !== refreshingRefreshToken) {
+						return null;
+					}
+
+					pendingSignupSessionRef.current = nextSession;
+					setPendingSignupSession(nextSession);
+				} else {
+					if (sessionRef.current?.refreshToken !== refreshingRefreshToken) {
+						return null;
+					}
+
+					await saveStoredSession(nextSession);
+					sessionRef.current = nextSession;
+					pendingSignupSessionRef.current = null;
+					setSession(nextSession);
+					setPendingSignupSession(null);
+				}
+
+				return nextSession.accessToken;
+			} catch {
+				await clearStoredSession();
+				sessionRef.current = null;
+				pendingSignupSessionRef.current = null;
+				setSession(null);
+				setPendingSignupSession(null);
+
+				return null;
+			} finally {
+				refreshPromiseRef.current = null;
+			}
+		})();
+
+		return refreshPromiseRef.current;
+	}
+
+	async function getValidAccessToken() {
+		const currentSession = sessionRef.current ?? pendingSignupSessionRef.current;
+
+		if (!currentSession) {
+			return null;
+		}
+
+		if (shouldRefreshSession(currentSession)) {
+			return refreshAccessTokenForSession();
+		}
+
+		return currentSession.accessToken;
+	}
 
 	useEffect(() => {
 		sessionRef.current = session;
@@ -64,17 +145,9 @@ export function AuthSessionProvider({ children }: PropsWithChildren) {
 
 	useEffect(() => {
 		configureApiClient({
-			getAccessToken: () =>
-				sessionRef.current?.accessToken ??
-				pendingSignupSessionRef.current?.accessToken ??
-				null,
-			onUnauthorized: () => {
-				void clearStoredSession();
-				sessionRef.current = null;
-				pendingSignupSessionRef.current = null;
-				setSession(null);
-				setPendingSignupSession(null);
-			},
+			getAccessToken: getValidAccessToken,
+			refreshAccessToken: refreshAccessTokenForSession,
+			onUnauthorized: clearActiveSession,
 		});
 	}, []);
 
@@ -238,6 +311,10 @@ function normalizeSession(tokens: AuthSessionTokens, user: AuthSession["user"]):
 		...tokens,
 		user,
 	};
+}
+
+function shouldRefreshSession(session: AuthSession) {
+	return session.expiresAt <= Math.floor(Date.now() / 1000) + REFRESH_BUFFER_SECONDS;
 }
 
 function buildCreateBabyRequest(input: CompleteSignupWithBabyInput): CreateBabyRequest {
