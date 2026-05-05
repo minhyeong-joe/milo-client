@@ -3,6 +3,11 @@
 # dependencies
 node_modules/
 
+# environment
+.env
+.env.*
+!.env.example
+
 # Expo
 .expo/
 dist/
