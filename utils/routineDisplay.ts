@@ -1,4 +1,4 @@
-import type { PreferredVolumeUnit, RoutineEvent, RoutineKind } from "@/data/homeData";
+import type { PreferredVolumeUnit, RoutineEvent } from "@/data/homeData";
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -109,37 +109,6 @@ export function getRoutineEventTime(event: RoutineEvent) {
 	}
 
 	return event.time;
-}
-
-export function getLastRoutineActionLabel(
-	events: RoutineEvent[],
-	kind: RoutineKind,
-	currentTime: string,
-) {
-	const latest = events
-		.filter((event) => event.kind === kind)
-		.map((event) => new Date(getRoutineEventTime(event)).getTime())
-		.sort((a, b) => b - a)[0];
-
-	if (!latest) {
-		return "No logs yet";
-	}
-
-	const diffMinutes = Math.max(0, Math.round((new Date(currentTime).getTime() - latest) / 60000));
-
-	if (diffMinutes < 60) {
-		return `Last: ${diffMinutes}m ago`;
-	}
-
-	const hours = Math.floor(diffMinutes / 60);
-	const minutes = diffMinutes % 60;
-
-	if (hours < 24) {
-		return minutes === 0 ? `Last: ${hours}h ago` : `Last: ${hours}h ${minutes}m ago`;
-	}
-
-	const days = Math.floor(hours / 24);
-	return days === 1 ? "Last: yesterday" : `Last: ${days}d ago`;
 }
 
 export function formatBowlAmount(amount: number) {

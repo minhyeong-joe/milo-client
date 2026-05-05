@@ -9,14 +9,20 @@ import type {
 	SleepEvent,
 	SleepType,
 } from "@/data/homeData";
-import { homeMockApiResponse } from "@/data/mockAPI/homeAPI";
 import {
 	getDateKeyStartMs,
 	getLocalDateKey,
 	getRoutineEventTime,
 	getSleepDurationMinutes,
 } from "@/utils/routineDisplay";
-import { createContext, PropsWithChildren, useContext, useMemo, useState } from "react";
+import {
+	createContext,
+	PropsWithChildren,
+	useCallback,
+	useContext,
+	useMemo,
+	useState,
+} from "react";
 
 export type AddMealInput = {
 	amountBowl?: number;
@@ -65,9 +71,11 @@ type RoutineDataContextValue = {
 	updateDiaper: (input: UpdateDiaperInput) => void;
 	updateMeal: (input: UpdateMealInput) => void;
 	updateSleep: (input: UpdateSleepInput) => void;
+	prependOlderDailyLogs: (logs: RoutineDay[]) => void;
 	removeDiaper: (diaperId: string) => void;
 	removeMeal: (mealId: string) => void;
 	removeSleep: (sleepId: string) => void;
+	replaceDailyLogs: (logs: RoutineDay[]) => void;
 };
 
 const RoutineDataContext = createContext<RoutineDataContextValue | undefined>(undefined);
@@ -242,8 +250,25 @@ function sortEventsDescending(a: RoutineEvent, b: RoutineEvent) {
 	return new Date(getRoutineEventTime(b)).getTime() - new Date(getRoutineEventTime(a)).getTime();
 }
 
+function mergeDailyLogs(currentLogs: RoutineDay[], incomingLogs: RoutineDay[]) {
+	const logsByDate = new Map<string, RoutineDay>();
+
+	[...currentLogs, ...incomingLogs].forEach((day) => {
+		logsByDate.set(day.date, day);
+	});
+
+	return Array.from(logsByDate.values()).sort(sortDaysDescending);
+}
+
 export function RoutineDataProvider({ children }: PropsWithChildren) {
-	const [dailyLogs, setDailyLogs] = useState<RoutineDay[]>(homeMockApiResponse.dailyLogs);
+	const [dailyLogs, setDailyLogs] = useState<RoutineDay[]>([]);
+	const replaceDailyLogs = useCallback((logs: RoutineDay[]) => {
+		setDailyLogs([...logs].sort(sortDaysDescending));
+	}, []);
+
+	const prependOlderDailyLogs = useCallback((logs: RoutineDay[]) => {
+		setDailyLogs((currentLogs) => mergeDailyLogs(currentLogs, logs));
+	}, []);
 
 	const value = useMemo<RoutineDataContextValue>(() => {
 		const getLatestMeal = () =>
@@ -604,14 +629,16 @@ export function RoutineDataProvider({ children }: PropsWithChildren) {
 			getLatestMeal,
 			getLatestSleep,
 			getOngoingSleep,
+			prependOlderDailyLogs,
 			updateDiaper,
 			updateMeal,
 			updateSleep,
 			removeDiaper,
 			removeMeal,
 			removeSleep,
+			replaceDailyLogs,
 		};
-	}, [dailyLogs]);
+	}, [dailyLogs, prependOlderDailyLogs, replaceDailyLogs]);
 
 	return <RoutineDataContext.Provider value={value}>{children}</RoutineDataContext.Provider>;
 }
