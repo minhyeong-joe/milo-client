@@ -48,6 +48,7 @@ module.exports = ({ config }) => {
 		},
 		plugins: [
 			...plugins,
+			"expo-secure-store",
 			[
 				"expo-dev-client",
 				{
