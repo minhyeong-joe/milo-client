@@ -56,7 +56,6 @@ export function AuthSessionProvider({ children }: PropsWithChildren) {
 
 	useEffect(() => {
 		sessionRef.current = session;
-		console.log("Session updated:", session);
 	}, [session]);
 
 	useEffect(() => {
@@ -71,7 +70,10 @@ export function AuthSessionProvider({ children }: PropsWithChildren) {
 				null,
 			onUnauthorized: () => {
 				void clearStoredSession();
+				sessionRef.current = null;
+				pendingSignupSessionRef.current = null;
 				setSession(null);
+				setPendingSignupSession(null);
 			},
 		});
 	}, []);
@@ -84,6 +86,7 @@ export function AuthSessionProvider({ children }: PropsWithChildren) {
 				const storedSession = await loadStoredSession();
 
 				if (isMounted) {
+					sessionRef.current = storedSession;
 					setSession(storedSession);
 				}
 			} finally {
@@ -119,6 +122,8 @@ export function AuthSessionProvider({ children }: PropsWithChildren) {
 					const nextSession = normalizeSession(response, response.user);
 
 					await saveStoredSession(nextSession);
+					sessionRef.current = nextSession;
+					pendingSignupSessionRef.current = null;
 					setSession(nextSession);
 					setPendingSignupSession(null);
 					setSignupDraft(null);
@@ -145,6 +150,7 @@ export function AuthSessionProvider({ children }: PropsWithChildren) {
 					password: input.password,
 					confirmPassword: input.confirmPassword,
 				});
+				pendingSignupSessionRef.current = null;
 				setPendingSignupSession(null);
 
 				return true;
@@ -178,12 +184,14 @@ export function AuthSessionProvider({ children }: PropsWithChildren) {
 						}
 
 						nextSession = normalizeSession(signupResponse.session, signupResponse.user);
-						setPendingSignupSession(nextSession);
 						pendingSignupSessionRef.current = nextSession;
+						setPendingSignupSession(nextSession);
 					}
 
 					await createBaby(buildCreateBabyRequest(input));
 					await saveStoredSession(nextSession);
+					sessionRef.current = nextSession;
+					pendingSignupSessionRef.current = null;
 					setSession(nextSession);
 					setPendingSignupSession(null);
 					setSignupDraft(null);
@@ -198,6 +206,8 @@ export function AuthSessionProvider({ children }: PropsWithChildren) {
 			},
 			signOut: async () => {
 				await clearStoredSession();
+				sessionRef.current = null;
+				pendingSignupSessionRef.current = null;
 				setSession(null);
 				setPendingSignupSession(null);
 				setSignupDraft(null);

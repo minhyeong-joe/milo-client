@@ -1,4 +1,4 @@
-import { apiPost } from "@/services/api/httpClient";
+import { apiGet, apiPost } from "@/services/api/httpClient";
 
 export type BabySex = "GIRL" | "BOY";
 
@@ -24,6 +24,10 @@ export type BabyAccess = {
 
 export type BabyRole = "FATHER" | "MOTHER" | "CAREGIVER";
 
+export type BabyListItem = Baby & {
+	role: BabyRole;
+};
+
 export type CreateBabyRequest = {
 	name: string;
 	birthdate: string;
@@ -37,6 +41,16 @@ export type CreateBabyResponse = {
 	baby: Baby;
 	access: BabyAccess;
 };
+
+export type GetBabiesResponse = {
+	babies: BabyListItem[];
+};
+
+export function getBabies() {
+	return apiGet<GetBabiesResponse>("/babies", {
+		auth: true,
+	});
+}
 
 export function createBaby(input: CreateBabyRequest) {
 	return apiPost<CreateBabyResponse, CreateBabyRequest>("/babies", input, {
