@@ -1,6 +1,10 @@
 import { useAuthSession } from "@/context/AuthSessionContext";
 import { getBabies, type BabyListItem } from "@/services/api/babies";
 import {
+	loadCachedBabySelection,
+	saveCachedBabySelection,
+} from "@/services/babies/babyCacheStore";
+import {
 	loadStoredSelectedBabyId,
 	saveStoredSelectedBabyId,
 } from "@/services/babies/selectedBabyStorage";
@@ -13,6 +17,10 @@ import {
 	useMemo,
 	useState,
 } from "react";
+
+function reportBackgroundError(error: unknown) {
+	console.warn(error);
+}
 
 type BabySelectionContextValue = {
 	babies: BabyListItem[];
@@ -45,6 +53,19 @@ export function BabySelectionProvider({ children }: PropsWithChildren) {
 		setError(null);
 
 		try {
+			const cachedSelection = await loadCachedBabySelection(session.user.id);
+
+			if (cachedSelection) {
+				const cachedSelectedBabyId =
+					getAccessibleBabyId(cachedSelection.babies, selectedBabyId) ??
+					getAccessibleBabyId(cachedSelection.babies, cachedSelection.selectedBabyId) ??
+					cachedSelection.babies[0]?.id ??
+					null;
+
+				setBabies(cachedSelection.babies);
+				setSelectedBabyId(cachedSelectedBabyId);
+			}
+
 			const response = await getBabies();
 			const storedBabyId = await loadStoredSelectedBabyId(session.user.id);
 			const nextSelectedBabyId =
@@ -55,6 +76,7 @@ export function BabySelectionProvider({ children }: PropsWithChildren) {
 
 			setBabies(response.babies);
 			setSelectedBabyId(nextSelectedBabyId);
+			await saveCachedBabySelection(session.user.id, response.babies, nextSelectedBabyId);
 
 			if (nextSelectedBabyId) {
 				await saveStoredSelectedBabyId(session.user.id, nextSelectedBabyId);
@@ -90,6 +112,7 @@ export function BabySelectionProvider({ children }: PropsWithChildren) {
 
 				if (session) {
 					void saveStoredSelectedBabyId(session.user.id, babyId);
+					void saveCachedBabySelection(session.user.id, babies, babyId).catch(reportBackgroundError);
 				}
 			},
 			selectedBaby,

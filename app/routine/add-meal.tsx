@@ -139,7 +139,7 @@ export default function AddMealScreen() {
 	return (
 		<SafeAreaView style={globalStyles.screen}>
 			<KeyboardAvoidingView
-				behavior={Platform.OS === "ios" ? "padding" : undefined}
+				behavior={Platform.OS === "ios" ? "padding" : "height"}
 				style={styles.keyboardView}
 			>
 				<View style={styles.header}>

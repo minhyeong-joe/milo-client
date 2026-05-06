@@ -71,7 +71,7 @@ export default function SignInScreen() {
 	return (
 		<SafeAreaView style={globalStyles.screen}>
 			<KeyboardAvoidingView
-				behavior={Platform.OS === "ios" ? "padding" : undefined}
+				behavior={Platform.OS === "ios" ? "padding" : "height"}
 				style={styles.keyboardView}
 			>
 				<ScrollView

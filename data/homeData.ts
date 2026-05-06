@@ -21,6 +21,7 @@ export type MealEvent = {
   amountBowl?: number;          // For solid feedings, representing number of bowls or servings (1/4, 1/2, 3/4, 1)
   id: string;
   kind: "meal";
+  syncStatus?: "pending" | "failed";
   notes?: string;
   time: string;
   type: MealType;
@@ -30,6 +31,7 @@ export type SleepEvent = {
   endTime?: string;
   id: string;
   kind: "sleep";
+  syncStatus?: "pending" | "failed";
   notes?: string;
   startTime: string;
   type: SleepType;
@@ -39,6 +41,7 @@ export type DiaperEvent = {
   color?: DiaperColor;
   id: string;
   kind: "diaper";
+  syncStatus?: "pending" | "failed";
   notes?: string;
   time: string;
   type: DiaperType;

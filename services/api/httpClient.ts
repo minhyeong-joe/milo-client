@@ -1,4 +1,5 @@
 const API_PREFIX = "/api";
+const DEFAULT_TIMEOUT_MS = 15000;
 
 export type HttpMethod = "GET" | "POST" | "PATCH" | "DELETE";
 
@@ -30,6 +31,7 @@ export type ApiRequestOptions<TBody = unknown> = {
 	auth?: boolean;
 	retryOnUnauthorized?: boolean;
 	signal?: AbortSignal;
+	timeoutMs?: number;
 };
 
 type ApiErrorInput = {
@@ -165,12 +167,23 @@ async function fetchApi<TBody>(
 		headers.Authorization = `Bearer ${accessToken}`;
 	}
 
-	return fetch(buildApiUrl(path, options.query), {
-		body: options.body === undefined ? undefined : JSON.stringify(options.body),
-		headers,
-		method: options.method ?? "GET",
-		signal: options.signal,
-	});
+	const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+	const timeoutController = new AbortController();
+	const timeoutId = setTimeout(() => timeoutController.abort(), timeoutMs);
+	const signal = mergeAbortSignals(options.signal, timeoutController.signal);
+
+	try {
+		return await fetch(buildApiUrl(path, options.query), {
+			body: options.body === undefined ? undefined : JSON.stringify(options.body),
+			headers,
+			method: options.method ?? "GET",
+			signal,
+		});
+	} catch (error) {
+		throw createNetworkError(error, timeoutController.signal.aborted);
+	} finally {
+		clearTimeout(timeoutId);
+	}
 }
 
 async function parseApiResponse<TResponse>(response: Response): Promise<TResponse> {
@@ -210,6 +223,24 @@ function createApiError(response: Response, body: unknown) {
 		details: apiError?.details,
 		body,
 		message: apiError?.message ?? `Milo API request failed with status ${response.status}.`,
+	});
+}
+
+function createNetworkError(error: unknown, didTimeout: boolean) {
+	if (didTimeout) {
+		return new ApiError({
+			status: 0,
+			code: "REQUEST_TIMEOUT",
+			body: error,
+			message: "Milo API request timed out. Please try again.",
+		});
+	}
+
+	return new ApiError({
+		status: 0,
+		code: "NETWORK_ERROR",
+		body: error,
+		message: "Could not reach Milo API. Please check your connection and try again.",
 	});
 }
 
@@ -265,4 +296,26 @@ function buildQueryString(query?: QueryParams) {
 	});
 
 	return parts.join("&");
+}
+
+function mergeAbortSignals(...signals: Array<AbortSignal | undefined>) {
+	const activeSignals = signals.filter(Boolean) as AbortSignal[];
+
+	if (activeSignals.length === 1) {
+		return activeSignals[0];
+	}
+
+	const controller = new AbortController();
+	const abort = () => controller.abort();
+
+	activeSignals.forEach((signal) => {
+		if (signal.aborted) {
+			abort();
+			return;
+		}
+
+		signal.addEventListener("abort", abort, { once: true });
+	});
+
+	return controller.signal;
 }

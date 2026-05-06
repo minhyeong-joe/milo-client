@@ -1,11 +1,16 @@
 import { BabyHeader } from "@/components/routine/BabyHeader";
 import { QuickActionGrid } from "@/components/routine/QuickActionGrid";
 import { RoutineDayCard } from "@/components/routine/RoutineDayCard";
+import { useAuthSession } from "@/context/AuthSessionContext";
 import { useBabySelection } from "@/context/BabySelectionContext";
 import { useRoutineData } from "@/context/RoutineDataContext";
 import type { RoutineKind } from "@/data/homeData";
 import { routineConfig } from "@/data/homeData";
 import { getRoutineDays, type RoutineLastLogged } from "@/services/api/routine";
+import {
+	loadCachedRoutineHome,
+	saveRoutineHomeCache,
+} from "@/services/routine/routineOfflineStore";
 import { colors, globalStyles, spacing } from "@/styles/globalStyles";
 import { formatBabyAge } from "@/utils/routineDisplay";
 import { useCurrentMinute } from "@/utils/useCurrentMinute";
@@ -23,9 +28,11 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const ROUTINE_PAGE_DAYS = 7;
+const OFFLINE_ROUTINE_MESSAGE = "Offline mode. Sync will be re-enabled once online.";
 
 export default function HomeScreen() {
 	const router = useRouter();
+	const { session } = useAuthSession();
 	const {
 		babies,
 		error: babyError,
@@ -41,6 +48,8 @@ export default function HomeScreen() {
 		prependOlderDailyLogs,
 		replaceDailyLogs,
 		setLastLogged,
+		syncError,
+		syncPendingMutations,
 	} = useRoutineData();
 	const currentDate = useCurrentMinute();
 	const currentTime = currentDate.toISOString();
@@ -51,6 +60,7 @@ export default function HomeScreen() {
 	const [isRefreshing, setIsRefreshing] = useState(false);
 	const routineRequestIdRef = useRef(0);
 	const isOlderRoutineLoadingRef = useRef(false);
+	const syncBannerMessage = routineError ?? syncError;
 	const quickActions = (["meal", "diaper", "sleep"] as const).map((id) => ({
 		id,
 		lastActionLabel: getLastLoggedActionLabel(lastLogged, id, currentTime),
@@ -74,9 +84,30 @@ export default function HomeScreen() {
 		isOlderRoutineLoadingRef.current = false;
 		setRoutineError(null);
 		setNextRoutineStartDate(null);
-		setLastLogged(null);
+
+		let didLoadCachedData = false;
 
 		try {
+			if (session) {
+				const cached = await loadCachedRoutineHome(session.user.id, selectedBaby.id);
+
+				if (routineRequestIdRef.current === requestId) {
+					didLoadCachedData = cached.dailyLogs.length > 0 || cached.lastLogged !== null;
+					setLastLogged(cached.lastLogged);
+
+					if (cached.dailyLogs.length > 0) {
+						replaceDailyLogs(cached.dailyLogs);
+						setNextRoutineStartDate(cached.nextStartDate);
+					}
+				}
+			} else {
+				setLastLogged(null);
+			}
+
+			if (routineRequestIdRef.current === requestId && !didLoadCachedData) {
+				setLastLogged(null);
+			}
+
 			const response = await getRoutineDays({
 				babyId: selectedBaby.id,
 				count: ROUTINE_PAGE_DAYS,
@@ -91,18 +122,30 @@ export default function HomeScreen() {
 			replaceDailyLogs(response.dailyLogs);
 			setNextRoutineStartDate(response.nextStartDate);
 			setLastLogged(response.lastLogged ?? null);
+
+			if (session) {
+				await saveRoutineHomeCache({
+					babyId: selectedBaby.id,
+					dailyLogs: response.dailyLogs,
+					lastLogged: response.lastLogged ?? null,
+					nextStartDate: response.nextStartDate,
+					userId: session.user.id,
+				});
+			}
+
+			await syncPendingMutations();
 		} catch (caughtError) {
 			if (routineRequestIdRef.current !== requestId) {
 				return;
 			}
 
-			setRoutineError(getErrorMessage(caughtError));
+			setRoutineError(didLoadCachedData ? OFFLINE_ROUTINE_MESSAGE : getErrorMessage(caughtError));
 		} finally {
 			if (routineRequestIdRef.current === requestId) {
 				setIsInitialRoutineLoading(false);
 			}
 		}
-	}, [replaceDailyLogs, selectedBaby, setLastLogged]);
+	}, [replaceDailyLogs, selectedBaby, session, setLastLogged, syncPendingMutations]);
 
 	useEffect(() => {
 		void loadLatestRoutineLogs();
@@ -150,12 +193,24 @@ export default function HomeScreen() {
 
 			prependOlderDailyLogs(response.dailyLogs);
 			setNextRoutineStartDate(response.nextStartDate);
+
+			if (session) {
+				await saveRoutineHomeCache({
+					babyId: selectedBaby.id,
+					dailyLogs: response.dailyLogs,
+					lastLogged,
+					nextStartDate: response.nextStartDate,
+					userId: session.user.id,
+				});
+			}
+
+			await syncPendingMutations();
 		} catch (caughtError) {
 			if (routineRequestIdRef.current !== requestId) {
 				return;
 			}
 
-			setRoutineError(getErrorMessage(caughtError));
+			setRoutineError(dailyLogs.length > 0 ? OFFLINE_ROUTINE_MESSAGE : getErrorMessage(caughtError));
 		} finally {
 			if (routineRequestIdRef.current === requestId) {
 				isOlderRoutineLoadingRef.current = false;
@@ -163,10 +218,14 @@ export default function HomeScreen() {
 			}
 		}
 	}, [
+		dailyLogs.length,
 		isInitialRoutineLoading,
+		lastLogged,
 		nextRoutineStartDate,
 		prependOlderDailyLogs,
 		selectedBaby,
+		session,
+		syncPendingMutations,
 	]);
 
 	const handleQuickActionPress = (kind: RoutineKind) => {
@@ -251,7 +310,25 @@ export default function HomeScreen() {
 					scrollEventThrottle={250}
 					showsVerticalScrollIndicator={false}
 				>
-					{selectedBaby && isInitialRoutineLoading && (
+					{selectedBaby && isInitialRoutineLoading && dailyLogs.length > 0 && (
+						<View style={styles.syncBanner}>
+							<ActivityIndicator color={colors.light.primary} size="small" />
+							<Text style={styles.syncBannerText}>Sync in progress...</Text>
+						</View>
+					)}
+					{selectedBaby && syncBannerMessage && dailyLogs.length > 0 && (
+						<View style={styles.syncBanner}>
+							<Text style={styles.syncBannerText}>{syncBannerMessage}</Text>
+							<Pressable
+								accessibilityRole="button"
+								onPress={() => void loadLatestRoutineLogs()}
+								style={styles.syncRetryButton}
+							>
+								<Text style={styles.syncRetryText}>Try again</Text>
+							</Pressable>
+						</View>
+					)}
+					{selectedBaby && isInitialRoutineLoading && dailyLogs.length === 0 && (
 						<View style={[globalStyles.card, styles.routineStateCard]}>
 							<Text style={styles.routineStateTitle}>Loading routine history...</Text>
 							<ActivityIndicator
@@ -262,7 +339,7 @@ export default function HomeScreen() {
 							<Text style={styles.routineStateText}>Getting the latest routine days.</Text>
 						</View>
 					)}
-					{selectedBaby && routineError && (
+					{selectedBaby && routineError && dailyLogs.length === 0 && (
 						<View style={[globalStyles.card, styles.routineStateCard]}>
 							<Text style={styles.routineStateTitle}>Could not load routine history</Text>
 							<Text style={styles.routineStateText}>{routineError}</Text>
@@ -361,6 +438,35 @@ const styles = StyleSheet.create({
 	},
 	scrollContent: {
 		paddingBottom: 8,
+	},
+	syncBanner: {
+		alignItems: "center",
+		backgroundColor: colors.light.surface,
+		borderColor: colors.light.border,
+		borderRadius: 12,
+		borderWidth: 1,
+		flexDirection: "row",
+		gap: spacing.sm,
+		marginBottom: spacing.md,
+		paddingHorizontal: spacing.md,
+		paddingVertical: spacing.sm,
+	},
+	syncBannerText: {
+		color: colors.light.textSecondary,
+		flex: 1,
+		fontSize: 13,
+		fontWeight: "700",
+	},
+	syncRetryButton: {
+		backgroundColor: colors.light.primary,
+		borderRadius: 8,
+		paddingHorizontal: spacing.sm,
+		paddingVertical: spacing.xs,
+	},
+	syncRetryText: {
+		color: colors.light.surface,
+		fontSize: 12,
+		fontWeight: "800",
 	},
 });
 

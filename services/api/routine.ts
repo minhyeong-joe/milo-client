@@ -37,6 +37,7 @@ export type CreateMealLogInput = {
 	amountBowl?: number;
 	amountGrams?: number;
 	amountMl?: number;
+	clientMutationId?: string;
 	durationMinutes?: number;
 	kind: "meal";
 	notes?: string;
@@ -45,6 +46,7 @@ export type CreateMealLogInput = {
 };
 
 export type CreateDiaperLogInput = {
+	clientMutationId?: string;
 	color?: DiaperColor;
 	kind: "diaper";
 	notes?: string;
@@ -53,6 +55,7 @@ export type CreateDiaperLogInput = {
 };
 
 export type CreateSleepLogInput = {
+	clientMutationId?: string;
 	endTime?: string;
 	kind: "sleep";
 	notes?: string;

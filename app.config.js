@@ -45,6 +45,7 @@ module.exports = ({ config }) => {
 		android: {
 			...config.android,
 			package: appVariant.identifier,
+			softwareKeyboardLayoutMode: "resize",
 		},
 		plugins: [
 			...plugins,
@@ -55,6 +56,7 @@ module.exports = ({ config }) => {
 					addGeneratedScheme: VARIANT === "development",
 				},
 			],
+			"expo-sqlite",
 		],
 	};
 };
