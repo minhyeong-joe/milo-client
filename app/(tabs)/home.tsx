@@ -1,10 +1,11 @@
 import { BabyHeader } from "@/components/routine/BabyHeader";
 import { QuickActionGrid } from "@/components/routine/QuickActionGrid";
 import { RoutineDayCard } from "@/components/routine/RoutineDayCard";
+import { useAppPreferences } from "@/context/AppPreferencesContext";
 import { useAuthSession } from "@/context/AuthSessionContext";
 import { useBabySelection } from "@/context/BabySelectionContext";
 import { useRoutineData } from "@/context/RoutineDataContext";
-import type { RoutineKind } from "@/data/homeData";
+import type { RoutineConfig, RoutineKind } from "@/data/homeData";
 import { routineConfig } from "@/data/homeData";
 import { getRoutineDays, type RoutineLastLogged } from "@/services/api/routine";
 import {
@@ -15,7 +16,7 @@ import { colors, globalStyles, spacing } from "@/styles/globalStyles";
 import { formatBabyAge } from "@/utils/routineDisplay";
 import { useCurrentMinute } from "@/utils/useCurrentMinute";
 import { useRouter } from "expo-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
 	ActivityIndicator,
 	Pressable,
@@ -33,6 +34,7 @@ const OFFLINE_ROUTINE_MESSAGE = "Offline mode. Sync will be re-enabled once onli
 export default function HomeScreen() {
 	const router = useRouter();
 	const { session } = useAuthSession();
+	const { preferredVolumeUnit } = useAppPreferences();
 	const {
 		babies,
 		error: babyError,
@@ -61,6 +63,13 @@ export default function HomeScreen() {
 	const routineRequestIdRef = useRef(0);
 	const isOlderRoutineLoadingRef = useRef(false);
 	const syncBannerMessage = routineError ?? syncError;
+	const routineDisplayConfig = useMemo<RoutineConfig>(
+		() => ({
+			...routineConfig,
+			preferredVolumeUnit,
+		}),
+		[preferredVolumeUnit],
+	);
 	const quickActions = (["meal", "diaper", "sleep"] as const).map((id) => ({
 		id,
 		lastActionLabel: getLastLoggedActionLabel(lastLogged, id, currentTime),
@@ -258,7 +267,7 @@ export default function HomeScreen() {
 						/>
 						<QuickActionGrid
 							actions={quickActions}
-							config={routineConfig}
+							config={routineDisplayConfig}
 							onActionPress={handleQuickActionPress}
 						/>
 					</>
@@ -367,7 +376,7 @@ export default function HomeScreen() {
 						dailyLogs.length > 0 &&
 						dailyLogs.map((log, index) => (
 							<RoutineDayCard
-								config={routineConfig}
+								config={routineDisplayConfig}
 								currentTime={currentTime}
 								day={log}
 								defaultView={index === 0 ? "timeline" : "summary"}

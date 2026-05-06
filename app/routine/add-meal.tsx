@@ -1,13 +1,14 @@
 import { ConfirmDeleteModal } from "@/components/routine/ConfirmDeleteModal";
+import { useAppPreferences } from "@/context/AppPreferencesContext";
 import type { MealEvent, MealType } from "@/data/homeData";
 import { routineConfig } from "@/data/homeData";
 import { useRoutineData } from "@/context/RoutineDataContext";
 import { colors, globalStyles, spacing } from "@/styles/globalStyles";
-import { formatClockTime } from "@/utils/routineDisplay";
+import { formatClockTime, formatOzInput, mlToOz, ozToMl } from "@/utils/routineDisplay";
 import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
 	KeyboardAvoidingView,
 	Platform,
@@ -22,8 +23,12 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { RoutineIcon } from "@/components/routine/RoutineIcon";
 
 const BOTTLE_STEP_ML = 10;
+const BOTTLE_STEP_OZ = 0.5;
+const SOLID_GRAMS_STEP = 5;
 const DURATION_STEP_MINUTES = 5;
 const NOTES_LIMIT = 100;
+const DEFAULT_BOTTLE_ML = 60;
+const DEFAULT_SOLID_GRAMS = 30;
 
 const mealTypes: MealType[] = ["breastfeed", "breastMilk", "formula", "solid"];
 const bowlOptions = [
@@ -49,6 +54,11 @@ export default function AddMealScreen() {
 	const router = useRouter();
 	const { mealId } = useLocalSearchParams<{ mealId?: string }>();
 	const { addMeal, dailyLogs, getLatestMeal, updateMeal, removeMeal } = useRoutineData();
+	const {
+		preferredSolidFoodUnit,
+		preferredVolumeUnit,
+		setPreferredSolidFoodUnit,
+	} = useAppPreferences();
 	const mealToEdit = dailyLogs
 	.flatMap((day) => day.timeline)
 	.find(
@@ -59,19 +69,78 @@ export default function AddMealScreen() {
 	const [mealTime, setMealTime] = useState(() => new Date(mealToEdit?.time ?? Date.now()));
 	const [activePicker, setActivePicker] = useState<"date" | "time" | null>(null);
 	const [mealType, setMealType] = useState<MealType>(mealToEdit?.type?? latestMeal?.type ?? "formula");
-	const [amountMl, setAmountMl] = useState(mealToEdit?.amountMl ?? latestMeal?.amountMl ?? 60);
-	const [durationMinutes, setDurationMinutes] = useState(mealToEdit?.durationMinutes ?? latestMeal?.durationMinutes ?? 15);
+	const initialBottleAmountMlRef = useRef(
+		mealToEdit?.amountMl ?? latestMeal?.amountMl ?? DEFAULT_BOTTLE_ML,
+	);
+	const previousVolumeUnitRef = useRef(preferredVolumeUnit);
+	const [bottleAmountText, setBottleAmountText] = useState(() =>
+		formatBottleAmountInput(initialBottleAmountMlRef.current, preferredVolumeUnit),
+	);
+	const [durationMinutesText, setDurationMinutesText] = useState(() =>
+		String(mealToEdit?.durationMinutes ?? latestMeal?.durationMinutes ?? 15),
+	);
 	const [amountBowl, setAmountBowl] = useState(mealToEdit?.amountBowl ?? latestMeal?.amountBowl ?? 0.5);
+	const [solidInputMode, setSolidInputMode] = useState<"bowl" | "grams">(() =>
+		mealToEdit?.amountGrams ? "grams" : mealToEdit?.amountBowl ? "bowl" : preferredSolidFoodUnit,
+	);
+	const [amountGramsText, setAmountGramsText] = useState(() =>
+		String(mealToEdit?.amountGrams ?? latestMeal?.amountGrams ?? DEFAULT_SOLID_GRAMS),
+	);
 	const [notes, setNotes] = useState(mealToEdit?.notes ?? "");
 	const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
 	const [isSaving, setIsSaving] = useState(false);
 	const [formError, setFormError] = useState<string | null>(null);
 
-	const decrementBottle = () => setAmountMl((value) => Math.max(BOTTLE_STEP_ML, value - BOTTLE_STEP_ML));
-	const incrementBottle = () => setAmountMl((value) => value + BOTTLE_STEP_ML);
+	useEffect(() => {
+		const previousUnit = previousVolumeUnitRef.current;
+
+		if (previousUnit === preferredVolumeUnit) {
+			return;
+		}
+
+		setBottleAmountText((value) => {
+			const amountMl = normalizeBottleAmountToMl(value, previousUnit);
+			return formatBottleAmountInput(amountMl, preferredVolumeUnit);
+		});
+		previousVolumeUnitRef.current = preferredVolumeUnit;
+	}, [preferredVolumeUnit]);
+
+	const decrementBottle = () =>
+		setBottleAmountText((value) =>
+			preferredVolumeUnit === "oz"
+				? formatOzInput(Math.max(BOTTLE_STEP_OZ, normalizeOzInput(value, BOTTLE_STEP_OZ) - BOTTLE_STEP_OZ))
+				: String(Math.max(BOTTLE_STEP_ML, normalizePositiveInteger(value, BOTTLE_STEP_ML) - BOTTLE_STEP_ML)),
+		);
+	const incrementBottle = () =>
+		setBottleAmountText((value) =>
+			preferredVolumeUnit === "oz"
+				? formatOzInput(normalizeOzInput(value, BOTTLE_STEP_OZ) + BOTTLE_STEP_OZ)
+				: String(normalizePositiveInteger(value, BOTTLE_STEP_ML) + BOTTLE_STEP_ML),
+		);
 	const decrementDuration = () =>
-		setDurationMinutes((value) => Math.max(DURATION_STEP_MINUTES, value - DURATION_STEP_MINUTES));
-	const incrementDuration = () => setDurationMinutes((value) => value + DURATION_STEP_MINUTES);
+		setDurationMinutesText((value) =>
+			String(Math.max(
+				DURATION_STEP_MINUTES,
+				normalizePositiveInteger(value, DURATION_STEP_MINUTES) - DURATION_STEP_MINUTES,
+			)),
+		);
+	const incrementDuration = () =>
+		setDurationMinutesText((value) =>
+			String(normalizePositiveInteger(value, DURATION_STEP_MINUTES) + DURATION_STEP_MINUTES),
+		);
+	const decrementSolidGrams = () =>
+		setAmountGramsText((value) =>
+			String(Math.max(SOLID_GRAMS_STEP, normalizePositiveInteger(value, SOLID_GRAMS_STEP) - SOLID_GRAMS_STEP)),
+		);
+	const incrementSolidGrams = () =>
+		setAmountGramsText((value) =>
+			String(normalizePositiveInteger(value, SOLID_GRAMS_STEP) + SOLID_GRAMS_STEP),
+		);
+
+	const selectSolidInputMode = (mode: "bowl" | "grams") => {
+		setSolidInputMode(mode);
+		void setPreferredSolidFoodUnit(mode);
+	};
 
 	const handlePickerChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
 		if (Platform.OS === "android") {
@@ -88,8 +157,19 @@ export default function AddMealScreen() {
 	const saveMeal = async () => {
 		setIsSaving(true);
 		setFormError(null);
+		const amountMl = normalizeBottleAmountToMl(
+			bottleAmountText,
+			preferredVolumeUnit,
+		);
+		const durationMinutes = normalizePositiveInteger(
+			durationMinutesText,
+			DURATION_STEP_MINUTES,
+		);
 		const input = {
-			amountBowl: mealType === "solid" ? amountBowl : undefined,
+			amountBowl: mealType === "solid" && solidInputMode === "bowl" ? amountBowl : undefined,
+			amountGrams: mealType === "solid" && solidInputMode === "grams"
+				? normalizePositiveInteger(amountGramsText, SOLID_GRAMS_STEP)
+				: undefined,
 			amountMl: isBottleMeal(mealType) ? amountMl : undefined,
 			durationMinutes: mealType === "breastfeed" ? durationMinutes : undefined,
 			notes,
@@ -228,7 +308,17 @@ export default function AddMealScreen() {
 							<Text style={styles.sectionLabel}>Duration</Text>
 							<View style={styles.stepperRow}>
 								<StepperButton icon="remove" onPress={decrementDuration} />
-								<Text style={styles.stepperValue}>{durationMinutes} min</Text>
+								<StepperNumberInput
+									onBlur={() =>
+										setDurationMinutesText((value) =>
+											String(normalizePositiveInteger(value, DURATION_STEP_MINUTES)),
+										)
+									}
+									keyboardType="number-pad"
+									onChangeText={setDurationMinutesText}
+									suffix="min"
+									value={durationMinutesText}
+								/>
 								<StepperButton icon="add" onPress={incrementDuration} />
 							</View>
 						</View>
@@ -239,7 +329,20 @@ export default function AddMealScreen() {
 							<Text style={styles.sectionLabel}>Amount</Text>
 							<View style={styles.stepperRow}>
 								<StepperButton icon="remove" onPress={decrementBottle} />
-								<Text style={styles.stepperValue}>{amountMl} ml</Text>
+								<StepperNumberInput
+									onBlur={() =>
+										setBottleAmountText((value) =>
+											formatBottleAmountInput(
+												normalizeBottleAmountToMl(value, preferredVolumeUnit),
+												preferredVolumeUnit,
+											),
+										)
+									}
+									keyboardType={preferredVolumeUnit === "oz" ? "decimal-pad" : "number-pad"}
+									onChangeText={setBottleAmountText}
+									suffix={preferredVolumeUnit === "oz" ? "oz" : "mL"}
+									value={bottleAmountText}
+								/>
 								<StepperButton icon="add" onPress={incrementBottle} />
 							</View>
 						</View>
@@ -247,25 +350,59 @@ export default function AddMealScreen() {
 
 					{mealType === "solid" ? (
 						<View style={styles.section}>
-							<Text style={styles.sectionLabel}>Bowl</Text>
-							<View style={styles.bowlGrid}>
-								{bowlOptions.map((option) => {
-									const isSelected = amountBowl === option.value;
-
-									return (
-										<Pressable
-											accessibilityRole="button"
-											key={option.value}
-											onPress={() => setAmountBowl(option.value)}
-											style={[styles.bowlButton, isSelected && styles.bowlButtonSelected]}
-										>
-											<Text style={[styles.bowlText, isSelected && styles.bowlTextSelected]}>
-												{option.label}
-											</Text>
-										</Pressable>
-									);
-								})}
+							<View style={styles.amountHeaderRow}>
+								<Text style={styles.sectionLabel}>
+									{solidInputMode === "grams" ? "Grams" : "Bowl"}
+								</Text>
+								<View style={styles.solidModeControl}>
+									<SolidModeButton
+										isSelected={solidInputMode === "bowl"}
+										label="Bowl"
+										onPress={() => selectSolidInputMode("bowl")}
+									/>
+									<SolidModeButton
+										isSelected={solidInputMode === "grams"}
+										label="Grams"
+										onPress={() => selectSolidInputMode("grams")}
+									/>
+								</View>
 							</View>
+							{solidInputMode === "bowl" ? (
+								<View style={styles.bowlGrid}>
+									{bowlOptions.map((option) => {
+										const isSelected = amountBowl === option.value;
+
+										return (
+											<Pressable
+												accessibilityRole="button"
+												key={option.value}
+												onPress={() => setAmountBowl(option.value)}
+												style={[styles.bowlButton, isSelected && styles.bowlButtonSelected]}
+											>
+												<Text style={[styles.bowlText, isSelected && styles.bowlTextSelected]}>
+													{option.label}
+												</Text>
+											</Pressable>
+										);
+									})}
+								</View>
+							) : (
+								<View style={styles.stepperRow}>
+									<StepperButton icon="remove" onPress={decrementSolidGrams} />
+									<StepperNumberInput
+										onBlur={() =>
+											setAmountGramsText((value) =>
+												String(normalizePositiveInteger(value, SOLID_GRAMS_STEP)),
+											)
+										}
+										keyboardType="number-pad"
+										onChangeText={setAmountGramsText}
+										suffix="g"
+										value={amountGramsText}
+									/>
+									<StepperButton icon="add" onPress={incrementSolidGrams} />
+								</View>
+							)}
 						</View>
 					) : null}
 
@@ -327,7 +464,72 @@ function StepperButton({
 	);
 }
 
+function SolidModeButton({
+	isSelected,
+	label,
+	onPress,
+}: {
+	isSelected: boolean;
+	label: string;
+	onPress: () => void;
+}) {
+	return (
+		<Pressable
+			accessibilityRole="button"
+			accessibilityState={{ selected: isSelected }}
+			onPress={onPress}
+			style={[styles.solidModeButton, isSelected && styles.solidModeButtonSelected]}
+		>
+			<Text style={[styles.solidModeText, isSelected && styles.solidModeTextSelected]}>
+				{label}
+			</Text>
+		</Pressable>
+	);
+}
+
+function StepperNumberInput({
+	keyboardType,
+	onBlur,
+	onChangeText,
+	suffix,
+	value,
+}: {
+	keyboardType: "decimal-pad" | "number-pad";
+	onBlur: () => void;
+	onChangeText: (value: string) => void;
+	suffix: string;
+	value: string;
+}) {
+	return (
+		<View style={styles.stepperInputGroup}>
+			<TextInput
+				keyboardType={keyboardType}
+				onBlur={onBlur}
+				onChangeText={(text) =>
+					onChangeText(
+						keyboardType === "decimal-pad"
+							? sanitizeDecimalInput(text)
+							: text.replace(/\D/g, ""),
+					)
+				}
+				placeholder="0"
+				placeholderTextColor={colors.light.textSecondary}
+				selectTextOnFocus
+				style={styles.stepperInput}
+				value={value}
+			/>
+			<Text style={styles.stepperSuffix}>{suffix}</Text>
+		</View>
+	);
+}
+
 const styles = StyleSheet.create({
+	amountHeaderRow: {
+		alignItems: "center",
+		flexDirection: "row",
+		gap: spacing.md,
+		justifyContent: "space-between",
+	},
 	bowlButton: {
 		alignItems: "center",
 		borderColor: colors.light.border,
@@ -483,6 +685,33 @@ const styles = StyleSheet.create({
 	segmentTextSelected: {
 		color: routineConfig.quickActions.meal.accentColor,
 	},
+	solidModeButton: {
+		alignItems: "center",
+		borderRadius: 9,
+		flex: 1,
+		paddingHorizontal: spacing.sm,
+		paddingVertical: 7,
+	},
+	solidModeButtonSelected: {
+		backgroundColor: routineConfig.quickActions.meal.accentColor,
+	},
+	solidModeControl: {
+		backgroundColor: colors.light.background,
+		borderColor: colors.light.border,
+		borderRadius: 12,
+		borderWidth: 1,
+		flexDirection: "row",
+		minWidth: 144,
+		padding: 3,
+	},
+	solidModeText: {
+		color: colors.light.textSecondary,
+		fontSize: 13,
+		fontWeight: "800",
+	},
+	solidModeTextSelected: {
+		color: colors.light.surface,
+	},
 	stepperButton: {
 		alignItems: "center",
 		backgroundColor: colors.light.surface,
@@ -503,12 +732,79 @@ const styles = StyleSheet.create({
 		justifyContent: "space-between",
 		padding: spacing.sm,
 	},
-	stepperValue: {
+	stepperInputGroup: {
+		alignItems: "baseline",
+		flexDirection: "row",
+		gap: spacing.xs,
+		justifyContent: "center",
+		minWidth: 112,
+	},
+	stepperInput: {
+		color: colors.light.textPrimary,
+		fontSize: 20,
+		fontWeight: "800",
+		minWidth: 48,
+		padding: 0,
+		textAlign: "center",
+	},
+	stepperSuffix: {
 		color: colors.light.textPrimary,
 		fontSize: 20,
 		fontWeight: "800",
 	},
 });
+
+function normalizePositiveInteger(value: string, fallback: number) {
+	const parsed = Number.parseInt(value, 10);
+
+	if (!Number.isFinite(parsed) || parsed <= 0) {
+		return fallback;
+	}
+
+	return parsed;
+}
+
+function normalizeBottleAmountToMl(
+	value: string,
+	unit: "ml" | "oz",
+) {
+	if (unit === "oz") {
+		return ozToMl(normalizeOzInput(value, BOTTLE_STEP_OZ));
+	}
+
+	return normalizePositiveInteger(value, BOTTLE_STEP_ML);
+}
+
+function formatBottleAmountInput(amountMl: number, unit: "ml" | "oz") {
+	if (unit === "oz") {
+		return formatOzInput(mlToOz(amountMl));
+	}
+
+	return String(Math.round(amountMl));
+}
+
+function normalizeOzInput(value: string, fallback: number) {
+	const parsed = Number.parseFloat(value);
+
+	if (!Number.isFinite(parsed) || parsed <= 0) {
+		return fallback;
+	}
+
+	return Math.round(parsed * 10) / 10;
+}
+
+function sanitizeDecimalInput(value: string) {
+	const normalized = value.replace(/,/g, ".");
+	const [whole = "", ...rest] = normalized.split(".");
+	const wholeDigits = whole.replace(/\D/g, "");
+	const decimalDigits = rest.join("").replace(/\D/g, "").slice(0, 1);
+
+	if (normalized.includes(".")) {
+		return `${wholeDigits}.${decimalDigits}`;
+	}
+
+	return wholeDigits;
+}
 
 function getErrorMessage(error: unknown) {
 	if (error instanceof Error) {

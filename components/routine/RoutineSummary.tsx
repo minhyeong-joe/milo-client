@@ -9,6 +9,20 @@ import type { ReactNode } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { RoutineIcon } from "./RoutineIcon";
 
+function formatSolidSummary(totalBowls?: number, totalGrams?: number) {
+	const parts: string[] = [];
+
+	if (totalBowls) {
+		parts.push(`${formatBowlAmount(totalBowls)} bowl`);
+	}
+
+	if (totalGrams) {
+		parts.push(`${totalGrams} g`);
+	}
+
+	return parts.length ? ` (${parts.join(" + ")})` : "";
+}
+
 function SummaryRow({
 	children,
 	config,
@@ -90,7 +104,7 @@ export function RoutineSummary({
 				{solid.count ? (
 					<DetailText>
 						{config.mealTypes.solid}: {solid.count}
-						{solid.totalBowls ? ` (${formatBowlAmount(solid.totalBowls)} bowl)` : ""}
+						{formatSolidSummary(solid.totalBowls, solid.totalGrams)}
 					</DetailText>
 				) : null}
 			</SummaryRow>

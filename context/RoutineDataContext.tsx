@@ -53,6 +53,7 @@ function reportBackgroundError(error: unknown) {
 
 export type AddMealInput = {
 	amountBowl?: number;
+	amountGrams?: number;
 	amountMl?: number;
 	durationMinutes?: number;
 	notes?: string;
@@ -121,7 +122,7 @@ function getEmptyMealsByType(): RoutineDay["summary"]["meals"]["byType"] {
 		breastfeed: { count: 0, totalMinutes: 0 },
 		breastMilk: { count: 0, totalAmountMl: 0 },
 		formula: { count: 0, totalAmountMl: 0 },
-		solid: { count: 0, totalBowls: 0 },
+		solid: { count: 0, totalBowls: 0, totalGrams: 0 },
 	};
 }
 
@@ -163,6 +164,7 @@ function applyMealToSummary(day: RoutineDay, meal: MealEvent): RoutineDay["summa
 		typeSummary.totalMinutes = (typeSummary.totalMinutes ?? 0) + (meal.durationMinutes ?? 0);
 	} else if (meal.type === "solid") {
 		typeSummary.totalBowls = (typeSummary.totalBowls ?? 0) + (meal.amountBowl ?? 0);
+		typeSummary.totalGrams = (typeSummary.totalGrams ?? 0) + (meal.amountGrams ?? 0);
 	} else {
 		typeSummary.totalAmountMl = (typeSummary.totalAmountMl ?? 0) + (meal.amountMl ?? 0);
 	}
@@ -189,6 +191,7 @@ function removeMealFromSummary(day: RoutineDay, meal: MealEvent): RoutineDay["su
 		typeSummary.totalMinutes = Math.max(0, (typeSummary.totalMinutes ?? 0) - (meal.durationMinutes ?? 0));
 	} else if (meal.type === "solid") {
 		typeSummary.totalBowls = Math.max(0, (typeSummary.totalBowls ?? 0) - (meal.amountBowl ?? 0));
+		typeSummary.totalGrams = Math.max(0, (typeSummary.totalGrams ?? 0) - (meal.amountGrams ?? 0));
 	} else {
 		typeSummary.totalAmountMl = Math.max(0, (typeSummary.totalAmountMl ?? 0) - (meal.amountMl ?? 0));
 	}
@@ -368,6 +371,7 @@ function updateMealInLogs(logs: RoutineDay[], input: UpdateMealInput) {
 	const updatedMeal: MealEvent = {
 		...existingMeal,
 		amountBowl: input.type === "solid" ? input.amountBowl : undefined,
+		amountGrams: input.type === "solid" ? input.amountGrams : undefined,
 		amountMl: input.type === "breastMilk" || input.type === "formula" ? input.amountMl : undefined,
 		durationMinutes: input.type === "breastfeed" ? input.durationMinutes : undefined,
 		notes: input.notes?.trim() ? input.notes.trim() : undefined,
@@ -599,6 +603,7 @@ export function RoutineDataProvider({ children }: PropsWithChildren) {
 			} as const;
 			const meal: MealEvent = {
 				amountBowl: input.type === "solid" ? input.amountBowl : undefined,
+				amountGrams: input.type === "solid" ? input.amountGrams : undefined,
 				amountMl: input.type === "breastMilk" || input.type === "formula" ? input.amountMl : undefined,
 				durationMinutes: input.type === "breastfeed" ? input.durationMinutes : undefined,
 				id: localId,

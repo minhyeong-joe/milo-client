@@ -1,9 +1,9 @@
 import type { RoutineConfig, RoutineEvent, RoutineStyle } from "@/data/homeData";
 import { colors, globalStyles } from "@/styles/globalStyles";
 import {
-	formatBowlAmount,
 	formatClockTime,
 	formatDuration,
+	formatSolidAmount,
 	formatVolume,
 	getSleepDurationMinutes,
 } from "@/utils/routineDisplay";
@@ -24,8 +24,11 @@ function getEventDisplay(
 				? `${event.durationMinutes} min`
 				: event.amountMl
 					? formatVolume(event.amountMl, config.preferredVolumeUnit)
-					: event.amountBowl
-						? `${formatBowlAmount(event.amountBowl)} bowl`
+					: event.amountBowl || event.amountGrams
+						? formatSolidAmount({
+								amountBowl: event.amountBowl,
+								amountGrams: event.amountGrams,
+							})
 						: "";
 
 		return { detail, style: config.quickActions.meal, title };

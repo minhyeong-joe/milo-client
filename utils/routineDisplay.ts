@@ -1,6 +1,7 @@
 import type { PreferredVolumeUnit, RoutineEvent } from "@/data/homeData";
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
+export const ML_PER_OZ = 29.5735;
 
 function padDatePart(value: number) {
 	return value.toString().padStart(2, "0");
@@ -61,10 +62,22 @@ export function formatDuration(totalMinutes: number) {
 
 export function formatVolume(amountMl: number, preferredUnit: PreferredVolumeUnit) {
 	if (preferredUnit === "oz") {
-		return `${(amountMl / 29.5735).toFixed(1)} oz`;
+		return `${mlToOz(amountMl).toFixed(1)} oz`;
 	}
 
-	return `${amountMl} ml`;
+	return `${Math.round(amountMl)} mL`;
+}
+
+export function mlToOz(amountMl: number) {
+	return amountMl / ML_PER_OZ;
+}
+
+export function ozToMl(amountOz: number) {
+	return Math.round(amountOz * ML_PER_OZ);
+}
+
+export function formatOzInput(amountOz: number) {
+	return amountOz.toFixed(1);
 }
 
 export function formatClockTime(value: string) {
@@ -122,5 +135,29 @@ export function formatBowlAmount(amount: number) {
 	} else if (fraction === 0.75) {
 		fractionLabel = "¾";
 	}
-	return whole > 0 ? `${whole} ${fractionLabel}` : fractionLabel;
+	if (whole > 0 && fractionLabel) {
+		return `${whole} ${fractionLabel}`;
+	}
+
+	return whole > 0 ? String(whole) : fractionLabel;
+}
+
+export function formatSolidAmount({
+	amountBowl,
+	amountGrams,
+}: {
+	amountBowl?: number | null;
+	amountGrams?: number | null;
+}) {
+	const parts: string[] = [];
+
+	if (amountBowl) {
+		parts.push(`${formatBowlAmount(amountBowl)} bowl`);
+	}
+
+	if (amountGrams) {
+		parts.push(`${amountGrams} g`);
+	}
+
+	return parts.join(" + ");
 }

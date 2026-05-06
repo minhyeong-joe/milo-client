@@ -1,3 +1,4 @@
+import { AppPreferencesProvider } from "@/context/AppPreferencesContext";
 import { AuthSessionProvider } from "@/context/AuthSessionContext";
 import { BabySelectionProvider } from "@/context/BabySelectionContext";
 import { RoutineDataProvider } from "@/context/RoutineDataContext";
@@ -9,19 +10,21 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
 
   return (
-    <AuthSessionProvider>
-      <BabySelectionProvider>
-        <RoutineDataProvider>
-          <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="(auth)" />
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="routine/add-diaper" />
-            <Stack.Screen name="routine/add-meal" />
-            <Stack.Screen name="routine/add-sleep" />
-          </Stack>
-        </RoutineDataProvider>
-      </BabySelectionProvider>
-    </AuthSessionProvider>
+    <AppPreferencesProvider>
+      <AuthSessionProvider>
+        <BabySelectionProvider>
+          <RoutineDataProvider>
+            <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
+            <Stack screenOptions={{ headerShown: false }}>
+              <Stack.Screen name="(auth)" />
+              <Stack.Screen name="(tabs)" />
+              <Stack.Screen name="routine/add-diaper" />
+              <Stack.Screen name="routine/add-meal" />
+              <Stack.Screen name="routine/add-sleep" />
+            </Stack>
+          </RoutineDataProvider>
+        </BabySelectionProvider>
+      </AuthSessionProvider>
+    </AppPreferencesProvider>
   );
 }
