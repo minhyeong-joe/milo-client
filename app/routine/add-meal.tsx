@@ -76,6 +76,7 @@ export default function AddMealScreen() {
 	const [bottleAmountText, setBottleAmountText] = useState(() =>
 		formatBottleAmountInput(initialBottleAmountMlRef.current, preferredVolumeUnit),
 	);
+	const [breastSide, setBreastSide] = useState<"left" | "right" | undefined>(mealToEdit?.breastSide ?? (mealType === "breastfeed" ? (latestMeal?.breastSide === "left"? "right" : "left") : undefined));
 	const [durationMinutesText, setDurationMinutesText] = useState(() =>
 		String(mealToEdit?.durationMinutes ?? latestMeal?.durationMinutes ?? 15),
 	);
@@ -172,6 +173,7 @@ export default function AddMealScreen() {
 				: undefined,
 			amountMl: isBottleMeal(mealType) ? amountMl : undefined,
 			durationMinutes: mealType === "breastfeed" ? durationMinutes : undefined,
+			breastSide: mealType === "breastfeed" ? breastSide : undefined,
 			notes,
 			time: mealTime.toISOString(),
 			type: mealType,
@@ -305,6 +307,24 @@ export default function AddMealScreen() {
 
 					{mealType === "breastfeed" ? (
 						<View style={styles.section}>
+							<View style={styles.segmentGrid}>
+								{["left", "right"].map((side) => {
+									const isSelected = breastSide === side;
+
+									return (
+										<Pressable
+											accessibilityRole="button"
+											key={side}
+											onPress={() => setBreastSide(side)}
+											style={[styles.segmentButton, isSelected && styles.segmentButtonSelected]}
+										>
+											<Text style={[styles.segmentText, isSelected && styles.segmentTextSelected]}>
+												{side.charAt(0).toUpperCase() + side.slice(1)}
+											</Text>
+										</Pressable>
+									);
+								})}
+							</View>
 							<Text style={styles.sectionLabel}>Duration</Text>
 							<View style={styles.stepperRow}>
 								<StepperButton icon="remove" onPress={decrementDuration} />

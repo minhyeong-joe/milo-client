@@ -112,7 +112,7 @@ export function TimelineRow({
 					<RoutineIcon size={40} style={display.style} />
 				</View>
 				<View style={styles.timelineText}>
-					<Text style={globalStyles.sectionTitleText}>{display.title}</Text>
+					<Text style={globalStyles.sectionTitleText}>{display.title} {event.breastSide ? `(${event.breastSide.toUpperCase().charAt(0)})` : ""}</Text>
 					{display.detail ? (
 						<Text style={styles.timelineDetail}>{display.detail}</Text>
 					) : null}

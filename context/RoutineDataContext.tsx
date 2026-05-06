@@ -56,6 +56,7 @@ export type AddMealInput = {
 	amountGrams?: number;
 	amountMl?: number;
 	durationMinutes?: number;
+	breastSide?: "left" | "right";
 	notes?: string;
 	time: string;
 	type: MealType;
@@ -374,6 +375,7 @@ function updateMealInLogs(logs: RoutineDay[], input: UpdateMealInput) {
 		amountGrams: input.type === "solid" ? input.amountGrams : undefined,
 		amountMl: input.type === "breastMilk" || input.type === "formula" ? input.amountMl : undefined,
 		durationMinutes: input.type === "breastfeed" ? input.durationMinutes : undefined,
+		breastSide: input.type === "breastfeed" ? input.breastSide : undefined,
 		notes: input.notes?.trim() ? input.notes.trim() : undefined,
 		syncStatus: "pending",
 		time: input.time,
@@ -606,6 +608,7 @@ export function RoutineDataProvider({ children }: PropsWithChildren) {
 				amountGrams: input.type === "solid" ? input.amountGrams : undefined,
 				amountMl: input.type === "breastMilk" || input.type === "formula" ? input.amountMl : undefined,
 				durationMinutes: input.type === "breastfeed" ? input.durationMinutes : undefined,
+				breastSide: input.type === "breastfeed" ? input.breastSide : undefined,
 				id: localId,
 				kind: "meal",
 				notes: input.notes?.trim() ? input.notes.trim() : undefined,

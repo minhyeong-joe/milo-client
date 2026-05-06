@@ -20,6 +20,7 @@ export type MealEvent = {
   durationMinutes?: number;     // For breastfeeding sessions
   amountBowl?: number;          // For solid feedings, representing number of bowls or servings (1/4, 1/2, 3/4, 1)
   amountGrams?: number;         // For solid feedings measured by weight. Separate from bowl units.
+  breastSide?: "left" | "right"; // For breastfeeding sessions, indicating which side was used
   id: string;
   kind: "meal";
   syncStatus?: "pending" | "failed";

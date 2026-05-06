@@ -39,6 +39,7 @@ export type CreateMealLogInput = {
 	amountMl?: number;
 	clientMutationId?: string;
 	durationMinutes?: number;
+	breastSide?: "left" | "right";
 	kind: "meal";
 	notes?: string;
 	time: string;
