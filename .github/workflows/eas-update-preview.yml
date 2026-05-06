@@ -37,4 +37,5 @@ jobs:
         env:
           APP_VARIANT: preview
         run: |
-          eas update --channel preview --environment preview --non-interactive --message "Preview update: ${{ github.sha }}"
+          eas update --platform ios --channel preview --environment preview --non-interactive --message "Preview iOS update: ${{ github.sha }}"
+          eas update --platform android --channel preview --environment preview --non-interactive --message "Preview Android update: ${{ github.sha }}"
