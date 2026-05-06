@@ -2,8 +2,10 @@ import type { BabyListItem } from "@/services/api/babies";
 import { colors, spacing, globalStyles } from "@/styles/globalStyles";
 import { formatBabyAge } from "@/utils/routineDisplay";
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
+	Alert,
 	FlatList,
 	Image,
 	Modal,
@@ -37,7 +39,9 @@ export function BabyHeader({
 	baby: BabyListItem;
 	onSelectBaby: (babyId: string) => void;
 }) {
+	const router = useRouter();
 	const [isSelectorOpen, setIsSelectorOpen] = useState(false);
+	const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 	const currentDate = new Date();
 
 	const handleSelectBaby = (babyId: string) => {
@@ -45,10 +49,23 @@ export function BabyHeader({
 		setIsSelectorOpen(false);
 	};
 
+	const onImagePress = () => {
+		Alert.alert(
+			"Change profile picture",
+			"TODO: Implement profile picture change flow"
+		);
+	}
+
 	return (
 		<View style={[globalStyles.rowBetween, styles.header]}>
 			<View style={[globalStyles.rowCenter, styles.profileRow]}>
-				<BabyAvatar baby={baby} />
+				<Pressable
+					accessibilityRole="button"
+					accessibilityLabel="Open baby profile actions"
+					onPress={() => setIsProfileModalOpen(true)}
+				>
+					<BabyAvatar baby={baby} />
+				</Pressable>
 				<View>
 					<Pressable
 						accessibilityRole="button"
@@ -130,6 +147,51 @@ export function BabyHeader({
 					</Pressable>
 				</Pressable>
 			</Modal>
+			<Modal
+				animationType="fade"
+				onRequestClose={() => setIsProfileModalOpen(false)}
+				transparent
+				visible={isProfileModalOpen}
+			>
+				<Pressable
+					accessibilityRole="button"
+					onPress={() => setIsProfileModalOpen(false)}
+					style={styles.profileModalBackdrop}
+				>
+					<Pressable style={[globalStyles.shadowCard, styles.profilePanel]}>
+						<Pressable
+							accessibilityRole="button"
+							onPress={onImagePress}
+							style={styles.largeAvatarButton}
+						>
+							<Image
+								source={getBabyAvatarUri(baby.avatarObjectKey) ? { uri: getBabyAvatarUri(baby.avatarObjectKey) } : fallbackBabyAvatar}
+								style={styles.largeAvatar}
+							/>
+						</Pressable>
+						<Pressable
+							accessibilityRole="button"
+							onPress={() => {
+								setIsProfileModalOpen(false);
+								router.push("/baby/edit-profile");
+							}}
+							style={styles.profileActionButton}
+						>
+							<Text style={styles.profileActionText}>Edit Profile</Text>
+						</Pressable>
+						<Pressable
+							accessibilityRole="button"
+							onPress={() => {
+								setIsProfileModalOpen(false);
+								router.push("/baby/add-measurement");
+							}}
+							style={styles.profileActionButton}
+						>
+							<Text style={styles.profileActionText}>Add Measurement</Text>
+						</Pressable>
+					</Pressable>
+				</Pressable>
+			</Modal>
 		</View>
 	);
 }
@@ -185,6 +247,15 @@ const styles = StyleSheet.create({
 	profileRow: {
 		gap: spacing.md,
 	},
+	largeAvatar: {
+		borderRadius: 72,
+		height: 144,
+		width: 144,
+	},
+	largeAvatarButton: {
+		alignItems: "center",
+		gap: spacing.sm,
+	},
 	modalBackdrop: {
 		backgroundColor: "rgba(21, 24, 39, 0.22)",
 		flex: 1,
@@ -235,5 +306,39 @@ const styles = StyleSheet.create({
 		paddingHorizontal: spacing.md,
 		paddingVertical: spacing.sm,
 		textTransform: "uppercase",
+	},
+	profileActionButton: {
+		alignItems: "center",
+		backgroundColor: colors.light.primary,
+		borderRadius: 12,
+		paddingVertical: 14,
+		width: "100%",
+	},
+	profileActionText: {
+		color: colors.light.surface,
+		fontSize: 15,
+		fontWeight: "800",
+	},
+	profileModalBackdrop: {
+		alignItems: "center",
+		backgroundColor: "rgba(21, 24, 39, 0.32)",
+		flex: 1,
+		justifyContent: "center",
+		padding: spacing.lg,
+	},
+	profilePanel: {
+		alignItems: "center",
+		backgroundColor: colors.light.surface,
+		borderColor: colors.light.border,
+		borderRadius: 16,
+		borderWidth: 1,
+		gap: spacing.md,
+		padding: spacing.lg,
+		width: "100%",
+	},
+	uploadHint: {
+		color: colors.light.textSecondary,
+		fontSize: 12,
+		fontWeight: "700",
 	},
 });

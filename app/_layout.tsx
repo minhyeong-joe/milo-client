@@ -18,6 +18,8 @@ export default function RootLayout() {
             <Stack screenOptions={{ headerShown: false }}>
               <Stack.Screen name="(auth)" />
               <Stack.Screen name="(tabs)" />
+              <Stack.Screen name="baby/add-measurement" />
+              <Stack.Screen name="baby/edit-profile" />
               <Stack.Screen name="routine/add-diaper" />
               <Stack.Screen name="routine/add-meal" />
               <Stack.Screen name="routine/add-sleep" />

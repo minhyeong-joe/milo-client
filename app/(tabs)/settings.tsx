@@ -8,7 +8,14 @@ import { SafeAreaView } from "react-native-safe-area-context";
 export default function SettingsScreen() {
   const router = useRouter();
   const { signOut } = useAuthSession();
-  const { preferredVolumeUnit, setPreferredVolumeUnit } = useAppPreferences();
+  const {
+    preferredLengthUnit,
+    preferredVolumeUnit,
+    preferredWeightUnit,
+    setPreferredLengthUnit,
+    setPreferredVolumeUnit,
+    setPreferredWeightUnit,
+  } = useAppPreferences();
 
   const handleSignOut = async () => {
     await signOut();
@@ -36,6 +43,36 @@ export default function SettingsScreen() {
                 isSelected={preferredVolumeUnit === "oz"}
                 label="oz"
                 onPress={() => void setPreferredVolumeUnit("oz")}
+              />
+            </View>
+          </View>
+          <View style={styles.settingRow}>
+            <Text style={styles.settingTitle}>Length unit</Text>
+            <View style={styles.segmentedControl}>
+              <UnitButton
+                isSelected={preferredLengthUnit === "cm"}
+                label="cm"
+                onPress={() => void setPreferredLengthUnit("cm")}
+              />
+              <UnitButton
+                isSelected={preferredLengthUnit === "in"}
+                label="in"
+                onPress={() => void setPreferredLengthUnit("in")}
+              />
+            </View>
+          </View>
+          <View style={styles.settingRow}>
+            <Text style={styles.settingTitle}>Weight unit</Text>
+            <View style={styles.segmentedControl}>
+              <UnitButton
+                isSelected={preferredWeightUnit === "kg"}
+                label="kg"
+                onPress={() => void setPreferredWeightUnit("kg")}
+              />
+              <UnitButton
+                isSelected={preferredWeightUnit === "lb"}
+                label="lb"
+                onPress={() => void setPreferredWeightUnit("lb")}
               />
             </View>
           </View>
@@ -105,6 +142,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexDirection: "row",
     gap: spacing.md,
+    marginTop: spacing.md,
   },
   signOutButton: {
     alignItems: "center",

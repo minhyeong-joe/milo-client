@@ -308,7 +308,7 @@ export default function AddMealScreen() {
 					{mealType === "breastfeed" ? (
 						<View style={styles.section}>
 							<View style={styles.segmentGrid}>
-								{["left", "right"].map((side) => {
+								{(["left", "right"] as const).map((side) => {
 									const isSelected = breastSide === side;
 
 									return (

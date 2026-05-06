@@ -2,7 +2,9 @@ import type { PreferredVolumeUnit } from "@/data/homeData";
 import {
 	loadStoredPreferences,
 	saveStoredPreferences,
+	type PreferredLengthUnit,
 	type PreferredSolidFoodUnit,
+	type PreferredWeightUnit,
 	type StoredPreferences,
 } from "@/services/preferences/preferencesStorage";
 import {
@@ -17,8 +19,10 @@ import {
 
 type AppPreferencesContextValue = StoredPreferences & {
 	isReady: boolean;
+	setPreferredLengthUnit: (unit: PreferredLengthUnit) => Promise<void>;
 	setPreferredSolidFoodUnit: (unit: PreferredSolidFoodUnit) => Promise<void>;
 	setPreferredVolumeUnit: (unit: PreferredVolumeUnit) => Promise<void>;
+	setPreferredWeightUnit: (unit: PreferredWeightUnit) => Promise<void>;
 };
 
 const AppPreferencesContext = createContext<AppPreferencesContextValue | undefined>(undefined);
@@ -28,6 +32,10 @@ export function AppPreferencesProvider({ children }: { children: ReactNode }) {
 		useState<PreferredVolumeUnit>("ml");
 	const [preferredSolidFoodUnit, setPreferredSolidFoodUnitState] =
 		useState<PreferredSolidFoodUnit>("bowl");
+	const [preferredLengthUnit, setPreferredLengthUnitState] =
+		useState<PreferredLengthUnit>("cm");
+	const [preferredWeightUnit, setPreferredWeightUnitState] =
+		useState<PreferredWeightUnit>("kg");
 	const [isReady, setIsReady] = useState(false);
 
 	useEffect(() => {
@@ -42,6 +50,8 @@ export function AppPreferencesProvider({ children }: { children: ReactNode }) {
 
 			setPreferredVolumeUnitState(storedPreferences.preferredVolumeUnit);
 			setPreferredSolidFoodUnitState(storedPreferences.preferredSolidFoodUnit);
+			setPreferredLengthUnitState(storedPreferences.preferredLengthUnit);
+			setPreferredWeightUnitState(storedPreferences.preferredWeightUnit);
 			setIsReady(true);
 		}
 
@@ -55,33 +65,65 @@ export function AppPreferencesProvider({ children }: { children: ReactNode }) {
 	const setPreferredVolumeUnit = useCallback(async (unit: PreferredVolumeUnit) => {
 		setPreferredVolumeUnitState(unit);
 		await saveStoredPreferences({
+			preferredLengthUnit,
 			preferredSolidFoodUnit,
 			preferredVolumeUnit: unit,
+			preferredWeightUnit,
 		});
-	}, [preferredSolidFoodUnit]);
+	}, [preferredLengthUnit, preferredSolidFoodUnit, preferredWeightUnit]);
 
 	const setPreferredSolidFoodUnit = useCallback(async (unit: PreferredSolidFoodUnit) => {
 		setPreferredSolidFoodUnitState(unit);
 		await saveStoredPreferences({
+			preferredLengthUnit,
 			preferredSolidFoodUnit: unit,
 			preferredVolumeUnit,
+			preferredWeightUnit,
 		});
-	}, [preferredVolumeUnit]);
+	}, [preferredLengthUnit, preferredVolumeUnit, preferredWeightUnit]);
+
+	const setPreferredLengthUnit = useCallback(async (unit: PreferredLengthUnit) => {
+		setPreferredLengthUnitState(unit);
+		await saveStoredPreferences({
+			preferredLengthUnit: unit,
+			preferredSolidFoodUnit,
+			preferredVolumeUnit,
+			preferredWeightUnit,
+		});
+	}, [preferredSolidFoodUnit, preferredVolumeUnit, preferredWeightUnit]);
+
+	const setPreferredWeightUnit = useCallback(async (unit: PreferredWeightUnit) => {
+		setPreferredWeightUnitState(unit);
+		await saveStoredPreferences({
+			preferredLengthUnit,
+			preferredSolidFoodUnit,
+			preferredVolumeUnit,
+			preferredWeightUnit: unit,
+		});
+	}, [preferredLengthUnit, preferredSolidFoodUnit, preferredVolumeUnit]);
 
 	const value = useMemo(
 		() => ({
 			isReady,
+			preferredLengthUnit,
 			preferredSolidFoodUnit,
 			preferredVolumeUnit,
+			preferredWeightUnit,
+			setPreferredLengthUnit,
 			setPreferredSolidFoodUnit,
 			setPreferredVolumeUnit,
+			setPreferredWeightUnit,
 		}),
 		[
 			isReady,
+			preferredLengthUnit,
 			preferredSolidFoodUnit,
 			preferredVolumeUnit,
+			preferredWeightUnit,
+			setPreferredLengthUnit,
 			setPreferredSolidFoodUnit,
 			setPreferredVolumeUnit,
+			setPreferredWeightUnit,
 		],
 	);
 
