@@ -9,6 +9,13 @@ import type {
 	SleepEvent,
 	SleepType,
 } from "@/data/homeData";
+import { useBabySelection } from "@/context/BabySelectionContext";
+import {
+	createRoutineLog,
+	deleteRoutineLog,
+	type RoutineLastLogged,
+	updateRoutineLog,
+} from "@/services/api/routine";
 import {
 	getDateKeyStartMs,
 	getLocalDateKey,
@@ -60,21 +67,23 @@ export type UpdateSleepInput = AddSleepInput & {
 };
 
 type RoutineDataContextValue = {
-	addDiaper: (input: AddDiaperInput) => void;
-	addMeal: (input: AddMealInput) => void;
-	addSleep: (input: AddSleepInput) => void;
+	addDiaper: (input: AddDiaperInput) => Promise<boolean>;
+	addMeal: (input: AddMealInput) => Promise<boolean>;
+	addSleep: (input: AddSleepInput) => Promise<boolean>;
 	dailyLogs: RoutineDay[];
 	getLatestDiaper: () => DiaperEvent | undefined;
 	getLatestMeal: () => MealEvent | undefined;
 	getLatestSleep: () => SleepEvent | undefined;
 	getOngoingSleep: () => SleepEvent | undefined;
-	updateDiaper: (input: UpdateDiaperInput) => void;
-	updateMeal: (input: UpdateMealInput) => void;
-	updateSleep: (input: UpdateSleepInput) => void;
+	lastLogged: RoutineLastLogged | null;
+	setLastLogged: (lastLogged: RoutineLastLogged | null) => void;
+	updateDiaper: (input: UpdateDiaperInput) => Promise<boolean>;
+	updateMeal: (input: UpdateMealInput) => Promise<boolean>;
+	updateSleep: (input: UpdateSleepInput) => Promise<boolean>;
 	prependOlderDailyLogs: (logs: RoutineDay[]) => void;
-	removeDiaper: (diaperId: string) => void;
-	removeMeal: (mealId: string) => void;
-	removeSleep: (sleepId: string) => void;
+	removeDiaper: (diaperId: string) => Promise<boolean>;
+	removeMeal: (mealId: string) => Promise<boolean>;
+	removeSleep: (sleepId: string) => Promise<boolean>;
 	replaceDailyLogs: (logs: RoutineDay[]) => void;
 };
 
@@ -254,20 +263,31 @@ function mergeDailyLogs(currentLogs: RoutineDay[], incomingLogs: RoutineDay[]) {
 	const logsByDate = new Map<string, RoutineDay>();
 
 	[...currentLogs, ...incomingLogs].forEach((day) => {
-		logsByDate.set(day.date, day);
+		if (day.timeline.length === 0) {
+			logsByDate.delete(day.date);
+		} else {
+			logsByDate.set(day.date, day);
+		}
 	});
 
 	return Array.from(logsByDate.values()).sort(sortDaysDescending);
 }
 
 export function RoutineDataProvider({ children }: PropsWithChildren) {
+	const { selectedBaby } = useBabySelection();
 	const [dailyLogs, setDailyLogs] = useState<RoutineDay[]>([]);
+	const [lastLogged, setLastLogged] = useState<RoutineLastLogged | null>(null);
 	const replaceDailyLogs = useCallback((logs: RoutineDay[]) => {
 		setDailyLogs([...logs].sort(sortDaysDescending));
 	}, []);
 
 	const prependOlderDailyLogs = useCallback((logs: RoutineDay[]) => {
 		setDailyLogs((currentLogs) => mergeDailyLogs(currentLogs, logs));
+	}, []);
+
+	const applyMutationResult = useCallback((logs: RoutineDay[], nextLastLogged: RoutineLastLogged) => {
+		setDailyLogs((currentLogs) => mergeDailyLogs(currentLogs, logs));
+		setLastLogged(nextLastLogged);
 	}, []);
 
 	const value = useMemo<RoutineDataContextValue>(() => {
@@ -295,329 +315,88 @@ export function RoutineDataProvider({ children }: PropsWithChildren) {
 				.filter((event): event is SleepEvent => event.kind === "sleep" && !event.endTime)
 				.sort(sortEventsDescending)[0];
 
-		const addMeal = (input: AddMealInput) => {
-			const meal: MealEvent = {
-				amountBowl: input.type === "solid" ? input.amountBowl : undefined,
-				amountMl: input.type === "breastMilk" || input.type === "formula" ? input.amountMl : undefined,
-				durationMinutes: input.type === "breastfeed" ? input.durationMinutes : undefined,
-				id: `meal-${Date.now()}`,
+		const addMeal = async (input: AddMealInput) => {
+			if (!selectedBaby) return false;
+
+			const response = await createRoutineLog(selectedBaby.id, {
+				...input,
 				kind: "meal",
-				notes: input.notes?.trim() ? input.notes.trim() : undefined,
-				time: input.time,
-				type: input.type,
-			};
-			const mealDate = getEventDate(meal);
-
-			setDailyLogs((currentLogs) => {
-				const hasDay = currentLogs.some((day) => day.date === mealDate);
-				const logs = hasDay ? currentLogs : [createEmptyRoutineDay(mealDate), ...currentLogs];
-
-				return logs
-					.map((day) => {
-						if (day.date !== mealDate) {
-							return day;
-						}
-
-						return {
-							...day,
-							summary: applyMealToSummary(day, meal),
-							timeline: [...day.timeline, meal].sort(sortEventsDescending),
-						};
-					})
-					.sort(sortDaysDescending);
 			});
+			applyMutationResult(response.affectedDailyLogs, response.lastLogged);
+			return true;
 		};
 
-		const addSleep = (input: AddSleepInput) => {
-			const sleep: SleepEvent = {
-				endTime: input.endTime,
-				id: `sleep-${Date.now()}`,
+		const addSleep = async (input: AddSleepInput) => {
+			if (!selectedBaby) return false;
+
+			const response = await createRoutineLog(selectedBaby.id, {
+				...input,
 				kind: "sleep",
-				notes: input.notes?.trim() ? input.notes.trim() : undefined,
-				startTime: input.startTime,
-				type: input.type,
-			};
-			const sleepDate = getEventDate(sleep);
-
-			setDailyLogs((currentLogs) => {
-				const hasDay = currentLogs.some((day) => day.date === sleepDate);
-				const logs = hasDay ? currentLogs : [createEmptyRoutineDay(sleepDate), ...currentLogs];
-
-				return logs
-					.map((day) => {
-						if (day.date !== sleepDate) {
-							return day;
-						}
-
-						return {
-							...day,
-							summary: applySleepToSummary(day, sleep),
-							timeline: [...day.timeline, sleep].sort(sortEventsDescending),
-						};
-					})
-					.sort(sortDaysDescending);
 			});
+			applyMutationResult(response.affectedDailyLogs, response.lastLogged);
+			return true;
 		};
 
-		const addDiaper = (input: AddDiaperInput) => {
-			const diaper: DiaperEvent = {
-				color: input.type === "dirty" || input.type === "both" ? input.color : undefined,
-				id: `diaper-${Date.now()}`,
+		const addDiaper = async (input: AddDiaperInput) => {
+			if (!selectedBaby) return false;
+
+			const response = await createRoutineLog(selectedBaby.id, {
+				...input,
 				kind: "diaper",
-				notes: input.notes?.trim() ? input.notes.trim() : undefined,
-				time: input.time,
-				type: input.type,
-			};
-			const diaperDate = getEventDate(diaper);
-
-			setDailyLogs((currentLogs) => {
-				const hasDay = currentLogs.some((day) => day.date === diaperDate);
-				const logs = hasDay ? currentLogs : [createEmptyRoutineDay(diaperDate), ...currentLogs];
-
-				return logs
-					.map((day) => {
-						if (day.date !== diaperDate) {
-							return day;
-						}
-
-						return {
-							...day,
-							summary: applyDiaperToSummary(day, diaper),
-							timeline: [...day.timeline, diaper].sort(sortEventsDescending),
-						};
-					})
-					.sort(sortDaysDescending);
 			});
+			applyMutationResult(response.affectedDailyLogs, response.lastLogged);
+			return true;
 		};
 
-		const updateMeal = (input: UpdateMealInput) => {
-			setDailyLogs((currentLogs) => {
-				const existingMeal = currentLogs
-					.flatMap((day) => day.timeline)
-					.find((event): event is MealEvent => event.kind === "meal" && event.id === input.id);
+		const updateMeal = async (input: UpdateMealInput) => {
+			if (!selectedBaby) return false;
 
-				if (!existingMeal) {
-					return currentLogs;
-				}
-
-				const updatedMeal: MealEvent = {
-					...existingMeal,
-					amountBowl: input.type === "solid" ? input.amountBowl : undefined,
-					amountMl: input.type === "breastMilk" || input.type === "formula" ? input.amountMl : undefined,
-					durationMinutes: input.type === "breastfeed" ? input.durationMinutes : undefined,
-					notes: input.notes?.trim() ? input.notes.trim() : undefined,
-					time: input.time,
-					type: input.type,
-				};
-				const previousDate = getEventDate(existingMeal);
-				const nextDate = getEventDate(updatedMeal);
-				const hasNextDay = currentLogs.some((day) => day.date === nextDate);
-				const logs = hasNextDay ? currentLogs : [createEmptyRoutineDay(nextDate), ...currentLogs];
-
-				return logs
-					.map((day) => {
-						let nextDay = day;
-
-						if (day.date === previousDate) {
-							nextDay = {
-								...nextDay,
-								summary: removeMealFromSummary(nextDay, existingMeal),
-								timeline: nextDay.timeline.filter((event) => event.id !== existingMeal.id),
-							};
-						}
-
-						if (day.date === nextDate) {
-							nextDay = {
-								...nextDay,
-								summary: applyMealToSummary(nextDay, updatedMeal),
-								timeline: [...nextDay.timeline, updatedMeal].sort(sortEventsDescending),
-							};
-						}
-
-						return nextDay;
-					})
-					.sort(sortDaysDescending);
-			});
+			const { id, ...payload } = input;
+			const response = await updateRoutineLog(selectedBaby.id, "meal", id, payload);
+			applyMutationResult(response.affectedDailyLogs, response.lastLogged);
+			return true;
 		};
 
-		const updateDiaper = (input: UpdateDiaperInput) => {
-			setDailyLogs((currentLogs) => {
-				const existingDiaper = currentLogs
-					.flatMap((day) => day.timeline)
-					.find((event): event is DiaperEvent => event.kind === "diaper" && event.id === input.id);
+		const updateDiaper = async (input: UpdateDiaperInput) => {
+			if (!selectedBaby) return false;
 
-				if (!existingDiaper) {
-					return currentLogs;
-				}
-
-				const updatedDiaper: DiaperEvent = {
-					...existingDiaper,
-					color: input.type === "dirty" || input.type === "both" ? input.color : undefined,
-					notes: input.notes?.trim() ? input.notes.trim() : undefined,
-					time: input.time,
-					type: input.type,
-				};
-				const previousDate = getEventDate(existingDiaper);
-				const nextDate = getEventDate(updatedDiaper);
-				const hasNextDay = currentLogs.some((day) => day.date === nextDate);
-				const logs = hasNextDay ? currentLogs : [createEmptyRoutineDay(nextDate), ...currentLogs];
-
-				return logs
-					.map((day) => {
-						let nextDay = day;
-
-						if (day.date === previousDate) {
-							nextDay = {
-								...nextDay,
-								summary: removeDiaperFromSummary(nextDay, existingDiaper),
-								timeline: nextDay.timeline.filter((event) => event.id !== existingDiaper.id),
-							};
-						}
-
-						if (day.date === nextDate) {
-							nextDay = {
-								...nextDay,
-								summary: applyDiaperToSummary(nextDay, updatedDiaper),
-								timeline: [...nextDay.timeline, updatedDiaper].sort(sortEventsDescending),
-							};
-						}
-
-						return nextDay;
-					})
-					.sort(sortDaysDescending);
-			});
+			const { id, ...payload } = input;
+			const response = await updateRoutineLog(selectedBaby.id, "diaper", id, payload);
+			applyMutationResult(response.affectedDailyLogs, response.lastLogged);
+			return true;
 		};
 
-		const updateSleep = (input: UpdateSleepInput) => {
-			setDailyLogs((currentLogs) => {
-				const existingSleep = currentLogs
-					.flatMap((day) => day.timeline)
-					.find((event): event is SleepEvent => event.kind === "sleep" && event.id === input.id);
+		const updateSleep = async (input: UpdateSleepInput) => {
+			if (!selectedBaby) return false;
 
-				if (!existingSleep) {
-					return currentLogs;
-				}
-
-				const updatedSleep: SleepEvent = {
-					...existingSleep,
-					endTime: input.endTime,
-					notes: input.notes?.trim() ? input.notes.trim() : undefined,
-					startTime: input.startTime,
-					type: input.type,
-				};
-				const previousDate = getEventDate(existingSleep);
-				const nextDate = getEventDate(updatedSleep);
-				const hasNextDay = currentLogs.some((day) => day.date === nextDate);
-				const logs = hasNextDay ? currentLogs : [createEmptyRoutineDay(nextDate), ...currentLogs];
-
-				return logs
-					.map((day) => {
-						let nextDay = day;
-
-						if (day.date === previousDate) {
-							nextDay = {
-								...nextDay,
-								summary: removeSleepFromSummary(nextDay, existingSleep),
-								timeline: nextDay.timeline.filter((event) => event.id !== existingSleep.id),
-							};
-						}
-
-						if (day.date === nextDate) {
-							nextDay = {
-								...nextDay,
-								summary: applySleepToSummary(nextDay, updatedSleep),
-								timeline: [...nextDay.timeline, updatedSleep].sort(sortEventsDescending),
-							};
-						}
-
-						return nextDay;
-					})
-					.sort(sortDaysDescending);
-			});
+			const { id, ...payload } = input;
+			const response = await updateRoutineLog(selectedBaby.id, "sleep", id, payload);
+			applyMutationResult(response.affectedDailyLogs, response.lastLogged);
+			return true;
 		};
 
-		const removeMeal = (mealId: string) => {
-			setDailyLogs((currentLogs) => {
-				const existingMeal = currentLogs
-					.flatMap((day) => day.timeline)
-					.find((event): event is MealEvent => event.kind === "meal" && event.id === mealId);
+		const removeMeal = async (mealId: string) => {
+			if (!selectedBaby) return false;
 
-				if (!existingMeal) {
-					return currentLogs;
-				}
-
-				const mealDate = getEventDate(existingMeal);
-
-				return currentLogs
-					.map((day) => {
-						if (day.date !== mealDate) {
-							return day;
-						}
-
-						return {
-							...day,
-							summary: removeMealFromSummary(day, existingMeal),
-							timeline: day.timeline.filter((event) => event.id !== existingMeal.id),
-						};
-					})
-					.sort(sortDaysDescending);
-			});
+			const response = await deleteRoutineLog(selectedBaby.id, "meal", mealId);
+			applyMutationResult(response.affectedDailyLogs, response.lastLogged);
+			return true;
 		};
 
-		const removeDiaper = (diaperId: string) => {
-			setDailyLogs((currentLogs) => {
-				const existingDiaper = currentLogs
-					.flatMap((day) => day.timeline)
-					.find((event): event is DiaperEvent => event.kind === "diaper" && event.id === diaperId);
+		const removeDiaper = async (diaperId: string) => {
+			if (!selectedBaby) return false;
 
-				if (!existingDiaper) {
-					return currentLogs;
-				}
-
-				const diaperDate = getEventDate(existingDiaper);
-
-				return currentLogs
-					.map((day) => {
-						if (day.date !== diaperDate) {
-							return day;
-						}
-
-						return {
-							...day,
-							summary: removeDiaperFromSummary(day, existingDiaper),
-							timeline: day.timeline.filter((event) => event.id !== existingDiaper.id),
-						};
-					})
-					.sort(sortDaysDescending);
-			});
+			const response = await deleteRoutineLog(selectedBaby.id, "diaper", diaperId);
+			applyMutationResult(response.affectedDailyLogs, response.lastLogged);
+			return true;
 		};
 
-		const removeSleep = (sleepId: string) => {
-			setDailyLogs((currentLogs) => {
-				const existingSleep = currentLogs
-					.flatMap((day) => day.timeline)
-					.find((event): event is SleepEvent => event.kind === "sleep" && event.id === sleepId);
+		const removeSleep = async (sleepId: string) => {
+			if (!selectedBaby) return false;
 
-				if (!existingSleep) {
-					return currentLogs;
-				}
-
-				const sleepDate = getEventDate(existingSleep);
-
-				return currentLogs
-					.map((day) => {
-						if (day.date !== sleepDate) {
-							return day;
-						}
-
-						return {
-							...day,
-							summary: removeSleepFromSummary(day, existingSleep),
-							timeline: day.timeline.filter((event) => event.id !== existingSleep.id),
-						};
-					})
-					.sort(sortDaysDescending);
-			});
+			const response = await deleteRoutineLog(selectedBaby.id, "sleep", sleepId);
+			applyMutationResult(response.affectedDailyLogs, response.lastLogged);
+			return true;
 		};
 
 		return {
@@ -629,7 +408,9 @@ export function RoutineDataProvider({ children }: PropsWithChildren) {
 			getLatestMeal,
 			getLatestSleep,
 			getOngoingSleep,
+			lastLogged,
 			prependOlderDailyLogs,
+			setLastLogged,
 			updateDiaper,
 			updateMeal,
 			updateSleep,
@@ -638,7 +419,7 @@ export function RoutineDataProvider({ children }: PropsWithChildren) {
 			removeSleep,
 			replaceDailyLogs,
 		};
-	}, [dailyLogs, prependOlderDailyLogs, replaceDailyLogs]);
+	}, [applyMutationResult, dailyLogs, lastLogged, prependOlderDailyLogs, replaceDailyLogs, selectedBaby]);
 
 	return <RoutineDataContext.Provider value={value}>{children}</RoutineDataContext.Provider>;
 }

@@ -64,6 +64,8 @@ export default function AddMealScreen() {
 	const [amountBowl, setAmountBowl] = useState(mealToEdit?.amountBowl ?? latestMeal?.amountBowl ?? 0.5);
 	const [notes, setNotes] = useState(mealToEdit?.notes ?? "");
 	const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
+	const [isSaving, setIsSaving] = useState(false);
+	const [formError, setFormError] = useState<string | null>(null);
 
 	const decrementBottle = () => setAmountMl((value) => Math.max(BOTTLE_STEP_ML, value - BOTTLE_STEP_ML));
 	const incrementBottle = () => setAmountMl((value) => value + BOTTLE_STEP_ML);
@@ -83,7 +85,9 @@ export default function AddMealScreen() {
 		setMealTime(selectedDate);
 	};
 
-	const saveMeal = () => {
+	const saveMeal = async () => {
+		setIsSaving(true);
+		setFormError(null);
 		const input = {
 			amountBowl: mealType === "solid" ? amountBowl : undefined,
 			amountMl: isBottleMeal(mealType) ? amountMl : undefined,
@@ -93,21 +97,43 @@ export default function AddMealScreen() {
 			type: mealType,
 		};
 
-		if (mealToEdit) {
-			updateMeal({ ...input, id: mealToEdit.id });
-		} else {
-			addMeal(input);
-		}
+		try {
+			const didSave = mealToEdit
+				? await updateMeal({ ...input, id: mealToEdit.id })
+				: await addMeal(input);
 
-		router.back();
+			if (didSave) {
+				router.back();
+			} else {
+				setFormError("Select a baby before saving this meal.");
+			}
+		} catch (error) {
+			setFormError(getErrorMessage(error));
+		} finally {
+			setIsSaving(false);
+		}
 	};
 
-	const deleteMeal = () => {
+	const deleteMeal = async () => {
 		if (!mealToEdit) return;
-		
-		removeMeal(mealToEdit.id);
-		setIsDeleteModalVisible(false);
-		router.back();
+
+		setIsSaving(true);
+		setFormError(null);
+
+		try {
+			const didDelete = await removeMeal(mealToEdit.id);
+
+			if (didDelete) {
+				setIsDeleteModalVisible(false);
+				router.back();
+			} else {
+				setFormError("Select a baby before deleting this meal.");
+			}
+		} catch (error) {
+			setFormError(getErrorMessage(error));
+		} finally {
+			setIsSaving(false);
+		}
 	}
 
 	return (
@@ -127,6 +153,7 @@ export default function AddMealScreen() {
 					{mealToEdit? (
 						<Pressable
 							accessibilityRole="button"
+							disabled={isSaving}
 							onPress={() => setIsDeleteModalVisible(true)}
 							style={styles.headerButton}
 						>
@@ -261,15 +288,23 @@ export default function AddMealScreen() {
 				</ScrollView>
 
 				<View style={styles.footer}>
-					<Pressable accessibilityRole="button" onPress={saveMeal} style={styles.saveButton}>
-						<Text style={styles.saveButtonText}>{mealToEdit ? "Update Meal" : "Save Meal"}</Text>
+					{formError ? <Text style={styles.errorText}>{formError}</Text> : null}
+					<Pressable
+						accessibilityRole="button"
+						disabled={isSaving}
+						onPress={() => void saveMeal()}
+						style={[styles.saveButton, isSaving && styles.saveButtonDisabled]}
+					>
+						<Text style={styles.saveButtonText}>
+							{isSaving ? "Saving..." : mealToEdit ? "Update Meal" : "Save Meal"}
+						</Text>
 					</Pressable>
 				</View>
 				<ConfirmDeleteModal
 					confirmLabel="Delete"
 					message="Are you sure you want to delete this meal log permanently?"
 					onCancel={() => setIsDeleteModalVisible(false)}
-					onConfirm={deleteMeal}
+					onConfirm={() => void deleteMeal()}
 					title="Delete meal entry?"
 					visible={isDeleteModalVisible}
 				/>
@@ -399,10 +434,19 @@ const styles = StyleSheet.create({
 		borderRadius: 16,
 		paddingVertical: 16,
 	},
+	saveButtonDisabled: {
+		opacity: 0.5,
+	},
 	saveButtonText: {
 		color: colors.light.surface,
 		fontSize: 16,
 		fontWeight: "800",
+	},
+	errorText: {
+		color: colors.light.error,
+		fontSize: 13,
+		fontWeight: "700",
+		marginBottom: spacing.sm,
 	},
 	section: {
 		gap: spacing.sm,
@@ -465,3 +509,11 @@ const styles = StyleSheet.create({
 		fontWeight: "800",
 	},
 });
+
+function getErrorMessage(error: unknown) {
+	if (error instanceof Error) {
+		return error.message;
+	}
+
+	return "Could not save meal. Please try again.";
+}

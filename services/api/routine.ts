@@ -1,5 +1,12 @@
 import type { RoutineDay } from "@/data/homeData";
-import { apiGet } from "@/services/api/httpClient";
+import type {
+	DiaperColor,
+	DiaperType,
+	MealType,
+	RoutineKind,
+	SleepType,
+} from "@/data/homeData";
+import { apiDelete, apiGet, apiPatch, apiPost } from "@/services/api/httpClient";
 
 export type RoutineLastLogged = {
 	meal: {
@@ -11,6 +18,7 @@ export type RoutineLastLogged = {
 		type: "wet" | "dirty" | "both" | "dry";
 	} | null;
 	sleep: {
+		id: string;
 		endTime: string | null;
 		isActive: boolean;
 		lastLoggedAt: string;
@@ -23,6 +31,50 @@ export type GetRoutineDaysResponse = {
 	dailyLogs: RoutineDay[];
 	lastLogged?: RoutineLastLogged;
 	nextStartDate: string | null;
+};
+
+export type CreateMealLogInput = {
+	amountBowl?: number;
+	amountGrams?: number;
+	amountMl?: number;
+	durationMinutes?: number;
+	kind: "meal";
+	notes?: string;
+	time: string;
+	type: MealType;
+};
+
+export type CreateDiaperLogInput = {
+	color?: DiaperColor;
+	kind: "diaper";
+	notes?: string;
+	time: string;
+	type: DiaperType;
+};
+
+export type CreateSleepLogInput = {
+	endTime?: string;
+	kind: "sleep";
+	notes?: string;
+	startTime: string;
+	type: SleepType;
+};
+
+export type CreateRoutineLogInput =
+	| CreateMealLogInput
+	| CreateDiaperLogInput
+	| CreateSleepLogInput;
+
+export type UpdateRoutineLogInput =
+	| Omit<CreateMealLogInput, "kind">
+	| Omit<CreateDiaperLogInput, "kind">
+	| Omit<CreateSleepLogInput, "kind">;
+
+export type RoutineMutationResponse = {
+	affectedDailyLogs: RoutineDay[];
+	event?: CreateRoutineLogInput & { id: string };
+	deleted?: true;
+	lastLogged: RoutineLastLogged;
 };
 
 export function getRoutineDays({
@@ -44,4 +96,32 @@ export function getRoutineDays({
 			startDate,
 		},
 	});
+}
+
+export function createRoutineLog(babyId: string, input: CreateRoutineLogInput) {
+	return apiPost<RoutineMutationResponse, CreateRoutineLogInput>(
+		`/babies/${babyId}/routine/logs`,
+		input,
+		{ auth: true },
+	);
+}
+
+export function updateRoutineLog(
+	babyId: string,
+	kind: RoutineKind,
+	id: string,
+	input: UpdateRoutineLogInput,
+) {
+	return apiPatch<RoutineMutationResponse, UpdateRoutineLogInput>(
+		`/babies/${babyId}/routine/logs/${kind}/${id}`,
+		input,
+		{ auth: true },
+	);
+}
+
+export function deleteRoutineLog(babyId: string, kind: RoutineKind, id: string) {
+	return apiDelete<RoutineMutationResponse>(
+		`/babies/${babyId}/routine/logs/${kind}/${id}`,
+		{ auth: true },
+	);
 }

@@ -63,13 +63,27 @@ function DateTimeRow({
 export default function AddSleepScreen() {
 	const router = useRouter();
 	const { sleepId } = useLocalSearchParams<{ sleepId?: string }>();
-	const { addSleep, dailyLogs, getLatestSleep, removeSleep, updateSleep } = useRoutineData();
-	const sleepToEdit = dailyLogs
+	const { addSleep, dailyLogs, getLatestSleep, lastLogged, removeSleep, updateSleep } = useRoutineData();
+	const timelineSleepToEdit = dailyLogs
 		.flatMap((day) => day.timeline)
 		.find(
 			(event): event is SleepEvent =>
 				event.kind === "sleep" && event.id === sleepId,
 		);
+	const activeLastLoggedSleep =
+		lastLogged?.sleep?.isActive && lastLogged.sleep.id === sleepId
+			? lastLogged.sleep
+			: null;
+	const sleepToEdit: SleepEvent | undefined = timelineSleepToEdit ??
+		(activeLastLoggedSleep
+			? {
+					endTime: activeLastLoggedSleep.endTime ?? undefined,
+					id: activeLastLoggedSleep.id,
+					kind: "sleep",
+					startTime: activeLastLoggedSleep.startTime,
+					type: activeLastLoggedSleep.type,
+				}
+			: undefined);
 	const latestSleep = getLatestSleep();
 	const isEndMode = Boolean(sleepToEdit);
 	const [activePicker, setActivePicker] = useState<ActivePicker>(null);
@@ -88,6 +102,8 @@ export default function AddSleepScreen() {
 	});
 	const [notes, setNotes] = useState(sleepToEdit?.notes ?? "");
 	const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
+	const [isSaving, setIsSaving] = useState(false);
+	const [formError, setFormError] = useState<string | null>(null);
 
 	const errorMessage =
 		endTime && endTime.getTime() < startTime.getTime()
@@ -116,10 +132,13 @@ export default function AddSleepScreen() {
 		}
 	};
 
-	const saveSleep = () => {
+	const saveSleep = async () => {
 		if (errorMessage) {
 			return;
 		}
+
+		setIsSaving(true);
+		setFormError(null);
 
 		const input = {
 			endTime: endTime?.toISOString(),
@@ -128,21 +147,43 @@ export default function AddSleepScreen() {
 			type: sleepType,
 		};
 
-		if (sleepToEdit) {
-			updateSleep({ ...input, id: sleepToEdit.id });
-		} else {
-			addSleep(input);
-		}
+		try {
+			const didSave = sleepToEdit
+				? await updateSleep({ ...input, id: sleepToEdit.id })
+				: await addSleep(input);
 
-		router.back();
+			if (didSave) {
+				router.back();
+			} else {
+				setFormError("Select a baby before saving this sleep.");
+			}
+		} catch (error) {
+			setFormError(getErrorMessage(error));
+		} finally {
+			setIsSaving(false);
+		}
 	};
 
-	const deleteSleep = () => {
+	const deleteSleep = async () => {
 		if (!sleepToEdit) return;
 
-		removeSleep(sleepToEdit.id);
-		setIsDeleteModalVisible(false);
-		router.back();
+		setIsSaving(true);
+		setFormError(null);
+
+		try {
+			const didDelete = await removeSleep(sleepToEdit.id);
+
+			if (didDelete) {
+				setIsDeleteModalVisible(false);
+				router.back();
+			} else {
+				setFormError("Select a baby before deleting this sleep.");
+			}
+		} catch (error) {
+			setFormError(getErrorMessage(error));
+		} finally {
+			setIsSaving(false);
+		}
 	};
 
 	return (
@@ -166,6 +207,7 @@ export default function AddSleepScreen() {
 					{sleepToEdit ? (
 						<Pressable
 							accessibilityRole="button"
+							disabled={isSaving}
 							onPress={() => setIsDeleteModalVisible(true)}
 							style={styles.headerButton}
 						>
@@ -298,14 +340,15 @@ export default function AddSleepScreen() {
 				</ScrollView>
 
 				<View style={styles.footer}>
+					{formError ? <Text style={styles.formErrorText}>{formError}</Text> : null}
 					<Pressable
 						accessibilityRole="button"
-						disabled={Boolean(errorMessage)}
-						onPress={saveSleep}
-						style={[styles.saveButton, errorMessage && styles.saveButtonDisabled]}
+						disabled={Boolean(errorMessage) || isSaving}
+						onPress={() => void saveSleep()}
+						style={[styles.saveButton, (errorMessage || isSaving) && styles.saveButtonDisabled]}
 					>
 						<Text style={styles.saveButtonText}>
-							{isEndMode ? "Update Sleep" : "Start Sleep"}
+							{isSaving ? "Saving..." : isEndMode ? "Update Sleep" : "Start Sleep"}
 						</Text>
 					</Pressable>
 				</View>
@@ -313,7 +356,7 @@ export default function AddSleepScreen() {
 					confirmLabel="Delete"
 					message="Are you sure you want to delete this sleep log permanently?"
 					onCancel={() => setIsDeleteModalVisible(false)}
-					onConfirm={deleteSleep}
+					onConfirm={() => void deleteSleep()}
 					title="Delete sleep entry?"
 					visible={isDeleteModalVisible}
 				/>
@@ -379,6 +422,12 @@ const styles = StyleSheet.create({
 		color: "#D92D20",
 		fontSize: 13,
 		fontWeight: "700",
+	},
+	formErrorText: {
+		color: colors.light.error,
+		fontSize: 13,
+		fontWeight: "700",
+		marginBottom: spacing.sm,
 	},
 	footer: {
 		backgroundColor: colors.light.background,
@@ -479,3 +528,11 @@ const styles = StyleSheet.create({
 		color: routineConfig.quickActions.sleep.accentColor,
 	},
 });
+
+function getErrorMessage(error: unknown) {
+	if (error instanceof Error) {
+		return error.message;
+	}
+
+	return "Could not save sleep. Please try again.";
+}

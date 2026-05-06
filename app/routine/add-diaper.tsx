@@ -52,9 +52,7 @@ export default function AddDiaperScreen() {
 		);
 	const latestDiaper = getLatestDiaper();
 	const initialType = diaperToEdit?.type ?? latestDiaper?.type ?? "wet";
-	const initialColor = needsColor(initialType)
-		? diaperToEdit?.color ?? latestDiaper?.color
-		: undefined;
+	const initialColor = needsColor(initialType) ? diaperToEdit?.color : undefined;
 	const [diaperTime, setDiaperTime] = useState(
 		() => new Date(diaperToEdit?.time ?? Date.now()),
 	);
@@ -67,6 +65,8 @@ export default function AddDiaperScreen() {
 	);
 	const [notes, setNotes] = useState(diaperToEdit?.notes ?? "");
 	const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
+	const [isSaving, setIsSaving] = useState(false);
+	const [formError, setFormError] = useState<string | null>(null);
 
 	const handlePickerChange = (
 		event: DateTimePickerEvent,
@@ -88,13 +88,12 @@ export default function AddDiaperScreen() {
 
 		if (!needsColor(type)) {
 			setDiaperColor(undefined);
-			return;
 		}
-
-		setDiaperColor((currentColor) => currentColor ?? latestDiaper?.color ?? "brown");
 	};
 
-	const saveDiaper = () => {
+	const saveDiaper = async () => {
+		setIsSaving(true);
+		setFormError(null);
 		const input = {
 			color: needsColor(diaperType) ? diaperColor : undefined,
 			notes,
@@ -102,21 +101,43 @@ export default function AddDiaperScreen() {
 			type: diaperType,
 		};
 
-		if (diaperToEdit) {
-			updateDiaper({ ...input, id: diaperToEdit.id });
-		} else {
-			addDiaper(input);
-		}
+		try {
+			const didSave = diaperToEdit
+				? await updateDiaper({ ...input, id: diaperToEdit.id })
+				: await addDiaper(input);
 
-		router.back();
+			if (didSave) {
+				router.back();
+			} else {
+				setFormError("Select a baby before saving this diaper.");
+			}
+		} catch (error) {
+			setFormError(getErrorMessage(error));
+		} finally {
+			setIsSaving(false);
+		}
 	};
 
-	const deleteDiaper = () => {
+	const deleteDiaper = async () => {
 		if (!diaperToEdit) return;
 
-		removeDiaper(diaperToEdit.id);
-		setIsDeleteModalVisible(false);
-		router.back();
+		setIsSaving(true);
+		setFormError(null);
+
+		try {
+			const didDelete = await removeDiaper(diaperToEdit.id);
+
+			if (didDelete) {
+				setIsDeleteModalVisible(false);
+				router.back();
+			} else {
+				setFormError("Select a baby before deleting this diaper.");
+			}
+		} catch (error) {
+			setFormError(getErrorMessage(error));
+		} finally {
+			setIsSaving(false);
+		}
 	};
 
 	return (
@@ -140,6 +161,7 @@ export default function AddDiaperScreen() {
 					{diaperToEdit ? (
 						<Pressable
 							accessibilityRole="button"
+							disabled={isSaving}
 							onPress={() => setIsDeleteModalVisible(true)}
 							style={styles.headerButton}
 						>
@@ -289,19 +311,23 @@ export default function AddDiaperScreen() {
 				</ScrollView>
 
 				<View style={styles.footer}>
+					{formError ? <Text style={styles.errorText}>{formError}</Text> : null}
 					<Pressable
 						accessibilityRole="button"
-						onPress={saveDiaper}
-						style={styles.saveButton}
+						disabled={isSaving}
+						onPress={() => void saveDiaper()}
+						style={[styles.saveButton, isSaving && styles.saveButtonDisabled]}
 					>
-						<Text style={styles.saveButtonText}>{diaperToEdit ? "Update Diaper" : "Save Diaper"}</Text>
+						<Text style={styles.saveButtonText}>
+							{isSaving ? "Saving..." : diaperToEdit ? "Update Diaper" : "Save Diaper"}
+						</Text>
 					</Pressable>
 				</View>
 				<ConfirmDeleteModal
 					confirmLabel="Delete"
 					message="Are you sure you want to delete this diaper log permanently?"
 					onCancel={() => setIsDeleteModalVisible(false)}
-					onConfirm={deleteDiaper}
+					onConfirm={() => void deleteDiaper()}
 					title="Delete diaper entry?"
 					visible={isDeleteModalVisible}
 				/>
@@ -426,10 +452,19 @@ const styles = StyleSheet.create({
 		borderRadius: 16,
 		paddingVertical: 16,
 	},
+	saveButtonDisabled: {
+		opacity: 0.5,
+	},
 	saveButtonText: {
 		color: colors.light.surface,
 		fontSize: 16,
 		fontWeight: "800",
+	},
+	errorText: {
+		color: colors.light.error,
+		fontSize: 13,
+		fontWeight: "700",
+		marginBottom: spacing.sm,
 	},
 	section: {
 		gap: spacing.sm,
@@ -467,3 +502,11 @@ const styles = StyleSheet.create({
 		color: routineConfig.quickActions.diaper.accentColor,
 	},
 });
+
+function getErrorMessage(error: unknown) {
+	if (error instanceof Error) {
+		return error.message;
+	}
+
+	return "Could not save diaper. Please try again.";
+}

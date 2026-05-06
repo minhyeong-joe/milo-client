@@ -37,8 +37,10 @@ export default function HomeScreen() {
 	const {
 		dailyLogs,
 		getOngoingSleep,
+		lastLogged,
 		prependOlderDailyLogs,
 		replaceDailyLogs,
+		setLastLogged,
 	} = useRoutineData();
 	const currentDate = useCurrentMinute();
 	const currentTime = currentDate.toISOString();
@@ -46,7 +48,6 @@ export default function HomeScreen() {
 	const [isOlderRoutineLoading, setIsOlderRoutineLoading] = useState(false);
 	const [routineError, setRoutineError] = useState<string | null>(null);
 	const [nextRoutineStartDate, setNextRoutineStartDate] = useState<string | null>(null);
-	const [lastLogged, setLastLogged] = useState<RoutineLastLogged | null>(null);
 	const [isRefreshing, setIsRefreshing] = useState(false);
 	const routineRequestIdRef = useRef(0);
 	const isOlderRoutineLoadingRef = useRef(false);
@@ -101,7 +102,7 @@ export default function HomeScreen() {
 				setIsInitialRoutineLoading(false);
 			}
 		}
-	}, [replaceDailyLogs, selectedBaby]);
+	}, [replaceDailyLogs, selectedBaby, setLastLogged]);
 
 	useEffect(() => {
 		void loadLatestRoutineLogs();
@@ -175,9 +176,12 @@ export default function HomeScreen() {
 			router.push("/routine/add-diaper");
 		} else if (kind === "sleep") {
 			const ongoingSleep = getOngoingSleep();
+			const activeSleepId = ongoingSleep?.id ?? (
+				lastLogged?.sleep?.isActive ? lastLogged.sleep.id : undefined
+			);
 			router.push({
 				pathname: "/routine/add-sleep",
-				params: ongoingSleep ? { sleepId: ongoingSleep.id } : undefined,
+				params: activeSleepId ? { sleepId: activeSleepId } : undefined,
 			});
 		}
 	};
@@ -402,9 +406,11 @@ function getLastLoggedActionLabel(
 	}
 
 	const loggedAt =
-		kind === "sleep"
-			? lastLogged.sleep?.lastLoggedAt
-			: lastLogged[kind]?.time;
+		kind === "sleep" ? lastLogged.sleep?.lastLoggedAt : lastLogged[kind]?.time;
+
+	if (kind === "sleep" && lastLogged.sleep?.isActive) {
+		return "Sleeping...";
+	}
 
 	if (!loggedAt) {
 		return "No logs yet";
