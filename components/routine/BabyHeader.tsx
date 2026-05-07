@@ -248,7 +248,9 @@ const styles = StyleSheet.create({
 		gap: spacing.md,
 	},
 	largeAvatar: {
+		borderColor: colors.light.border,
 		borderRadius: 72,
+		borderWidth: 1,
 		height: 144,
 		width: 144,
 	},

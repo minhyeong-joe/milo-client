@@ -23,7 +23,7 @@ export default function SettingsScreen() {
   };
 
   return (
-    <SafeAreaView style={globalStyles.screen}>
+    <SafeAreaView edges={["top", "left", "right"]} style={globalStyles.screen}>
       <View style={globalStyles.screenContent}>
         <Text style={globalStyles.titleText}>Settings Screen</Text>
         <Text style={globalStyles.bodyText}>

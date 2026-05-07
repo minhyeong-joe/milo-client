@@ -4,7 +4,6 @@ export type GrowthRecord = {
 	id: string;
 	babyId: string;
 	measuredDate: string;
-	measuredAt: string;
 	heightMm: number | null;
 	weightGrams: number | null;
 	headCircumferenceMm: number | null;

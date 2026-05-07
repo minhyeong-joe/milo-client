@@ -4,7 +4,7 @@ import { globalStyles } from "@/styles/globalStyles";
 
 export default function DiaryScreen() {
   return (
-    <SafeAreaView style={globalStyles.screen}>
+    <SafeAreaView edges={["top", "left", "right"]} style={globalStyles.screen}>
       <View style={globalStyles.screenContent}>
         <Text style={globalStyles.titleText}>Diary Screen</Text>
         <Text style={globalStyles.bodyText}>
