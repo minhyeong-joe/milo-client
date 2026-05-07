@@ -466,11 +466,11 @@ function buildChartPoints(
 				id: record.id,
 				measuredValue,
 				percentile: whoReference?.percentile ?? null,
-				value: toDisplayGrowthValue(metric, measuredValue, units),
+				value: measuredValue,
 				whoMedian:
 					whoReference === null
 						? null
-						: toDisplayGrowthValue(metric, whoReference.median, units),
+						: whoReference.median,
 			};
 		})
 		.filter((point): point is ChartPoint => point !== null);
