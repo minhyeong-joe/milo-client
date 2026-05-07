@@ -116,4 +116,12 @@ export const globalStyles = StyleSheet.create({
 		...typography.body,
 		color: colors.light.textSecondary,
 	},
+    placeholderCard: {
+        gap: spacing.sm,
+        marginTop: spacing.lg,
+    },
+    placeholderTitle: {
+        ...typography.sectionTitle,
+        color: colors.light.textPrimary,
+    },
 });
