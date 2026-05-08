@@ -97,11 +97,11 @@ export default function GrowthChartCard({
             />
         ),
         onPress: () => setSelectedPointId(point.id),
-        value: point.value,
+        value: toChartUnitValue(point.value, metric, lengthUnit, weightUnit),
     }));
     const whoLineData = chartPoints.map<LineDataItem>((point) => ({
         hideDataPoint: true,
-        value: point.whoMedian ?? point.value,
+        value: toChartUnitValue(point.whoMedian ?? point.value, metric, lengthUnit, weightUnit),
     }));
     const chartValues = [...lineData, ...whoLineData].map((point) => point.value);
     const minValue = Math.min(...chartValues);
@@ -273,6 +273,19 @@ function buildChartPoints(
             };
         })
         .filter((point): point is ChartPoint => point !== null);
+}
+
+function toChartUnitValue(
+    value: number,
+    metric: GrowthMetric,
+    lengthUnit: "cm" | "in",
+    weightUnit: "kg" | "lb",
+) {
+    if (metric === "weight") {
+        return weightUnit === "kg" ? value : value * 2.2046226218;
+    }
+
+    return lengthUnit === "cm" ? value : value / 2.54;
 }
 
 
