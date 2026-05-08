@@ -1,5 +1,6 @@
 import { useAuthSession } from "@/context/AuthSessionContext";
 import { useBabySelection } from "@/context/BabySelectionContext";
+import { useGrowthData } from "@/context/GrowthDataContext";
 import { useRoutineData } from "@/context/RoutineDataContext";
 import {
 	createContext,
@@ -16,7 +17,7 @@ export type ConnectionStatus = "online" | "offline" | "authRequired";
 
 type SyncNowOptions = {
 	babyId?: string;
-	scope?: "routine" | "all";
+	scope?: "growth" | "routine" | "all";
 };
 
 type SyncContextValue = {
@@ -37,6 +38,7 @@ const SYNC_TIMEOUT_MS = 10000;
 export function SyncProvider({ children }: PropsWithChildren) {
 	const { authStatus, session } = useAuthSession();
 	const { refreshBabies, selectedBaby } = useBabySelection();
+	const { syncPendingGrowthMutations } = useGrowthData();
 	const { syncPendingMutations } = useRoutineData();
 	const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("online");
 	const [status, setStatus] = useState<SyncStatus>("idle");
@@ -84,13 +86,19 @@ export function SyncProvider({ children }: PropsWithChildren) {
 					await refreshBabies();
 				}
 
-				if (scope === "all" || scope === "routine") {
+				if (scope === "all" || scope === "routine" || scope === "growth") {
 					if (!options.babyId && !selectedBaby) {
-					markOnline();
-					return true;
+						markOnline();
+						return true;
+					}
 				}
 
+				if (scope === "all" || scope === "routine") {
 					await syncPendingMutations();
+				}
+
+				if (scope === "all" || scope === "growth") {
+					await syncPendingGrowthMutations();
 				}
 
 				markOnline();
@@ -126,6 +134,7 @@ export function SyncProvider({ children }: PropsWithChildren) {
 		refreshBabies,
 		selectedBaby,
 		session,
+		syncPendingGrowthMutations,
 		syncPendingMutations,
 	]);
 

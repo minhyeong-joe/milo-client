@@ -183,11 +183,11 @@ export function BabyHeader({
 							accessibilityRole="button"
 							onPress={() => {
 								setIsProfileModalOpen(false);
-								router.push("/baby/add-measurement");
+								router.push("/baby/growth");
 							}}
 							style={styles.profileActionButton}
 						>
-							<Text style={styles.profileActionText}>Add Measurement</Text>
+							<Text style={styles.profileActionText}>Edit Growth</Text>
 						</Pressable>
 					</Pressable>
 				</Pressable>

@@ -1,11 +1,11 @@
 import { useAppPreferences } from "@/context/AppPreferencesContext";
 import { useBabySelection } from "@/context/BabySelectionContext";
-import { createGrowthRecord } from "@/services/api/growth";
+import { useGrowthData } from "@/context/GrowthDataContext";
 import { colors, globalStyles, spacing } from "@/styles/globalStyles";
 import DateTimePicker, { type DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useEffect, useMemo, useState } from "react";
 import {
 	KeyboardAvoidingView,
 	Platform,
@@ -17,21 +17,45 @@ import {
 	View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { ConfirmDeleteModal } from "@/components/routine/ConfirmDeleteModal";
 
 const NOTES_LIMIT = 200;
 
 export default function AddMeasurementScreen() {
 	const router = useRouter();
+	const { growthId } = useLocalSearchParams<{ growthId?: string }>();
 	const { selectedBaby } = useBabySelection();
+	const {
+		createGrowthRecord,
+		deleteGrowthRecord,
+		getGrowthRecord,
+		updateGrowthRecord,
+	} = useGrowthData();
 	const { preferredLengthUnit, preferredWeightUnit } = useAppPreferences();
+	const existingRecord = useMemo(
+		() => (growthId ? getGrowthRecord(growthId) : undefined),
+		[getGrowthRecord, growthId],
+	);
+	const isEditMode = Boolean(growthId);
 	const [measuredDate, setMeasuredDate] = useState(new Date());
 	const [isPickerOpen, setIsPickerOpen] = useState(false);
 	const [heightText, setHeightText] = useState("");
 	const [weightText, setWeightText] = useState("");
 	const [headText, setHeadText] = useState("");
 	const [notes, setNotes] = useState("");
+	const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
 	const [isSaving, setIsSaving] = useState(false);
 	const [formError, setFormError] = useState<string | null>(null);
+
+	useEffect(() => {
+		if (!existingRecord) return;
+
+		setMeasuredDate(parseDateKey(existingRecord.measuredDate));
+		setHeightText(formatLengthForInput(existingRecord.heightMm, preferredLengthUnit));
+		setWeightText(formatWeightForInput(existingRecord.weightGrams, preferredWeightUnit));
+		setHeadText(formatLengthForInput(existingRecord.headCircumferenceMm, preferredLengthUnit));
+		setNotes(existingRecord.notes ?? "");
+	}, [existingRecord, preferredLengthUnit, preferredWeightUnit]);
 
 	const handlePickerChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
 		if (Platform.OS === "android") {
@@ -64,14 +88,45 @@ export default function AddMeasurementScreen() {
 		setFormError(null);
 
 		try {
-			await createGrowthRecord(selectedBaby.id, {
+			const input = {
 				headCircumferenceMm: headCircumferenceMm ?? undefined,
 				heightMm: heightMm ?? undefined,
 				measuredDate: getDateKey(measuredDate),
 				notes,
 				weightGrams: weightGrams ?? undefined,
-			});
+			};
+			const didSave = growthId
+				? await updateGrowthRecord(growthId, input)
+				: await createGrowthRecord(input);
+
+			if (!didSave) {
+				setFormError("Could not save measurement. Please try again.");
+				return;
+			}
+
 			router.back();
+		} catch (error) {
+			setFormError(getErrorMessage(error));
+		} finally {
+			setIsSaving(false);
+		}
+	};
+
+	const removeMeasurement = async () => {
+		if (!growthId) return;
+
+		setIsSaving(true);
+		setFormError(null);
+
+		try {
+			const didDelete = await deleteGrowthRecord(growthId);
+
+			if (didDelete) {
+				setIsDeleteModalVisible(false);
+				router.back();
+			} else {
+				setFormError("Could not delete measurement. Please try again.");
+			}
 		} catch (error) {
 			setFormError(getErrorMessage(error));
 		} finally {
@@ -89,8 +144,19 @@ export default function AddMeasurementScreen() {
 					<Pressable accessibilityRole="button" onPress={() => router.back()} style={styles.headerButton}>
 						<Text style={styles.cancelText}>Cancel</Text>
 					</Pressable>
-					<Text style={globalStyles.sectionTitleText}>Add Measurement</Text>
-					<View style={styles.headerButton} />
+					<Text style={globalStyles.sectionTitleText}>
+						{isEditMode ? "Edit Measurement" : "Add Measurement"}
+					</Text>
+					{isEditMode? (
+						<Pressable
+							accessibilityRole="button"
+							disabled={isSaving}
+							onPress={() => setIsDeleteModalVisible(true)}
+							style={styles.headerButton}
+						>
+							<Ionicons name="trash-outline" size={24} style={styles.deleteIcon} />
+						</Pressable>
+					): (<View style={styles.headerSpacer} />)}
 				</View>
 				<ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
 					<View style={styles.section}>
@@ -155,9 +221,19 @@ export default function AddMeasurementScreen() {
 						onPress={() => void saveMeasurement()}
 						style={[styles.saveButton, isSaving && styles.saveButtonDisabled]}
 					>
-						<Text style={styles.saveButtonText}>{isSaving ? "Saving..." : "Save Measurement"}</Text>
+						<Text style={styles.saveButtonText}>
+							{isSaving ? "Saving..." : "Save Measurement"}
+						</Text>
 					</Pressable>
 				</View>
+				<ConfirmDeleteModal
+					confirmLabel="Delete"
+					message="Are you sure you want to delete this measurement permanently?"
+					onCancel={() => setIsDeleteModalVisible(false)}
+					onConfirm={() => void removeMeasurement()}
+					title="Delete measurement?"
+					visible={isDeleteModalVisible}
+				/>
 			</KeyboardAvoidingView>
 		</SafeAreaView>
 	);
@@ -207,6 +283,27 @@ function formatDate(value: Date) {
 		month: "short",
 		year: "numeric",
 	}).format(value);
+}
+
+function parseDateKey(value: string) {
+	const [year, month, day] = value.split("-").map(Number);
+	return new Date(year, month - 1, day);
+}
+
+function formatLengthForInput(valueMm: number | null, unit: "cm" | "in") {
+	if (typeof valueMm !== "number") return "";
+	const value = unit === "cm" ? valueMm / 10 : valueMm / 25.4;
+	return formatInputDecimal(value);
+}
+
+function formatWeightForInput(valueGrams: number | null, unit: "kg" | "lb") {
+	if (typeof valueGrams !== "number") return "";
+	const value = unit === "kg" ? valueGrams / 1000 : valueGrams / 453.59237;
+	return formatInputDecimal(value);
+}
+
+function formatInputDecimal(value: number) {
+	return value.toFixed(2).replace(/\.?0+$/, "");
 }
 
 function parsePositiveDecimal(value: string) {
@@ -272,6 +369,10 @@ const styles = StyleSheet.create({
 		fontSize: 16,
 		fontWeight: "800",
 	},
+	deleteIcon: {
+		color: colors.light.error,
+		alignSelf: "flex-end",
+	},
 	errorText: {
 		color: colors.light.error,
 		fontSize: 13,
@@ -292,6 +393,9 @@ const styles = StyleSheet.create({
 	headerButton: {
 		minWidth: 72,
 		paddingVertical: spacing.sm,
+	},
+	headerSpacer: {
+		width: 72,
 	},
 	keyboardView: {
 		flex: 1,

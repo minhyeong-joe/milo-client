@@ -98,5 +98,39 @@ async function initLocalDb(db: SQLite.SQLiteDatabase) {
 
     CREATE INDEX IF NOT EXISTS sync_job_queue_pending_idx
     ON sync_job_queue(user_id, status, created_at);
+
+    CREATE TABLE IF NOT EXISTS growth_record_cache (
+      user_id TEXT NOT NULL,
+      baby_id TEXT NOT NULL,
+      id TEXT NOT NULL,
+      measured_date TEXT NOT NULL,
+      record_json TEXT NOT NULL,
+      sync_status TEXT NOT NULL CHECK(sync_status IN ('synced', 'pending', 'failed')),
+      deleted_at TEXT,
+      error TEXT,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (user_id, baby_id, id)
+    );
+
+    CREATE INDEX IF NOT EXISTS growth_record_cache_date_idx
+    ON growth_record_cache(user_id, baby_id, measured_date DESC);
+
+    CREATE TABLE IF NOT EXISTS growth_mutation_queue (
+      id TEXT PRIMARY KEY NOT NULL,
+      user_id TEXT NOT NULL,
+      baby_id TEXT NOT NULL,
+      operation TEXT NOT NULL CHECK(operation IN ('create', 'update', 'delete')),
+      growth_id TEXT,
+      local_id TEXT,
+      payload_json TEXT NOT NULL,
+      status TEXT NOT NULL CHECK(status IN ('pending', 'failed')),
+      error TEXT,
+      retry_count INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS growth_mutation_queue_pending_idx
+    ON growth_mutation_queue(user_id, baby_id, status, created_at);
   `);
 }

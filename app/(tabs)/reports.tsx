@@ -1,13 +1,15 @@
 import { SyncStatusCard } from "@/components/sync/SyncStatusCard";
 import { useAppPreferences } from "@/context/AppPreferencesContext";
 import { useBabySelection } from "@/context/BabySelectionContext";
+import { useGrowthData } from "@/context/GrowthDataContext";
+import { useRoutineData } from "@/context/RoutineDataContext";
 import {
 	AUTH_REQUIRED_SYNC_MESSAGE,
 	OFFLINE_SYNC_MESSAGE,
 	useSync,
 } from "@/context/SyncContext";
+import type { RoutineEvent } from "@/data/homeData";
 import { ApiError } from "@/services/api/httpClient";
-import { getGrowthRecords, type GrowthRecord } from "@/services/api/growth";
 import { getRoutineStats, type RoutineStatsResponse } from "@/services/api/routine";
 import { colors, globalStyles, spacing, typography } from "@/styles/globalStyles";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -32,6 +34,11 @@ const REPORT_SYNC_TIMEOUT_MS = 10000;
 
 export default function ReportsScreen() {
 	const { selectedBaby } = useBabySelection();
+	const {
+		growthRecords,
+		loadGrowthRecords: loadLocalGrowthRecords,
+	} = useGrowthData();
+	const { dailyLogs, syncPendingMutations } = useRoutineData();
 	const { preferredLengthUnit, preferredWeightUnit } = useAppPreferences();
 	const {
 		connectionStatus,
@@ -42,7 +49,6 @@ export default function ReportsScreen() {
 		status: syncStatus,
 	} = useSync();
 	const [activeTab, setActiveTab] = useState<ReportsTab>("growth");
-	const [growthRecords, setGrowthRecords] = useState<GrowthRecord[]>([]);
 	const [patternRangeMode, setPatternRangeMode] = useState<PatternRangeMode>("week");
 	const [patternEndDate, setPatternEndDate] = useState<string | null>(null);
 	const initialPatternEndDate = selectedBaby
@@ -63,7 +69,6 @@ export default function ReportsScreen() {
 
 	const loadGrowthRecords = useCallback(async () => {
 		if (!selectedBaby) {
-			setGrowthRecords([]);
 			setGrowthError(null);
 			return;
 		}
@@ -72,11 +77,10 @@ export default function ReportsScreen() {
 		setGrowthError(null);
 
 		try {
-			const response = await withTimeout(
-				getGrowthRecords(selectedBaby.id),
+			await withTimeout(
+				loadLocalGrowthRecords({ sync: true }),
 				REPORT_SYNC_TIMEOUT_MS,
 			);
-			setGrowthRecords(response.growthRecords);
 			markOnline();
 		} catch (caughtError) {
 			if (isAuthRequiredError(caughtError)) {
@@ -89,7 +93,7 @@ export default function ReportsScreen() {
 		} finally {
 			setIsGrowthLoading(false);
 		}
-	}, [markAuthRequired, markOffline, markOnline, selectedBaby]);
+	}, [loadLocalGrowthRecords, markAuthRequired, markOffline, markOnline, selectedBaby]);
 
 	const patternDayCount = PATTERN_RANGE_DAYS[patternRangeMode];
 	const patternEndDateKey =
@@ -98,12 +102,20 @@ export default function ReportsScreen() {
 			? getDateKeyInTimeZone(new Date(), selectedBaby.timezone)
 			: getDateKey(new Date()));
 	const patternStartDate = addDays(patternEndDateKey, -(patternDayCount - 1));
+	const localPatternStats = useMemo(
+		() => buildRoutineStatsFromLocalLogs(dailyLogs, patternStartDate, patternEndDateKey),
+		[dailyLogs, patternEndDateKey, patternStartDate],
+	);
+	const displayedPatternStats = useMemo(
+		() => mergeRoutineStatsForDisplay(localPatternStats, patternStats),
+		[localPatternStats, patternStats],
+	);
 
 	const loadPatternStats = useCallback(async () => {
-		const emptyStats = createEmptyRoutineStats(patternStartDate, patternEndDateKey);
+		const localStats = buildRoutineStatsFromLocalLogs(dailyLogs, patternStartDate, patternEndDateKey);
 
 		if (!selectedBaby) {
-			setPatternStats(emptyStats);
+			setPatternStats(localStats);
 			setPatternError(null);
 			return;
 		}
@@ -115,10 +127,11 @@ export default function ReportsScreen() {
 			patternStats.startDate !== patternStartDate ||
 			patternStats.endDate !== patternEndDateKey
 		) {
-			setPatternStats(emptyStats);
+			setPatternStats(localStats);
 		}
 
 		try {
+			await syncPendingMutations();
 			const response = await withTimeout(
 				getRoutineStats({
 					babyId: selectedBaby.id,
@@ -141,6 +154,7 @@ export default function ReportsScreen() {
 			setIsPatternLoading(false);
 		}
 	}, [
+		dailyLogs,
 		markAuthRequired,
 		markOffline,
 		markOnline,
@@ -149,6 +163,7 @@ export default function ReportsScreen() {
 		patternStats.endDate,
 		patternStats.startDate,
 		selectedBaby,
+		syncPendingMutations,
 	]);
 
 	const refreshGrowthRecords = useCallback(async () => {
@@ -220,7 +235,7 @@ export default function ReportsScreen() {
 	const hasActiveData =
 		activeTab === "growth"
 			? growthRecords.length > 0
-			: patternStats.days.some((day) => day.logs.length > 0);
+			: displayedPatternStats.days.some((day) => day.logs.length > 0);
 
 	return (
 		<SafeAreaView edges={["top", "left", "right"]} style={globalStyles.screen}>
@@ -276,12 +291,92 @@ export default function ReportsScreen() {
 						rangeMode={patternRangeMode}
 						selectedBaby={selectedBaby}
 						startDate={patternStartDate}
-						stats={patternStats}
+						stats={displayedPatternStats}
 					/>
 				)}
 			</View>
 		</SafeAreaView>
 	);
+}
+
+function buildRoutineStatsFromLocalLogs(
+	dailyLogs: { date: string; timeline: RoutineEvent[] }[],
+	startDate: string,
+	endDate: string,
+): RoutineStatsResponse {
+	const stats = createEmptyRoutineStats(startDate, endDate);
+	const daysByDate = new Map(stats.days.map((day) => [day.date, day]));
+
+	for (const day of dailyLogs) {
+		const statsDay = daysByDate.get(day.date);
+
+		if (!statsDay) {
+			continue;
+		}
+
+		statsDay.logs = day.timeline.map((event) => {
+			if (event.kind === "meal") {
+				return {
+					amountBowl: event.amountBowl ?? null,
+					amountGrams: event.amountGrams ?? null,
+					amountMl: event.amountMl ?? null,
+					durationMinutes: event.durationMinutes ?? null,
+					id: event.id,
+					kind: "meal",
+					time: event.time,
+					type: event.type,
+				};
+			}
+
+			if (event.kind === "diaper") {
+				return {
+					id: event.id,
+					kind: "diaper",
+					time: event.time,
+					type: event.type,
+				};
+			}
+
+			return {
+				endTime: event.endTime ?? null,
+				id: event.id,
+				kind: "sleep",
+				startTime: event.startTime,
+				type: event.type,
+			};
+		});
+	}
+
+	return stats;
+}
+
+function mergeRoutineStatsForDisplay(
+	localStats: RoutineStatsResponse,
+	apiStats: RoutineStatsResponse,
+) {
+	if (
+		apiStats.startDate !== localStats.startDate ||
+		apiStats.endDate !== localStats.endDate
+	) {
+		return localStats;
+	}
+
+	return {
+		...apiStats,
+		days: apiStats.days.map((apiDay, index) => {
+			const localDay = localStats.days[index];
+			const logsById = new Map(apiDay.logs.map((log) => [log.id, log]));
+
+			for (const log of localDay?.logs ?? []) {
+				logsById.set(log.id, log);
+			}
+
+			return {
+				...apiDay,
+				logs: Array.from(logsById.values()),
+			};
+		}),
+	};
 }
 
 function TabButton({
