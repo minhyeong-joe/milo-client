@@ -55,7 +55,7 @@ export default function RoutineTimetableChart({
 		() =>
 			days.map((day, index) => ({
 				...day,
-				blocks: buildBlocksForDay(day),
+				blocks: buildBlocksForDay(day, days),
 				shouldShowLabel: shouldShowDateLabel(index, days.length),
 				showYear: index === 0 || day.date.slice(0, 4) !== days[index - 1]?.date.slice(0, 4),
 			})),
@@ -148,8 +148,9 @@ export default function RoutineTimetableChart({
 	);
 }
 
-function buildBlocksForDay(day: RoutineStatsDay) {
-	return day.logs
+function buildBlocksForDay(day: RoutineStatsDay, days: RoutineStatsDay[]) {
+	return [
+		...day.logs
 		.flatMap((log): TimetableBlock[] => {
 			if (log.kind === "sleep") {
 				return buildSleepBlocks(log, day.date);
@@ -167,8 +168,29 @@ function buildBlocksForDay(day: RoutineStatsDay) {
 				startMinute,
 				type: log.type,
 			}];
-		})
+		}),
+		...buildPreviousEveningSleepBlocks(day.date, days),
+	]
 		.sort((left, right) => left.startMinute - right.startMinute);
+}
+
+function buildPreviousEveningSleepBlocks(dayDate: string, days: RoutineStatsDay[]) {
+	return days.flatMap((sourceDay) =>
+		sourceDay.logs.flatMap((log): TimetableBlock[] => {
+			if (sourceDay.date === dayDate || log.kind !== "sleep") {
+				return [];
+			}
+
+			const start = getLocalTimeParts(log.startTime);
+			const end = log.endTime ? getLocalTimeParts(log.endTime) : null;
+
+			if (!start || start.dateKey !== dayDate || end?.dateKey === dayDate) {
+				return [];
+			}
+
+			return [createSleepBlock(log, start.minuteOfDay, DAY_MINUTES, "previous-evening")];
+		}),
+	);
 }
 
 function buildSleepBlocks(
@@ -183,21 +205,12 @@ function buildSleepBlocks(
 	}
 
 	const blocks: TimetableBlock[] = [];
-	const label = `Sleep (${log.type})`;
 	const createBlock = (startMinute: number, endMinute: number, suffix: string) => {
 		if (endMinute <= startMinute) {
 			return;
 		}
 
-		blocks.push({
-			color: KIND_COLORS.sleep,
-			endMinute,
-			id: `${log.id}:${suffix}`,
-			kind: "sleep",
-			label,
-			startMinute,
-			type: log.type,
-		});
+		blocks.push(createSleepBlock(log, startMinute, endMinute, suffix));
 	};
 
 	if (!end) {
@@ -219,7 +232,6 @@ function buildSleepBlocks(
 	}
 
 	if (start.dateKey < dayDate && end.dateKey === dayDate) {
-		createBlock(start.minuteOfDay, DAY_MINUTES, "previous-evening");
 		createBlock(0, end.minuteOfDay, "wake-morning");
 		return blocks;
 	}
@@ -233,6 +245,23 @@ function buildSleepBlocks(
 	}
 
 	return blocks;
+}
+
+function createSleepBlock(
+	log: Extract<RoutinePatternLog, { kind: "sleep" }>,
+	startMinute: number,
+	endMinute: number,
+	suffix: string,
+): TimetableBlock {
+	return {
+		color: KIND_COLORS.sleep,
+		endMinute,
+		id: `${log.id}:${suffix}`,
+		kind: "sleep",
+		label: `Sleep (${log.type})`,
+		startMinute,
+		type: log.type,
+	};
 }
 
 function buildStacks(blocks: TimetableBlock[]) {
