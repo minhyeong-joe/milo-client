@@ -240,44 +240,55 @@ function createEmptyRoutineStats(startDate: string, endDate: string): RoutineSta
 		startDate,
 		summary: {
 			diaper: {
-				both: { averageCount: 0 },
-				dirty: { averageCount: 0 },
-				dry: { averageCount: 0 },
-				total: { averageCount: 0 },
-				wet: { averageCount: 0 },
+				activeDays: 0,
+				avgChangesPerActiveDay: 0,
+				byType: {
+					both: { avgChangesPerActiveDay: 0 },
+					dirty: { avgChangesPerActiveDay: 0 },
+					dry: { avgChangesPerActiveDay: 0 },
+					wet: { avgChangesPerActiveDay: 0 },
+				},
 			},
 			meal: {
-				breastfeed: {
-					averageCount: 0,
-					averageDurationMinutes: null,
+				activeDays: 0,
+				avgSessionsPerActiveDay: 0,
+				byType: {
+					breastfeed: {
+						activeDays: 0,
+						avgDurationMinutesPerSession: 0,
+						avgSessionsPerActiveDay: 0,
+					},
+					breastMilk: {
+						activeDays: 0,
+						avgAmountMlPerSession: 0,
+						avgSessionsPerActiveDay: 0,
+					},
+					formula: {
+						activeDays: 0,
+						avgAmountMlPerSession: 0,
+						avgSessionsPerActiveDay: 0,
+					},
+					solid: {
+						activeDays: 0,
+						avgBowlsPerSession: 0,
+						avgGramsPerSession: 0,
+						avgSessionsPerActiveDay: 0,
+					},
 				},
-				breastMilk: {
-					averageAmountMl: null,
-					averageCount: 0,
-				},
-				formula: {
-					averageAmountMl: null,
-					averageCount: 0,
-				},
-				solid: {
-					averageAmountBowl: null,
-					averageAmountGrams: null,
-					averageCount: 0,
-				},
-				total: { averageCount: 0 },
 			},
 			sleep: {
-				nap: {
-					averageCount: 0,
-					averageDurationMinutes: null,
-				},
-				nighttime: {
-					averageCount: 0,
-					averageDurationMinutes: null,
-				},
-				total: {
-					averageCount: 0,
-					averageDurationMinutes: null,
+				activeDays: 0,
+				avgDurationMinutesPerActiveDay: 0,
+				avgSessionsPerActiveDay: 0,
+				byType: {
+					nap: {
+						avgDurationMinutesPerActiveDay: 0,
+						avgSessionsPerActiveDay: 0,
+					},
+					nighttime: {
+						avgDurationMinutesPerActiveDay: 0,
+						avgSessionsPerActiveDay: 0,
+					},
 				},
 			},
 		},

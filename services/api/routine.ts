@@ -132,58 +132,65 @@ export type RoutineStatsSummary = {
 };
 
 export type MealAverage = {
-	breastfeed: {
-		averageCount: number;
-		averageDurationMinutes: number | null;
-	};
-	breastMilk: {
-		averageAmountMl: number | null;
-		averageCount: number;
-	};
-	formula: {
-		averageAmountMl: number | null;
-		averageCount: number;
-	};
-	solid: {
-		averageAmountBowl: number | null;
-		averageAmountGrams: number | null;
-		averageCount: number;
-	};
-	total: {
-		averageCount: number;
+	activeDays: number;
+	avgSessionsPerActiveDay: number;
+	byType: {
+		breastfeed: {
+			activeDays: number;
+			avgDurationMinutesPerSession: number;
+			avgSessionsPerActiveDay: number;
+		};
+		breastMilk: {
+			activeDays: number;
+			avgAmountMlPerSession: number;
+			avgSessionsPerActiveDay: number;
+		};
+		formula: {
+			activeDays: number;
+			avgAmountMlPerSession: number;
+			avgSessionsPerActiveDay: number;
+		};
+		solid: {
+			activeDays: number;
+			avgBowlsPerSession: number;
+			avgGramsPerSession: number;
+			avgSessionsPerActiveDay: number;
+		};
 	};
 };
 
 export type DiaperAverage = {
-	both: {
-		averageCount: number;
-	};
-	dirty: {
-		averageCount: number;
-	};
-	dry: {
-		averageCount: number;
-	};
-	total: {
-		averageCount: number;
-	};
-	wet: {
-		averageCount: number;
+	activeDays: number;
+	avgChangesPerActiveDay: number;
+	byType: {
+		both: {
+			avgChangesPerActiveDay: number;
+		};
+		dirty: {
+			avgChangesPerActiveDay: number;
+		};
+		dry: {
+			avgChangesPerActiveDay: number;
+		};
+		wet: {
+			avgChangesPerActiveDay: number;
+		};
 	};
 };
 
 export type SleepAverage = {
-	nap: {
-		averageCount: number;
-		averageDurationMinutes: number | null;
-	};
-	nighttime: {
-		averageCount: number;
-		averageDurationMinutes: number | null;
-	};
-	total: {
-		averageCount: number;
-		averageDurationMinutes: number | null;
+	activeDays: number;
+	avgDurationMinutesPerActiveDay: number;
+	avgSessionsPerActiveDay: number;
+	byType: {
+		nap: {
+			avgDurationMinutesPerActiveDay: number;
+			avgSessionsPerActiveDay: number;
+		};
+		nighttime: {
+			avgDurationMinutesPerActiveDay: number;
+			avgSessionsPerActiveDay: number;
+		};
 	};
 };
 
@@ -203,6 +210,24 @@ export function getRoutineDays({
 		query: {
 			count,
 			includeLastLogged: includeLastLogged ? "true" : undefined,
+			startDate,
+		},
+	});
+}
+
+export function getRoutineStats({
+	babyId,
+	endDate,
+	startDate,
+}: {
+	babyId: string;
+	endDate: string;
+	startDate: string;
+}) {
+	return apiGet<RoutineStatsResponse>(`/babies/${babyId}/routine/stats`, {
+		auth: true,
+		query: {
+			endDate,
 			startDate,
 		},
 	});
