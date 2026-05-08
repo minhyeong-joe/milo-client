@@ -2,7 +2,7 @@ import type { AuthSession, AuthSessionTokens, SignUpRequest } from "@/services/a
 import { refreshAuthSession, signInUser, signUpUser } from "@/services/api/auth";
 import type { BabyRole, BabySex, CreateBabyRequest } from "@/services/api/babies";
 import { createBaby } from "@/services/api/babies";
-import { configureApiClient } from "@/services/api/httpClient";
+import { ApiError, configureApiClient } from "@/services/api/httpClient";
 import {
 	clearStoredSession,
 	loadStoredSession,
@@ -31,6 +31,7 @@ export type CompleteSignupWithBabyInput = {
 };
 
 type AuthSessionContextValue = {
+	authStatus: "authenticated" | "authRequiredForSync" | "signedOut";
 	error: string | null;
 	isLoading: boolean;
 	isReady: boolean;
@@ -52,16 +53,19 @@ export function AuthSessionProvider({ children }: PropsWithChildren) {
 	const [isReady, setIsReady] = useState(false);
 	const [isLoading, setIsLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const [authRequiresSyncLogin, setAuthRequiresSyncLogin] = useState(false);
 	const sessionRef = useRef<AuthSession | null>(null);
 	const pendingSignupSessionRef = useRef<AuthSession | null>(null);
 	const refreshPromiseRef = useRef<Promise<string | null> | null>(null);
+	const transientRefreshFailureRef = useRef(false);
 
 	function clearActiveSession() {
-		void clearStoredSession();
-		sessionRef.current = null;
-		pendingSignupSessionRef.current = null;
-		setSession(null);
-		setPendingSignupSession(null);
+		if (transientRefreshFailureRef.current) {
+			transientRefreshFailureRef.current = false;
+			return;
+		}
+
+		setAuthRequiresSyncLogin(true);
 	}
 
 	async function refreshAccessTokenForSession() {
@@ -105,12 +109,13 @@ export function AuthSessionProvider({ children }: PropsWithChildren) {
 				}
 
 				return nextSession.accessToken;
-			} catch {
-				await clearStoredSession();
-				sessionRef.current = null;
-				pendingSignupSessionRef.current = null;
-				setSession(null);
-				setPendingSignupSession(null);
+			} catch (caughtError) {
+				if (isInvalidRefreshSessionError(caughtError)) {
+					transientRefreshFailureRef.current = false;
+					setAuthRequiresSyncLogin(true);
+				} else {
+					transientRefreshFailureRef.current = true;
+				}
 
 				return null;
 			} finally {
@@ -161,6 +166,7 @@ export function AuthSessionProvider({ children }: PropsWithChildren) {
 				if (isMounted) {
 					sessionRef.current = storedSession;
 					setSession(storedSession);
+					setAuthRequiresSyncLogin(false);
 				}
 			} finally {
 				if (isMounted) {
@@ -178,6 +184,9 @@ export function AuthSessionProvider({ children }: PropsWithChildren) {
 
 	const value = useMemo<AuthSessionContextValue>(
 		() => ({
+			authStatus: session
+				? (authRequiresSyncLogin ? "authRequiredForSync" : "authenticated")
+				: "signedOut",
 			error,
 			isLoading,
 			isReady,
@@ -197,6 +206,7 @@ export function AuthSessionProvider({ children }: PropsWithChildren) {
 					await saveStoredSession(nextSession);
 					sessionRef.current = nextSession;
 					pendingSignupSessionRef.current = null;
+					setAuthRequiresSyncLogin(false);
 					setSession(nextSession);
 					setPendingSignupSession(null);
 					setSignupDraft(null);
@@ -265,6 +275,7 @@ export function AuthSessionProvider({ children }: PropsWithChildren) {
 					await saveStoredSession(nextSession);
 					sessionRef.current = nextSession;
 					pendingSignupSessionRef.current = null;
+					setAuthRequiresSyncLogin(false);
 					setSession(nextSession);
 					setPendingSignupSession(null);
 					setSignupDraft(null);
@@ -281,12 +292,13 @@ export function AuthSessionProvider({ children }: PropsWithChildren) {
 				await clearStoredSession();
 				sessionRef.current = null;
 				pendingSignupSessionRef.current = null;
+				setAuthRequiresSyncLogin(false);
 				setSession(null);
 				setPendingSignupSession(null);
 				setSignupDraft(null);
 			},
 		}),
-		[error, isLoading, isReady, pendingSignupSession, session, signupDraft],
+		[authRequiresSyncLogin, error, isLoading, isReady, pendingSignupSession, session, signupDraft],
 	);
 
 	return (
@@ -342,4 +354,14 @@ function getErrorMessage(error: unknown) {
 	}
 
 	return "Something went wrong. Please try again.";
+}
+
+function isInvalidRefreshSessionError(error: unknown) {
+	if (!(error instanceof ApiError)) {
+		return false;
+	}
+
+	return error.status === 401 ||
+		error.status === 403 ||
+		error.code === "INVALID_REFRESH_TOKEN";
 }

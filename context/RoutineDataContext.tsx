@@ -45,7 +45,6 @@ import {
 	useRef,
 	useState,
 } from "react";
-import { AppState } from "react-native";
 
 function reportBackgroundError(error: unknown) {
 	console.warn(error);
@@ -468,7 +467,7 @@ function applyEventToDaySummary(day: RoutineDay, event: RoutineEvent) {
 }
 
 export function RoutineDataProvider({ children }: PropsWithChildren) {
-	const { session } = useAuthSession();
+	const { authStatus, session } = useAuthSession();
 	const { selectedBaby } = useBabySelection();
 	const [dailyLogs, setDailyLogs] = useState<RoutineDay[]>([]);
 	const [lastLogged, setLastLogged] = useState<RoutineLastLogged | null>(null);
@@ -505,6 +504,11 @@ export function RoutineDataProvider({ children }: PropsWithChildren) {
 
 	const syncQueuedMutations = useCallback(async () => {
 		if (!session || !selectedBaby) return;
+
+		if (authStatus === "authRequiredForSync") {
+			setSyncError("Sync paused. Sign in again to sync changes.");
+			return;
+		}
 
 		if (syncPromiseRef.current) {
 			return syncPromiseRef.current;
@@ -546,27 +550,7 @@ export function RoutineDataProvider({ children }: PropsWithChildren) {
 		} finally {
 			syncPromiseRef.current = null;
 		}
-	}, [selectedBaby, session]);
-
-	useEffect(() => {
-		void syncQueuedMutations();
-	}, [syncQueuedMutations]);
-
-	useEffect(() => {
-		const interval = setInterval(() => {
-			void syncQueuedMutations();
-		}, 30000);
-		const subscription = AppState.addEventListener("change", (state) => {
-			if (state === "active") {
-				void syncQueuedMutations();
-			}
-		});
-
-		return () => {
-			clearInterval(interval);
-			subscription.remove();
-		};
-	}, [syncQueuedMutations]);
+	}, [authStatus, selectedBaby, session]);
 
 	const value = useMemo<RoutineDataContextValue>(() => {
 		const getLatestMeal = () =>

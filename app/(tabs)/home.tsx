@@ -1,10 +1,16 @@
 import { BabyHeader } from "@/components/routine/BabyHeader";
 import { QuickActionGrid } from "@/components/routine/QuickActionGrid";
 import { RoutineDayCard } from "@/components/routine/RoutineDayCard";
+import { SyncStatusCard } from "@/components/sync/SyncStatusCard";
 import { useAppPreferences } from "@/context/AppPreferencesContext";
 import { useAuthSession } from "@/context/AuthSessionContext";
 import { useBabySelection } from "@/context/BabySelectionContext";
 import { useRoutineData } from "@/context/RoutineDataContext";
+import {
+	AUTH_REQUIRED_SYNC_MESSAGE,
+	OFFLINE_SYNC_MESSAGE,
+	useSync,
+} from "@/context/SyncContext";
 import type { RoutineConfig, RoutineKind } from "@/data/homeData";
 import { routineConfig } from "@/data/homeData";
 import { getRoutineDays, type RoutineLastLogged } from "@/services/api/routine";
@@ -29,11 +35,16 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const ROUTINE_PAGE_DAYS = 7;
-const OFFLINE_ROUTINE_MESSAGE = "Offline mode. Sync will be re-enabled once online.";
+const HOME_SYNC_TIMEOUT_MS = 10000;
+
+type LoadLatestRoutineOptions = {
+	refreshBabyList?: boolean;
+	trigger?: "initial" | "manual";
+};
 
 export default function HomeScreen() {
 	const router = useRouter();
-	const { session } = useAuthSession();
+	const { authStatus, session } = useAuthSession();
 	const { preferredVolumeUnit } = useAppPreferences();
 	const {
 		babies,
@@ -53,6 +64,14 @@ export default function HomeScreen() {
 		syncError,
 		syncPendingMutations,
 	} = useRoutineData();
+	const {
+		connectionStatus,
+		error: syncProviderError,
+		markAuthRequired,
+		markOffline,
+		markOnline,
+		status: syncStatus,
+	} = useSync();
 	const currentDate = useCurrentMinute();
 	const currentTime = currentDate.toISOString();
 	const [isInitialRoutineLoading, setIsInitialRoutineLoading] = useState(false);
@@ -62,7 +81,7 @@ export default function HomeScreen() {
 	const [isRefreshing, setIsRefreshing] = useState(false);
 	const routineRequestIdRef = useRef(0);
 	const isOlderRoutineLoadingRef = useRef(false);
-	const syncBannerMessage = routineError ?? syncError;
+	const syncBannerMessage = syncProviderError ?? routineError ?? syncError;
 	const routineDisplayConfig = useMemo<RoutineConfig>(
 		() => ({
 			...routineConfig,
@@ -75,7 +94,10 @@ export default function HomeScreen() {
 		lastActionLabel: getLastLoggedActionLabel(lastLogged, id, currentTime),
 	}));
 
-	const loadLatestRoutineLogs = useCallback(async () => {
+	const loadLatestRoutineLogs = useCallback(async ({
+		refreshBabyList = false,
+		trigger = "manual",
+	}: LoadLatestRoutineOptions = {}) => {
 		if (!selectedBaby) {
 			replaceDailyLogs([]);
 			setRoutineError(null);
@@ -87,8 +109,8 @@ export default function HomeScreen() {
 		const requestId = routineRequestIdRef.current + 1;
 		routineRequestIdRef.current = requestId;
 		const startDate = getDateKeyInTimeZone(new Date(), selectedBaby.timezone);
+		const isManualSync = trigger === "manual";
 
-		replaceDailyLogs([]);
 		setIsInitialRoutineLoading(true);
 		isOlderRoutineLoadingRef.current = false;
 		setRoutineError(null);
@@ -117,20 +139,30 @@ export default function HomeScreen() {
 				setLastLogged(null);
 			}
 
-			const response = await getRoutineDays({
+			if (authStatus === "authRequiredForSync") {
+				markAuthRequired();
+				setRoutineError(AUTH_REQUIRED_SYNC_MESSAGE);
+				return;
+			}
+
+			if (isManualSync) {
+				if (refreshBabyList) {
+					await withTimeout(refreshBabies(), HOME_SYNC_TIMEOUT_MS);
+				}
+
+				await withTimeout(syncPendingMutations(), HOME_SYNC_TIMEOUT_MS);
+			}
+
+			const response = await withTimeout(getRoutineDays({
 				babyId: selectedBaby.id,
 				count: ROUTINE_PAGE_DAYS,
 				includeLastLogged: true,
 				startDate,
-			});
+			}), HOME_SYNC_TIMEOUT_MS);
 
 			if (routineRequestIdRef.current !== requestId) {
 				return;
 			}
-
-			replaceDailyLogs(response.dailyLogs);
-			setNextRoutineStartDate(response.nextStartDate);
-			setLastLogged(response.lastLogged ?? null);
 
 			if (session) {
 				await saveRoutineHomeCache({
@@ -140,38 +172,62 @@ export default function HomeScreen() {
 					nextStartDate: response.nextStartDate,
 					userId: session.user.id,
 				});
-			}
+				const reconciledCache = await loadCachedRoutineHome(session.user.id, selectedBaby.id);
 
-			await syncPendingMutations();
+				replaceDailyLogs(reconciledCache.dailyLogs);
+				setNextRoutineStartDate(reconciledCache.nextStartDate);
+				setLastLogged(reconciledCache.lastLogged);
+			} else {
+				replaceDailyLogs(response.dailyLogs);
+				setNextRoutineStartDate(response.nextStartDate);
+				setLastLogged(response.lastLogged ?? null);
+			}
+			markOnline();
+			setRoutineError(null);
+
 		} catch (caughtError) {
 			if (routineRequestIdRef.current !== requestId) {
 				return;
 			}
 
-			setRoutineError(didLoadCachedData ? OFFLINE_ROUTINE_MESSAGE : getErrorMessage(caughtError));
+			if (isAuthRequiredError(caughtError)) {
+				markAuthRequired();
+				setRoutineError(AUTH_REQUIRED_SYNC_MESSAGE);
+			} else {
+				markOffline();
+				setRoutineError(didLoadCachedData ? OFFLINE_SYNC_MESSAGE : getErrorMessage(caughtError));
+			}
 		} finally {
 			if (routineRequestIdRef.current === requestId) {
 				setIsInitialRoutineLoading(false);
 			}
 		}
-	}, [replaceDailyLogs, selectedBaby, session, setLastLogged, syncPendingMutations]);
+	}, [
+		authStatus,
+		markAuthRequired,
+		markOffline,
+		markOnline,
+		refreshBabies,
+		replaceDailyLogs,
+		selectedBaby,
+		session,
+		setLastLogged,
+		syncPendingMutations,
+	]);
 
 	useEffect(() => {
-		void loadLatestRoutineLogs();
+		void loadLatestRoutineLogs({ trigger: "initial" });
 	}, [loadLatestRoutineLogs]);
 
 	const refreshHome = useCallback(async () => {
 		setIsRefreshing(true);
 
 		try {
-			await Promise.all([
-				refreshBabies(),
-				loadLatestRoutineLogs(),
-			]);
+			await loadLatestRoutineLogs({ refreshBabyList: true, trigger: "manual" });
 		} finally {
 			setIsRefreshing(false);
 		}
-	}, [loadLatestRoutineLogs, refreshBabies]);
+	}, [loadLatestRoutineLogs]);
 
 	const loadOlderRoutineLogs = useCallback(async () => {
 		if (
@@ -200,9 +256,6 @@ export default function HomeScreen() {
 				return;
 			}
 
-			prependOlderDailyLogs(response.dailyLogs);
-			setNextRoutineStartDate(response.nextStartDate);
-
 			if (session) {
 				await saveRoutineHomeCache({
 					babyId: selectedBaby.id,
@@ -211,6 +264,13 @@ export default function HomeScreen() {
 					nextStartDate: response.nextStartDate,
 					userId: session.user.id,
 				});
+				const reconciledCache = await loadCachedRoutineHome(session.user.id, selectedBaby.id);
+
+				replaceDailyLogs(reconciledCache.dailyLogs);
+				setNextRoutineStartDate(reconciledCache.nextStartDate);
+			} else {
+				prependOlderDailyLogs(response.dailyLogs);
+				setNextRoutineStartDate(response.nextStartDate);
 			}
 
 			await syncPendingMutations();
@@ -219,7 +279,8 @@ export default function HomeScreen() {
 				return;
 			}
 
-			setRoutineError(dailyLogs.length > 0 ? OFFLINE_ROUTINE_MESSAGE : getErrorMessage(caughtError));
+			markOffline();
+			setRoutineError(dailyLogs.length > 0 ? OFFLINE_SYNC_MESSAGE : getErrorMessage(caughtError));
 		} finally {
 			if (routineRequestIdRef.current === requestId) {
 				isOlderRoutineLoadingRef.current = false;
@@ -230,8 +291,10 @@ export default function HomeScreen() {
 		dailyLogs.length,
 		isInitialRoutineLoading,
 		lastLogged,
+		markOffline,
 		nextRoutineStartDate,
 		prependOlderDailyLogs,
+		replaceDailyLogs,
 		selectedBaby,
 		session,
 		syncPendingMutations,
@@ -320,22 +383,17 @@ export default function HomeScreen() {
 					showsVerticalScrollIndicator={false}
 				>
 					{selectedBaby && isInitialRoutineLoading && dailyLogs.length > 0 && (
-						<View style={styles.syncBanner}>
-							<ActivityIndicator color={colors.light.primary} size="small" />
-							<Text style={styles.syncBannerText}>Sync in progress...</Text>
-						</View>
+						<SyncStatusCard status="syncing" />
 					)}
-					{selectedBaby && syncBannerMessage && dailyLogs.length > 0 && (
-						<View style={styles.syncBanner}>
-							<Text style={styles.syncBannerText}>{syncBannerMessage}</Text>
-							<Pressable
-								accessibilityRole="button"
-								onPress={() => void loadLatestRoutineLogs()}
-								style={styles.syncRetryButton}
-							>
-								<Text style={styles.syncRetryText}>Try again</Text>
-							</Pressable>
-						</View>
+					{selectedBaby && syncStatus === "syncing" && !isInitialRoutineLoading && !syncBannerMessage && dailyLogs.length > 0 && (
+						<SyncStatusCard status="syncing" />
+					)}
+					{selectedBaby && !isInitialRoutineLoading && syncStatus !== "syncing" && connectionStatus !== "online" && dailyLogs.length > 0 && (
+						<SyncStatusCard
+							message={syncBannerMessage}
+							onRetry={() => void loadLatestRoutineLogs({ trigger: "manual" })}
+							status={connectionStatus === "authRequired" ? "authRequired" : "offline"}
+						/>
 					)}
 					{selectedBaby && isInitialRoutineLoading && dailyLogs.length === 0 && (
 						<View style={[globalStyles.card, styles.routineStateCard]}>
@@ -354,7 +412,7 @@ export default function HomeScreen() {
 							<Text style={styles.routineStateText}>{routineError}</Text>
 							<Pressable
 								accessibilityRole="button"
-								onPress={() => void loadLatestRoutineLogs()}
+								onPress={() => void loadLatestRoutineLogs({ trigger: "manual" })}
 								style={styles.retryButton}
 							>
 								<Text style={styles.retryButtonText}>Try again</Text>
@@ -501,11 +559,33 @@ function isNearBottom({
 }
 
 function getErrorMessage(error: unknown) {
+	if (error instanceof Error && error.message === "SYNC_TIMEOUT") {
+		return OFFLINE_SYNC_MESSAGE;
+	}
+
 	if (error instanceof Error) {
-		return error.message;
+		return OFFLINE_SYNC_MESSAGE;
 	}
 
 	return "Something went wrong. Please try again.";
+}
+
+function isAuthRequiredError(error: unknown) {
+	return error instanceof Error &&
+		error.message.toLowerCase().includes("unauthorized");
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number) {
+	let timeoutId: ReturnType<typeof setTimeout> | undefined;
+	const timeoutPromise = new Promise<never>((_, reject) => {
+		timeoutId = setTimeout(() => reject(new Error("SYNC_TIMEOUT")), timeoutMs);
+	});
+
+	return Promise.race([promise, timeoutPromise]).finally(() => {
+		if (timeoutId) {
+			clearTimeout(timeoutId);
+		}
+	});
 }
 
 function getLastLoggedActionLabel(

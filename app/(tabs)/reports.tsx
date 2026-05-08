@@ -1,5 +1,12 @@
+import { SyncStatusCard } from "@/components/sync/SyncStatusCard";
 import { useAppPreferences } from "@/context/AppPreferencesContext";
 import { useBabySelection } from "@/context/BabySelectionContext";
+import {
+	AUTH_REQUIRED_SYNC_MESSAGE,
+	OFFLINE_SYNC_MESSAGE,
+	useSync,
+} from "@/context/SyncContext";
+import { ApiError } from "@/services/api/httpClient";
 import { getGrowthRecords, type GrowthRecord } from "@/services/api/growth";
 import { getRoutineStats, type RoutineStatsResponse } from "@/services/api/routine";
 import { colors, globalStyles, spacing, typography } from "@/styles/globalStyles";
@@ -21,10 +28,19 @@ const PATTERN_RANGE_DAYS: Record<PatternRangeMode, number> = {
 	month: 30,
 	week: 7,
 };
+const REPORT_SYNC_TIMEOUT_MS = 10000;
 
 export default function ReportsScreen() {
 	const { selectedBaby } = useBabySelection();
 	const { preferredLengthUnit, preferredWeightUnit } = useAppPreferences();
+	const {
+		connectionStatus,
+		error: syncError,
+		markAuthRequired,
+		markOffline,
+		markOnline,
+		status: syncStatus,
+	} = useSync();
 	const [activeTab, setActiveTab] = useState<ReportsTab>("growth");
 	const [growthRecords, setGrowthRecords] = useState<GrowthRecord[]>([]);
 	const [patternRangeMode, setPatternRangeMode] = useState<PatternRangeMode>("week");
@@ -56,14 +72,24 @@ export default function ReportsScreen() {
 		setGrowthError(null);
 
 		try {
-			const response = await getGrowthRecords(selectedBaby.id);
+			const response = await withTimeout(
+				getGrowthRecords(selectedBaby.id),
+				REPORT_SYNC_TIMEOUT_MS,
+			);
 			setGrowthRecords(response.growthRecords);
+			markOnline();
 		} catch (caughtError) {
-			setGrowthError(getErrorMessage(caughtError, "Could not load growth records."));
+			if (isAuthRequiredError(caughtError)) {
+				markAuthRequired();
+				setGrowthError(AUTH_REQUIRED_SYNC_MESSAGE);
+			} else {
+				markOffline();
+				setGrowthError(getErrorMessage(caughtError));
+			}
 		} finally {
 			setIsGrowthLoading(false);
 		}
-	}, [selectedBaby]);
+	}, [markAuthRequired, markOffline, markOnline, selectedBaby]);
 
 	const patternDayCount = PATTERN_RANGE_DAYS[patternRangeMode];
 	const patternEndDateKey =
@@ -84,22 +110,46 @@ export default function ReportsScreen() {
 
 		setIsPatternLoading(true);
 		setPatternError(null);
-		setPatternStats(emptyStats);
+
+		if (
+			patternStats.startDate !== patternStartDate ||
+			patternStats.endDate !== patternEndDateKey
+		) {
+			setPatternStats(emptyStats);
+		}
 
 		try {
-			const response = await getRoutineStats({
-				babyId: selectedBaby.id,
-				endDate: patternEndDateKey,
-				startDate: patternStartDate,
-			});
+			const response = await withTimeout(
+				getRoutineStats({
+					babyId: selectedBaby.id,
+					endDate: patternEndDateKey,
+					startDate: patternStartDate,
+				}),
+				REPORT_SYNC_TIMEOUT_MS,
+			);
 			setPatternStats(response);
+			markOnline();
 		} catch (caughtError) {
-			setPatternStats(emptyStats);
-			setPatternError(getErrorMessage(caughtError, "Could not load routine stats."));
+			if (isAuthRequiredError(caughtError)) {
+				markAuthRequired();
+				setPatternError(AUTH_REQUIRED_SYNC_MESSAGE);
+			} else {
+				markOffline();
+				setPatternError(getErrorMessage(caughtError));
+			}
 		} finally {
 			setIsPatternLoading(false);
 		}
-	}, [patternEndDateKey, patternStartDate, selectedBaby]);
+	}, [
+		markAuthRequired,
+		markOffline,
+		markOnline,
+		patternEndDateKey,
+		patternStartDate,
+		patternStats.endDate,
+		patternStats.startDate,
+		selectedBaby,
+	]);
 
 	const refreshGrowthRecords = useCallback(async () => {
 		setIsRefreshing(true);
@@ -166,6 +216,11 @@ export default function ReportsScreen() {
 	);
 	const retryActiveTab = activeTab === "growth" ? loadGrowthRecords : loadPatternStats;
 	const activeError = activeTab === "growth" ? growthError : patternError;
+	const activeIsLoading = activeTab === "growth" ? isGrowthLoading : isPatternLoading;
+	const hasActiveData =
+		activeTab === "growth"
+			? growthRecords.length > 0
+			: patternStats.days.some((day) => day.logs.length > 0);
 
 	return (
 		<SafeAreaView edges={["top", "left", "right"]} style={globalStyles.screen}>
@@ -185,13 +240,16 @@ export default function ReportsScreen() {
 					/>
 				</View>
 
-				{activeError ? (
-					<View style={[globalStyles.card, styles.errorCard]}>
-						<Text style={styles.errorText}>{activeError}</Text>
-						<Pressable style={styles.retryButton} onPress={() => void retryActiveTab()}>
-							<Text style={styles.retryButtonText}>Try Again</Text>
-						</Pressable>
-					</View>
+				{activeIsLoading && hasActiveData ? (
+					<SyncStatusCard status="syncing" />
+				) : null}
+
+				{!activeIsLoading && syncStatus !== "syncing" && connectionStatus !== "online" ? (
+					<SyncStatusCard
+						message={syncError ?? activeError}
+						onRetry={() => void retryActiveTab()}
+						status={connectionStatus === "authRequired" ? "authRequired" : "offline"}
+					/>
 				) : null}
 
 				{activeTab === "growth" ? (
@@ -247,12 +305,13 @@ function TabButton({
 	);
 }
 
-function getErrorMessage(error: unknown, fallback: string) {
-	if (error instanceof Error) {
-		return error.message;
-	}
+function getErrorMessage(_error: unknown) {
+	return OFFLINE_SYNC_MESSAGE;
+}
 
-	return fallback;
+function isAuthRequiredError(error: unknown) {
+	return error instanceof ApiError &&
+		(error.status === 401 || error.status === 403);
 }
 
 function createEmptyRoutineStats(startDate: string, endDate: string): RoutineStatsResponse {
@@ -357,27 +416,20 @@ function getInclusiveDayCount(startDate: string, endDate: string) {
 	return Math.max(1, Math.round((end - start) / 86400000) + 1);
 }
 
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number) {
+	let timeoutId: ReturnType<typeof setTimeout> | undefined;
+	const timeoutPromise = new Promise<never>((_, reject) => {
+		timeoutId = setTimeout(() => reject(new Error("SYNC_TIMEOUT")), timeoutMs);
+	});
+
+	return Promise.race([promise, timeoutPromise]).finally(() => {
+		if (timeoutId) {
+			clearTimeout(timeoutId);
+		}
+	});
+}
+
 const styles = StyleSheet.create({
-	errorCard: {
-		borderColor: "#FECACA",
-		gap: spacing.md,
-		marginTop: spacing.md,
-	},
-	errorText: {
-		...typography.body,
-		color: colors.light.error,
-	},
-	retryButton: {
-		alignSelf: "flex-start",
-		backgroundColor: colors.light.primary,
-		borderRadius: 10,
-		paddingHorizontal: spacing.md,
-		paddingVertical: spacing.sm,
-	},
-	retryButtonText: {
-		...typography.caption,
-		color: colors.light.surface,
-	},
 	segmentedControl: {
 		backgroundColor: "#ECEEF5",
 		borderRadius: 14,

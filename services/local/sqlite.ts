@@ -81,5 +81,22 @@ async function initLocalDb(db: SQLite.SQLiteDatabase) {
     CREATE UNIQUE INDEX IF NOT EXISTS routine_mutation_queue_client_mutation_idx
     ON routine_mutation_queue(client_mutation_id)
     WHERE client_mutation_id IS NOT NULL;
+
+    CREATE TABLE IF NOT EXISTS sync_job_queue (
+      id TEXT PRIMARY KEY NOT NULL,
+      user_id TEXT NOT NULL,
+      baby_id TEXT,
+      scope TEXT NOT NULL,
+      operation TEXT NOT NULL,
+      payload_json TEXT NOT NULL,
+      status TEXT NOT NULL CHECK(status IN ('pending', 'failed')),
+      error TEXT,
+      retry_count INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS sync_job_queue_pending_idx
+    ON sync_job_queue(user_id, status, created_at);
   `);
 }
