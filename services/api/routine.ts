@@ -81,6 +81,112 @@ export type RoutineMutationResponse = {
 	lastLogged: RoutineLastLogged;
 };
 
+export type RoutineStatsResponse = {
+	dayCount: number;
+	days: RoutineStatsDay[];
+	endDate: string;
+	startDate: string;
+	summary: RoutineStatsSummary;
+};
+
+export type RoutineStatsDay = {
+	date: string;
+	logs: RoutinePatternLog[];
+};
+
+export type RoutinePatternLog =
+	| MealPatternLog
+	| DiaperPatternLog
+	| SleepPatternLog;
+
+export type MealPatternLog = {
+	amountBowl?: number | null;
+	amountGrams?: number | null;
+	amountMl?: number | null;
+	durationMinutes?: number | null;
+	id: string;
+	kind: "meal";
+	time: string;
+	type: MealType;
+};
+
+export type DiaperPatternLog = {
+	id: string;
+	kind: "diaper";
+	time: string;
+	type: DiaperType;
+};
+
+export type SleepPatternLog = {
+	endTime: string | null;
+	id: string;
+	kind: "sleep";
+	startTime: string;
+	type: SleepType;
+};
+
+export type RoutineStatsSummary = {
+	diaper: DiaperAverage;
+	meal: MealAverage;
+	sleep: SleepAverage;
+};
+
+export type MealAverage = {
+	breastfeed: {
+		averageCount: number;
+		averageDurationMinutes: number | null;
+	};
+	breastMilk: {
+		averageAmountMl: number | null;
+		averageCount: number;
+	};
+	formula: {
+		averageAmountMl: number | null;
+		averageCount: number;
+	};
+	solid: {
+		averageAmountBowl: number | null;
+		averageAmountGrams: number | null;
+		averageCount: number;
+	};
+	total: {
+		averageCount: number;
+	};
+};
+
+export type DiaperAverage = {
+	both: {
+		averageCount: number;
+	};
+	dirty: {
+		averageCount: number;
+	};
+	dry: {
+		averageCount: number;
+	};
+	total: {
+		averageCount: number;
+	};
+	wet: {
+		averageCount: number;
+	};
+};
+
+export type SleepAverage = {
+	nap: {
+		averageCount: number;
+		averageDurationMinutes: number | null;
+	};
+	nighttime: {
+		averageCount: number;
+		averageDurationMinutes: number | null;
+	};
+	total: {
+		averageCount: number;
+		averageDurationMinutes: number | null;
+	};
+};
+
 export function getRoutineDays({
 	babyId,
 	count,

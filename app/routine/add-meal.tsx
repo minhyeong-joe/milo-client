@@ -229,7 +229,7 @@ export default function AddMealScreen() {
 						<Text style={styles.cancelText}>Cancel</Text>
 					</Pressable>
 					<View style={styles.headerTitle}>
-						<RoutineIcon style={routineConfig.quickActions["meal"]} size={30} />
+						<RoutineIcon kind="meal" size={30} />
 						<Text style={globalStyles.sectionTitleText}>Meal</Text>
 					</View>
 					{mealToEdit? (

@@ -75,7 +75,7 @@ export default function GrowthChartCard({
     );
     const chartPoints = useMemo(
         () => buildChartPoints(records, metric, birthdate, sex),
-        [birthdate, metric, records, sex, units],
+        [birthdate, metric, records, sex],
     );
     const selectedPoint =
         chartPoints.find((point) => point.id === selectedPointId) ??

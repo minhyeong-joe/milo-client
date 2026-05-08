@@ -155,7 +155,7 @@ export default function AddDiaperScreen() {
 						<Text style={styles.cancelText}>Cancel</Text>
 					</Pressable>
 					<View style={styles.headerTitle}>
-						<RoutineIcon style={routineConfig.quickActions.diaper} size={30} />
+						<RoutineIcon kind="diaper" size={30} />
 						<Text style={globalStyles.sectionTitleText}>Diaper</Text>
 					</View>
 					{diaperToEdit ? (

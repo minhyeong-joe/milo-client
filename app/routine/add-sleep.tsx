@@ -201,7 +201,7 @@ export default function AddSleepScreen() {
 						<Text style={styles.cancelText}>Cancel</Text>
 					</Pressable>
 					<View style={styles.headerTitle}>
-						<RoutineIcon style={routineConfig.quickActions.sleep} size={30} />
+						<RoutineIcon kind="sleep" size={30} />
 						<Text style={globalStyles.sectionTitleText}>Sleep</Text>
 					</View>
 					{sleepToEdit ? (

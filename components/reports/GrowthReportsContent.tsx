@@ -1,26 +1,22 @@
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View, StyleSheet } from "react-native";
-import { colors, globalStyles, spacing, typography } from "@/styles/globalStyles";
+import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import { colors, globalStyles, spacing } from "@/styles/globalStyles";
 import { useBabySelection } from "@/context/BabySelectionContext";
 import { type GrowthRecord } from "@/services/api/growth";
 import GrowthChartCard from "./GrowthChartCard";
 
 export default function GrowthReportsContent({
-    error,
     isLoading,
     isRefreshing,
     lengthUnit,
     onRefresh,
-    onRetry,
     records,
     selectedBaby,
     weightUnit,
 }: {
-    error: string | null;
     isLoading: boolean;
     isRefreshing: boolean;
     lengthUnit: "cm" | "in";
     onRefresh: () => Promise<void>;
-    onRetry: () => Promise<void>;
     records: GrowthRecord[];
     selectedBaby: ReturnType<typeof useBabySelection>["selectedBaby"];
     weightUnit: "kg" | "lb";
@@ -47,7 +43,7 @@ export default function GrowthReportsContent({
 
     return (
         <ScrollView
-            contentContainerStyle={styles.scrollContent}
+            contentContainerStyle={globalStyles.scrollContent}
             refreshControl={
                 <RefreshControl
                     refreshing={isRefreshing}
@@ -57,15 +53,6 @@ export default function GrowthReportsContent({
             }
             showsVerticalScrollIndicator={false}
         >
-            {error ? (
-                <View style={[globalStyles.card, styles.errorCard]}>
-                    <Text style={styles.errorText}>{error}</Text>
-                    <Pressable style={styles.retryButton} onPress={() => void onRetry()}>
-                        <Text style={styles.retryButtonText}>Try Again</Text>
-                    </Pressable>
-                </View>
-            ) : null}
-
             <GrowthChartCard
                 birthdate={selectedBaby.birthdate}
                 lengthUnit={lengthUnit}
@@ -95,34 +82,10 @@ export default function GrowthReportsContent({
 }
 
 const styles = StyleSheet.create({
-    errorCard: {
-        borderColor: "#FECACA",
-        gap: spacing.md,
-    },
-    errorText: {
-        ...typography.body,
-        color: colors.light.error,
-    },
     loadingContainer: {
         alignItems: "center",
         flex: 1,
         gap: spacing.md,
         justifyContent: "center",
     },
-    retryButton: {
-        alignSelf: "flex-start",
-        backgroundColor: colors.light.primary,
-        borderRadius: 10,
-        paddingHorizontal: spacing.md,
-        paddingVertical: spacing.sm,
-    },
-    retryButtonText: {
-        ...typography.caption,
-        color: colors.light.surface,
-    },
-    scrollContent: {
-        gap: spacing.md,
-        paddingBottom: spacing.md,
-        paddingTop: spacing.md,
-    }
 });

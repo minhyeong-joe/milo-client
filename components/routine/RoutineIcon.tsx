@@ -1,32 +1,38 @@
 import type { RoutineStyle } from "@/data/homeData";
 import { Ionicons } from "@expo/vector-icons";
 import { Image, StyleSheet, View } from "react-native";
+import { type RoutineKind, routineConfig, type RoutineConfig } from "@/data/homeData";
 
 export function RoutineIcon({
 	size,
-	style,
+	kind,
+	customStyle,
 }: {
 	size: number;
-	style: RoutineStyle;
+	kind: RoutineKind;
+	customStyle?: object | object[] | undefined;
 }) {
+	const iconInfo: RoutineConfig["quickActions"][RoutineKind] = routineConfig.quickActions[kind];
+
 	return (
 		<View
 			style={[
 				styles.iconWrap,
+				customStyle,
 				{
-					backgroundColor: style.backgroundColor,
+					backgroundColor: iconInfo.backgroundColor,
 					borderRadius: size / 2,
 					height: size,
 					width: size,
 				},
 			]}
 		>
-			{style.imageSource ? (
-				<Image source={style.imageSource} style={styles.imageIcon} />
-			) : style.icon ? (
+			{iconInfo.imageSource ? (
+				<Image source={iconInfo.imageSource} style={styles.imageIcon} />
+			) : iconInfo.icon ? (
 				<Ionicons
-					color={style.accentColor}
-					name={style.icon}
+					color={iconInfo.accentColor}
+					name={iconInfo.icon}
 					size={Math.round(size * 0.55)}
 				/>
 			) : null}

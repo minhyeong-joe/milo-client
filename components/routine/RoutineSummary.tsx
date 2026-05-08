@@ -36,14 +36,14 @@ function SummaryRow({
 	title: string;
 	total: string;
 }) {
-	const style = config.quickActions[kind];
+	const iconInfo = config.quickActions[kind];
 
 	return (
 		<View style={styles.summaryRow}>
 			<View
-				style={[styles.summaryIcon, { backgroundColor: style.backgroundColor }]}
+				style={[styles.summaryIcon, { backgroundColor: iconInfo.backgroundColor }]}
 			>
-				<RoutineIcon size={30} style={style} />
+				<RoutineIcon size={30} kind={kind} />
 			</View>
 			<View style={styles.summaryContent}>
 				<View style={styles.summaryHeader}>

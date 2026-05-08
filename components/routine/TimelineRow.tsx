@@ -109,7 +109,7 @@ export function TimelineRow({
 				onPress={onEventClick}
 			>
 				<View style={styles.timelineIcon}>
-					<RoutineIcon size={40} style={display.style} />
+					<RoutineIcon size={40} kind={event.kind} />
 				</View>
 				<View style={styles.timelineText}>
 					<Text style={globalStyles.sectionTitleText}>

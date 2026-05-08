@@ -12,7 +12,7 @@ function QuickActionButton({
 	config: RoutineConfig;
 	onPress?: (kind: RoutineKind) => void;
 }) {
-	const style = config.quickActions[action.id];
+	const iconInfo: RoutineConfig["quickActions"][RoutineKind] = config.quickActions[action.id];
 
 	return (
 		<Pressable
@@ -21,10 +21,10 @@ function QuickActionButton({
 			style={styles.quickAction}
 		>
 			<View style={styles.quickIcon}>
-				<RoutineIcon size={56} style={style} />
+				<RoutineIcon size={56} kind={action.id} />
 			</View>
 			<Text style={[globalStyles.labelText, styles.quickLabel]}>
-				{style.label}
+				{iconInfo.label}
 			</Text>
 			<Text style={styles.quickDetail}>{action.lastActionLabel}</Text>
 		</Pressable>

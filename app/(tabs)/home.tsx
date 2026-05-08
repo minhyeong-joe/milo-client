@@ -302,7 +302,7 @@ export default function HomeScreen() {
 				)}
 
 				<ScrollView
-					contentContainerStyle={styles.scrollContent}
+					contentContainerStyle={globalStyles.scrollContent}
 					onScroll={({ nativeEvent }) => {
 						if (isNearBottom(nativeEvent)) {
 							void loadOlderRoutineLogs();
@@ -444,9 +444,6 @@ const styles = StyleSheet.create({
 	inlineSpinner: {
 		alignSelf: "flex-start",
 		marginTop: spacing.sm,
-	},
-	scrollContent: {
-		paddingBottom: 8,
 	},
 	syncBanner: {
 		alignItems: "center",

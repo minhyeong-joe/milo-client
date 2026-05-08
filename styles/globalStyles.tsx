@@ -74,6 +74,10 @@ export const globalStyles = StyleSheet.create({
 		paddingHorizontal: spacing.md,
 		paddingTop: spacing.md,
 	},
+	scrollContent: {
+		gap: spacing.md,
+		paddingBottom: spacing.md,
+	},
 	card: {
 		backgroundColor: colors.light.surface,
 		borderColor: colors.light.border,
