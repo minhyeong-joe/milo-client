@@ -1,7 +1,7 @@
 import { useAppPreferences } from "@/context/AppPreferencesContext";
 import { useBabySelection } from "@/context/BabySelectionContext";
 import { getGrowthRecords, type GrowthRecord } from "@/services/api/growth";
-import { type RoutineStatsResponse } from "@/services/api/routine";
+import { getRoutineStats, type RoutineStatsResponse } from "@/services/api/routine";
 import { colors, globalStyles, spacing, typography } from "@/styles/globalStyles";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -29,46 +29,79 @@ export default function ReportsScreen() {
 	const [growthRecords, setGrowthRecords] = useState<GrowthRecord[]>([]);
 	const [patternRangeMode, setPatternRangeMode] = useState<PatternRangeMode>("week");
 	const [patternEndDate, setPatternEndDate] = useState<string | null>(null);
-	const [isLoading, setIsLoading] = useState(false);
+	const initialPatternEndDate = selectedBaby
+		? getDateKeyInTimeZone(new Date(), selectedBaby.timezone)
+		: getDateKey(new Date());
+	const initialPatternStartDate = addDays(
+		initialPatternEndDate,
+		-(PATTERN_RANGE_DAYS.week - 1),
+	);
+	const [patternStats, setPatternStats] = useState<RoutineStatsResponse>(() =>
+		createEmptyRoutineStats(initialPatternStartDate, initialPatternEndDate),
+	);
+	const [isGrowthLoading, setIsGrowthLoading] = useState(false);
+	const [isPatternLoading, setIsPatternLoading] = useState(false);
 	const [isRefreshing, setIsRefreshing] = useState(false);
-	const [error, setError] = useState<string | null>(null);
+	const [growthError, setGrowthError] = useState<string | null>(null);
+	const [patternError, setPatternError] = useState<string | null>(null);
 
 	const loadGrowthRecords = useCallback(async () => {
 		if (!selectedBaby) {
 			setGrowthRecords([]);
-			setError(null);
+			setGrowthError(null);
 			return;
 		}
 
-		setIsLoading(true);
-		setError(null);
+		setIsGrowthLoading(true);
+		setGrowthError(null);
 
 		try {
 			const response = await getGrowthRecords(selectedBaby.id);
 			setGrowthRecords(response.growthRecords);
 		} catch (caughtError) {
-			setError(getErrorMessage(caughtError));
+			setGrowthError(getErrorMessage(caughtError, "Could not load growth records."));
 		} finally {
-			setIsLoading(false);
+			setIsGrowthLoading(false);
 		}
 	}, [selectedBaby]);
 
-	// const refreshReports = useCallback(async () => {
-	// 	setIsRefreshing(true);
+	const patternDayCount = PATTERN_RANGE_DAYS[patternRangeMode];
+	const patternEndDateKey =
+		patternEndDate ??
+		(selectedBaby
+			? getDateKeyInTimeZone(new Date(), selectedBaby.timezone)
+			: getDateKey(new Date()));
+	const patternStartDate = addDays(patternEndDateKey, -(patternDayCount - 1));
 
-	// 	try {
-	// 		await refreshBabies();
-	// 		await loadGrowthRecords();
-	// 	} finally {
-	// 		setIsRefreshing(false);
-	// 	}
-	// }, [loadGrowthRecords, refreshBabies]);
+	const loadPatternStats = useCallback(async () => {
+		const emptyStats = createEmptyRoutineStats(patternStartDate, patternEndDateKey);
 
-	const refreshGrowthRecords = useCallback(async () => {
 		if (!selectedBaby) {
+			setPatternStats(emptyStats);
+			setPatternError(null);
 			return;
 		}
 
+		setIsPatternLoading(true);
+		setPatternError(null);
+		setPatternStats(emptyStats);
+
+		try {
+			const response = await getRoutineStats({
+				babyId: selectedBaby.id,
+				endDate: patternEndDateKey,
+				startDate: patternStartDate,
+			});
+			setPatternStats(response);
+		} catch (caughtError) {
+			setPatternStats(emptyStats);
+			setPatternError(getErrorMessage(caughtError, "Could not load routine stats."));
+		} finally {
+			setIsPatternLoading(false);
+		}
+	}, [patternEndDateKey, patternStartDate, selectedBaby]);
+
+	const refreshGrowthRecords = useCallback(async () => {
 		setIsRefreshing(true);
 
 		try {
@@ -76,21 +109,17 @@ export default function ReportsScreen() {
 		} finally {
 			setIsRefreshing(false);
 		}
-	}, [loadGrowthRecords, selectedBaby]);
+	}, [loadGrowthRecords]);
 
 	const refreshLogStats = useCallback(async () => {
-		if (!selectedBaby) {
-			return;
-		}
-
 		setIsRefreshing(true);
 
 		try {
-			// await loadPatternRecords();
+			await loadPatternStats();
 		} finally {
 			setIsRefreshing(false);
 		}
-	}, [selectedBaby]);
+	}, [loadPatternStats]);
 	const shiftPatternRange = useCallback((direction: -1 | 1) => {
 		if (!selectedBaby) {
 			return;
@@ -108,8 +137,16 @@ export default function ReportsScreen() {
 	}, [patternRangeMode, selectedBaby]);
 
 	useEffect(() => {
-		void loadGrowthRecords();
-	}, [loadGrowthRecords]);
+		if (activeTab === "growth") {
+			void loadGrowthRecords();
+		}
+	}, [activeTab, loadGrowthRecords]);
+
+	useEffect(() => {
+		if (activeTab === "patterns") {
+			void loadPatternStats();
+		}
+	}, [activeTab, loadPatternStats]);
 
 	useEffect(() => {
 		if (!selectedBaby) {
@@ -127,17 +164,8 @@ export default function ReportsScreen() {
 			),
 		[growthRecords],
 	);
-	const patternDayCount = PATTERN_RANGE_DAYS[patternRangeMode];
-	const patternEndDateKey =
-		patternEndDate ??
-		(selectedBaby
-			? getDateKeyInTimeZone(new Date(), selectedBaby.timezone)
-			: getDateKey(new Date()));
-	const patternStartDate = addDays(patternEndDateKey, -(patternDayCount - 1));
-	const patternStats = useMemo(
-		() => createEmptyRoutineStats(patternStartDate, patternEndDateKey),
-		[patternEndDateKey, patternStartDate],
-	);
+	const retryActiveTab = activeTab === "growth" ? loadGrowthRecords : loadPatternStats;
+	const activeError = activeTab === "growth" ? growthError : patternError;
 
 	return (
 		<SafeAreaView edges={["top", "left", "right"]} style={globalStyles.screen}>
@@ -157,10 +185,10 @@ export default function ReportsScreen() {
 					/>
 				</View>
 
-				{error ? (
+				{activeError ? (
 					<View style={[globalStyles.card, styles.errorCard]}>
-						<Text style={styles.errorText}>{error}</Text>
-						<Pressable style={styles.retryButton} onPress={() => void loadGrowthRecords()}>
+						<Text style={styles.errorText}>{activeError}</Text>
+						<Pressable style={styles.retryButton} onPress={() => void retryActiveTab()}>
 							<Text style={styles.retryButtonText}>Try Again</Text>
 						</Pressable>
 					</View>
@@ -168,7 +196,7 @@ export default function ReportsScreen() {
 
 				{activeTab === "growth" ? (
 					<GrowthReportsContent
-						isLoading={isLoading}
+						isLoading={isGrowthLoading}
 						isRefreshing={isRefreshing}
 						lengthUnit={preferredLengthUnit}
 						onRefresh={refreshGrowthRecords}
@@ -182,7 +210,7 @@ export default function ReportsScreen() {
 							? getDateKeyInTimeZone(new Date(), selectedBaby.timezone)
 							: getDateKey(new Date()))}
 						endDate={patternEndDateKey}
-						isLoading={isLoading}
+						isLoading={isPatternLoading}
 						isRefreshing={isRefreshing}
 						onRefresh={refreshLogStats}
 						onRangeModeChange={setPatternRangeMode}
@@ -219,12 +247,12 @@ function TabButton({
 	);
 }
 
-function getErrorMessage(error: unknown) {
+function getErrorMessage(error: unknown, fallback: string) {
 	if (error instanceof Error) {
 		return error.message;
 	}
 
-	return "Could not load growth records.";
+	return fallback;
 }
 
 function createEmptyRoutineStats(startDate: string, endDate: string): RoutineStatsResponse {

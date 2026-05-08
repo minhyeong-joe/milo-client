@@ -34,7 +34,6 @@ export default function PatternReportsContent({
 	const [showDiaper, setShowDiaper] = useState(true);
 	const [showSleep, setShowSleep] = useState(true);
 
-
 	return (
 		<ScrollView
 			contentContainerStyle={globalStyles.scrollContent}

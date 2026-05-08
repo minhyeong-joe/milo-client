@@ -138,6 +138,7 @@ export default function RoutineTimetableChart({
 					xAxisLabelsVerticalShift={8}
 					xAxisThickness={1}
 					yAxisColor="#D9DEE8"
+					// Gifted Charts maps these labels from bottom to top.
 					yAxisLabelTexts={["12AM", "6PM", "12PM", "6AM", "12AM"]}
 					yAxisLabelWidth={Y_AXIS_LABEL_WIDTH}
 					yAxisTextStyle={styles.axisLabel}
@@ -149,30 +150,15 @@ export default function RoutineTimetableChart({
 
 function buildBlocksForDay(day: RoutineStatsDay) {
 	return day.logs
-		.map((log): TimetableBlock | null => {
+		.flatMap((log): TimetableBlock[] => {
 			if (log.kind === "sleep") {
-				const startMinute = getMinuteOfDay(log.startTime, day.date);
-				const endMinute = log.endTime ? getMinuteOfDay(log.endTime, day.date) : DAY_MINUTES;
-
-				if (endMinute <= startMinute) {
-					return null;
-				}
-
-				return {
-					color: KIND_COLORS.sleep,
-					endMinute,
-					id: log.id,
-					kind: "sleep",
-					label: `Sleep (${log.type})`,
-					startMinute,
-					type: log.type,
-				};
+				return buildSleepBlocks(log, day.date);
 			}
 
 			const startMinute = getMinuteOfDay(log.time, day.date);
 			const endMinute = Math.min(DAY_MINUTES, startMinute + POINT_EVENT_MINUTES);
 
-			return {
+			return [{
 				color: KIND_COLORS[log.kind],
 				endMinute,
 				id: log.id,
@@ -180,22 +166,94 @@ function buildBlocksForDay(day: RoutineStatsDay) {
 				label: `${capitalize(log.kind)} (${log.type})`,
 				startMinute,
 				type: log.type,
-			};
+			}];
 		})
-		.filter((block): block is TimetableBlock => block !== null)
 		.sort((left, right) => left.startMinute - right.startMinute);
+}
+
+function buildSleepBlocks(
+	log: Extract<RoutinePatternLog, { kind: "sleep" }>,
+	dayDate: string,
+) {
+	const start = getLocalTimeParts(log.startTime);
+	const end = log.endTime ? getLocalTimeParts(log.endTime) : null;
+
+	if (!start) {
+		return [];
+	}
+
+	const blocks: TimetableBlock[] = [];
+	const label = `Sleep (${log.type})`;
+	const createBlock = (startMinute: number, endMinute: number, suffix: string) => {
+		if (endMinute <= startMinute) {
+			return;
+		}
+
+		blocks.push({
+			color: KIND_COLORS.sleep,
+			endMinute,
+			id: `${log.id}:${suffix}`,
+			kind: "sleep",
+			label,
+			startMinute,
+			type: log.type,
+		});
+	};
+
+	if (!end) {
+		if (start.dateKey < dayDate) {
+			createBlock(0, DAY_MINUTES, "active-day");
+		} else if (start.dateKey === dayDate) {
+			createBlock(start.minuteOfDay, DAY_MINUTES, "active-start");
+		}
+
+		return blocks;
+	}
+
+	if (start.dateKey === end.dateKey) {
+		if (start.dateKey === dayDate) {
+			createBlock(start.minuteOfDay, end.minuteOfDay, "same-day");
+		}
+
+		return blocks;
+	}
+
+	if (start.dateKey < dayDate && end.dateKey === dayDate) {
+		createBlock(start.minuteOfDay, DAY_MINUTES, "previous-evening");
+		createBlock(0, end.minuteOfDay, "wake-morning");
+		return blocks;
+	}
+
+	if (start.dateKey === dayDate) {
+		createBlock(start.minuteOfDay, DAY_MINUTES, "start-day");
+	} else if (start.dateKey < dayDate && end.dateKey > dayDate) {
+		createBlock(0, DAY_MINUTES, "full-day");
+	} else if (end.dateKey === dayDate) {
+		createBlock(0, end.minuteOfDay, "end-day");
+	}
+
+	return blocks;
 }
 
 function buildStacks(blocks: TimetableBlock[]) {
 	const stacks: stackDataItem["stacks"] = [];
-	let cursor = 0;
+	let cursor = DAY_MINUTES;
 
-	for (const block of blocks) {
-		const startMinute = Math.max(cursor, block.startMinute);
-		const endMinute = Math.max(startMinute, block.endMinute);
+	const displayBlocks = blocks
+		.map((block) => ({
+			...block,
+			endMinute: clampMinute(block.endMinute),
+			startMinute: clampMinute(block.startMinute),
+		}))
+		.filter((block) => block.endMinute > block.startMinute)
+		.sort((left, right) => right.endMinute - left.endMinute);
 
-		if (startMinute > cursor) {
-			stacks.push(createGapStack(startMinute - cursor));
+	for (const block of displayBlocks) {
+		const endMinute = Math.min(cursor, block.endMinute);
+		const startMinute = Math.min(endMinute, block.startMinute);
+
+		if (cursor > endMinute) {
+			stacks.push(createGapStack(cursor - endMinute));
 		}
 
 		if (endMinute > startMinute) {
@@ -206,11 +264,11 @@ function buildStacks(blocks: TimetableBlock[]) {
 			});
 		}
 
-		cursor = endMinute;
+		cursor = startMinute;
 	}
 
-	if (cursor < DAY_MINUTES) {
-		stacks.push(createGapStack(DAY_MINUTES - cursor));
+	if (cursor > 0) {
+		stacks.push(createGapStack(cursor));
 	}
 
 	if (stacks.length === 0) {
@@ -227,6 +285,10 @@ function createGapStack(value: number) {
 	};
 }
 
+function clampMinute(value: number) {
+	return Math.min(DAY_MINUTES, Math.max(0, value));
+}
+
 function handleChartLayout(setChartWidth: (width: number) => void) {
 	return (event: LayoutChangeEvent) => {
 		const nextWidth = Math.floor(event.nativeEvent.layout.width);
@@ -238,21 +300,44 @@ function handleChartLayout(setChartWidth: (width: number) => void) {
 }
 
 function getMinuteOfDay(value: string, dayDate: string) {
-	const eventDate = value.slice(0, 10);
-	if (eventDate < dayDate) {
+	const parts = getLocalTimeParts(value);
+
+	if (!parts) {
 		return 0;
 	}
-	if (eventDate > dayDate) {
+
+	if (parts.dateKey < dayDate) {
+		return 0;
+	}
+	if (parts.dateKey > dayDate) {
 		return DAY_MINUTES;
 	}
 
-	const [, timePart = "00:00"] = value.split("T");
-	const [hour = "0", minute = "0"] = timePart.split(":");
+	return parts.minuteOfDay;
+}
 
-	return Math.min(
-		DAY_MINUTES,
-		Math.max(0, Number(hour) * 60 + Number(minute)),
-	);
+function getLocalTimeParts(value: string) {
+	const date = new Date(value);
+
+	if (Number.isNaN(date.getTime())) {
+		return null;
+	}
+
+	return {
+		dateKey: getLocalDateKey(date),
+		minuteOfDay: Math.min(
+			DAY_MINUTES,
+			Math.max(0, date.getHours() * 60 + date.getMinutes()),
+		),
+	};
+}
+
+function getLocalDateKey(date: Date) {
+	const year = date.getFullYear();
+	const month = `${date.getMonth() + 1}`.padStart(2, "0");
+	const day = `${date.getDate()}`.padStart(2, "0");
+
+	return `${year}-${month}-${day}`;
 }
 
 function formatShortDate(date: string, compact: boolean) {
