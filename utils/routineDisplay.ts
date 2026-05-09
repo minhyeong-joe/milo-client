@@ -43,7 +43,7 @@ export function formatBabyAge(birthdate: string, today = new Date()) {
 	const monthLabel = months === 1 ? "month" : "months";
 	const dayLabel = days === 1 ? "day" : "days";
 
-	return `${months} ${monthLabel} • ${days} ${dayLabel}`;
+	return `${months} ${monthLabel} - ${days} ${dayLabel}`;
 }
 
 export function formatDuration(totalMinutes: number | null) {
@@ -125,35 +125,17 @@ export function getRoutineEventTime(event: RoutineEvent) {
 	return event.time;
 }
 
-export function formatBowlAmount(amount: number) {
-	const whole = Math.floor(amount);
-	const fraction = amount - whole;
-	let fractionLabel = "";
-	if (fraction === 0.25) {
-		fractionLabel = "¼";
-	} else if (fraction === 0.5) {
-		fractionLabel = "½";
-	} else if (fraction === 0.75) {
-		fractionLabel = "¾";
-	}
-	if (whole > 0 && fractionLabel) {
-		return `${whole} ${fractionLabel}`;
-	}
-
-	return whole > 0 ? String(whole) : fractionLabel;
-}
-
 export function formatSolidAmount({
-	amountBowl,
+	amountServings,
 	amountGrams,
 }: {
-	amountBowl?: number | null;
+	amountServings?: number | null;
 	amountGrams?: number | null;
 }) {
 	const parts: string[] = [];
 
-	if (amountBowl) {
-		parts.push(`${formatBowlAmount(amountBowl)} bowl`);
+	if (amountServings) {
+		parts.push(`${amountServings.toFixed(2)} serving${amountServings !== 1 ? "s" : ""}`);
 	}
 
 	if (amountGrams) {

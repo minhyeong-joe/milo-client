@@ -291,11 +291,11 @@ function formatSegmentDetail(
 		}
 
 		if (type === "solid") {
-			const totalBowls = mealLogs.reduce((total, log) => total + (log.amountBowl ?? 0), 0);
+			const totalServings = mealLogs.reduce((total, log) => total + (log.amountServings ?? 0), 0);
 			const totalGrams = mealLogs.reduce((total, log) => total + (log.amountGrams ?? 0), 0);
 			const details = [];
 
-			if (totalBowls > 0) details.push(`${formatCompactNumber(totalBowls)} bowls`);
+			if (totalServings > 0) details.push(`${formatCompactNumber(totalServings)} servings`);
 			if (totalGrams > 0) details.push(`${Math.round(totalGrams)} g`);
 
 			return details.length > 0 ? `${details.join(" + ")} total` : "No amount logged";

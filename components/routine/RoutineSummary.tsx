@@ -4,16 +4,16 @@ import type {
 	RoutineKind,
 } from "@/data/homeData";
 import { colors } from "@/styles/globalStyles";
-import { formatBowlAmount, formatDuration, formatVolume } from "@/utils/routineDisplay";
+import { formatDuration, formatVolume } from "@/utils/routineDisplay";
 import type { ReactNode } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { RoutineIcon } from "./RoutineIcon";
 
-function formatSolidSummary(totalBowls?: number, totalGrams?: number) {
+function formatSolidSummary(totalServings?: number, totalGrams?: number) {
 	const parts: string[] = [];
 
-	if (totalBowls) {
-		parts.push(`${formatBowlAmount(totalBowls)} bowl`);
+	if (totalServings) {
+		parts.push(`${totalServings.toFixed(2)} servings`);
 	}
 
 	if (totalGrams) {
@@ -104,7 +104,7 @@ export function RoutineSummary({
 				{solid.count ? (
 					<DetailText>
 						{config.mealTypes.solid}: {solid.count}
-						{formatSolidSummary(solid.totalBowls, solid.totalGrams)}
+						{formatSolidSummary(solid.totalServings, solid.totalGrams)}
 					</DetailText>
 				) : null}
 			</SummaryRow>

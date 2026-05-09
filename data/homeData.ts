@@ -18,8 +18,8 @@ export type BabyProfile = {
 export type MealEvent = {
   amountMl?: number;            // For bottle feedings. UI responsible for converting to preferred unit if needed.
   durationMinutes?: number;     // For breastfeeding sessions
-  amountBowl?: number;          // For solid feedings, representing number of bowls or servings (1/4, 1/2, 3/4, 1)
-  amountGrams?: number;         // For solid feedings measured by weight. Separate from bowl units.
+  amountServings?: number;          // For solid feedings, representing number of servings.
+  amountGrams?: number;         // For solid feedings measured by weight. Separate from serving units.
   breastSide?: "left" | "right"; // For breastfeeding sessions, indicating which side was used
   id: string;
   kind: "meal";
@@ -80,7 +80,7 @@ export type DailyRoutineSummary = {
     totalChanges: number;
   };
   meals: {
-    byType: Record<MealType, { count: number; totalMinutes?: number; totalAmountMl?: number; totalBowls?: number; totalGrams?: number }>;
+    byType: Record<MealType, { count: number; totalMinutes?: number; totalAmountMl?: number; totalServings?: number; totalGrams?: number }>;
     totalCount: number;
   };
   sleep: {

@@ -30,12 +30,11 @@ export default function AverageSummaryCard({
                     if (avgCountByType === 0) {
                         return;
                     }
-                    const configTypes = kind === "meal" ? routineConfig.mealTypes : kind === "diaper" ? routineConfig.diaperTypes : routineConfig.sleepTypes;
                     const avgByType = getAverageByType(kind, type, summaryDetail, preferredVolumeUnit);
                     return (
                         <View key={type} style={styles.detailWrap}>
                             <Text style={styles.detailText}>
-                                {configTypes[type]}: {avgByType}
+                                {getTypeLabel(kind, type)}: {avgByType}
                             </Text>
                         </View>
                     );
@@ -43,6 +42,22 @@ export default function AverageSummaryCard({
             </View>
         </View>
     );
+}
+
+function getTypeLabel(kind: RoutineKind, type: string) {
+	if (kind === "meal" && type in routineConfig.mealTypes) {
+		return routineConfig.mealTypes[type as keyof typeof routineConfig.mealTypes];
+	}
+
+	if (kind === "diaper" && type in routineConfig.diaperTypes) {
+		return routineConfig.diaperTypes[type as keyof typeof routineConfig.diaperTypes];
+	}
+
+	if (kind === "sleep" && type in routineConfig.sleepTypes) {
+		return routineConfig.sleepTypes[type as keyof typeof routineConfig.sleepTypes];
+	}
+
+	return type;
 }
 
 const getAverageByType = (
@@ -59,10 +74,10 @@ const getAverageByType = (
         if (type === "breastMilk" || type === "formula") {
             return `${formatVolume(summaryDetail.avgAmountMlPerActiveDay, preferredVolumeUnit)}`;
         }
-        const formattedBowls = summaryDetail.avgBowlsPerActiveDay? `${summaryDetail.avgBowlsPerActiveDay.toFixed(1)} bowls` : "";
+        const formattedServings = summaryDetail.avgServingsPerActiveDay? `${summaryDetail.avgServingsPerActiveDay.toFixed(1)} servings` : "";
         const formattedGrams = summaryDetail.avgGramsPerActiveDay? `${summaryDetail.avgGramsPerActiveDay.toFixed(2)}g` : "";
-        const separator = formattedBowls && formattedGrams ? " + " : "";
-        return `${formattedBowls}${separator}${formattedGrams}`;
+        const separator = formattedServings && formattedGrams ? " + " : "";
+        return `${formattedServings}${separator}${formattedGrams}`;
     }
     if (kind === "diaper") {
         return `${summaryDetail.avgChangesPerActiveDay.toFixed(1)} changes`;

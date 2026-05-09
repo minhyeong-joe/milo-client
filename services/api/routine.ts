@@ -34,7 +34,7 @@ export type GetRoutineDaysResponse = {
 };
 
 export type CreateMealLogInput = {
-	amountBowl?: number;
+	amountServings?: number;
 	amountGrams?: number;
 	amountMl?: number;
 	clientMutationId?: string;
@@ -100,7 +100,7 @@ export type RoutinePatternLog =
 	| SleepPatternLog;
 
 export type MealPatternLog = {
-	amountBowl?: number | null;
+	amountServings?: number | null;
 	amountGrams?: number | null;
 	amountMl?: number | null;
 	durationMinutes?: number | null;
@@ -164,15 +164,15 @@ export type MealAverage = {
 			activeDays: number;
 			totalSessions: number;
 
-			totalBowls: number;
+			totalServings: number;
 			totalGrams: number;
-			bowlEntryCount: number;
+			servingEntryCount: number;
 			gramEntryCount: number;
 
 			avgSessionsPerActiveDay: number;
-			avgBowlsPerSession: number;
+			avgServingsPerSession: number;
 			avgGramsPerSession: number;
-			avgBowlsPerActiveDay: number;
+			avgServingsPerActiveDay: number;
 			avgGramsPerActiveDay: number;
 		};
 	};

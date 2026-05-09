@@ -24,19 +24,15 @@ import { RoutineIcon } from "@/components/routine/RoutineIcon";
 
 const BOTTLE_STEP_ML = 10;
 const BOTTLE_STEP_OZ = 0.5;
+const SERVING_STEP = 0.25;
 const SOLID_GRAMS_STEP = 5;
 const DURATION_STEP_MINUTES = 5;
 const NOTES_LIMIT = 100;
 const DEFAULT_BOTTLE_ML = 60;
+const DEFAULT_SERVINGS = 0.5;
 const DEFAULT_SOLID_GRAMS = 30;
 
 const mealTypes: MealType[] = ["breastfeed", "breastMilk", "formula", "solid"];
-const bowlOptions = [
-	{ label: "1/4", value: 0.25 },
-	{ label: "1/2", value: 0.5 },
-	{ label: "3/4", value: 0.75 },
-	{ label: "1 bowl", value: 1 },
-];
 
 function isBottleMeal(type: MealType) {
 	return type === "breastMilk" || type === "formula";
@@ -80,9 +76,11 @@ export default function AddMealScreen() {
 	const [durationMinutesText, setDurationMinutesText] = useState(() =>
 		String(mealToEdit?.durationMinutes ?? latestMeal?.durationMinutes ?? 15),
 	);
-	const [amountBowl, setAmountBowl] = useState(mealToEdit?.amountBowl ?? latestMeal?.amountBowl ?? 0.5);
-	const [solidInputMode, setSolidInputMode] = useState<"bowl" | "grams">(() =>
-		mealToEdit?.amountGrams ? "grams" : mealToEdit?.amountBowl ? "bowl" : preferredSolidFoodUnit,
+	const [amountServingsText, setAmountServingsText] = useState(() =>
+		formatServingInput(mealToEdit?.amountServings ?? latestMeal?.amountServings ?? DEFAULT_SERVINGS),
+	);
+	const [solidInputMode, setSolidInputMode] = useState<"servings" | "grams">(() =>
+		mealToEdit?.amountGrams ? "grams" : mealToEdit?.amountServings ? "servings" : preferredSolidFoodUnit,
 	);
 	const [amountGramsText, setAmountGramsText] = useState(() =>
 		String(mealToEdit?.amountGrams ?? latestMeal?.amountGrams ?? DEFAULT_SOLID_GRAMS),
@@ -137,8 +135,16 @@ export default function AddMealScreen() {
 		setAmountGramsText((value) =>
 			String(normalizePositiveInteger(value, SOLID_GRAMS_STEP) + SOLID_GRAMS_STEP),
 		);
+	const decrementServings = () =>
+		setAmountServingsText((value) =>
+			formatServingInput(Math.max(SERVING_STEP, normalizeServingAmount(value) - SERVING_STEP)),
+		);
+	const incrementServings = () =>
+		setAmountServingsText((value) =>
+			formatServingInput(normalizeServingAmount(value) + SERVING_STEP),
+		);
 
-	const selectSolidInputMode = (mode: "bowl" | "grams") => {
+	const selectSolidInputMode = (mode: "servings" | "grams") => {
 		setSolidInputMode(mode);
 		void setPreferredSolidFoodUnit(mode);
 	};
@@ -167,7 +173,9 @@ export default function AddMealScreen() {
 			DURATION_STEP_MINUTES,
 		);
 		const input = {
-			amountBowl: mealType === "solid" && solidInputMode === "bowl" ? amountBowl : undefined,
+			amountServings: mealType === "solid" && solidInputMode === "servings"
+				? normalizeServingAmount(amountServingsText)
+				: undefined,
 			amountGrams: mealType === "solid" && solidInputMode === "grams"
 				? normalizePositiveInteger(amountGramsText, SOLID_GRAMS_STEP)
 				: undefined,
@@ -372,13 +380,13 @@ export default function AddMealScreen() {
 						<View style={styles.section}>
 							<View style={styles.amountHeaderRow}>
 								<Text style={styles.sectionLabel}>
-									{solidInputMode === "grams" ? "Grams" : "Bowl"}
+									{solidInputMode === "grams" ? "Grams" : "Servings"}
 								</Text>
 								<View style={styles.solidModeControl}>
 									<SolidModeButton
-										isSelected={solidInputMode === "bowl"}
-										label="Bowl"
-										onPress={() => selectSolidInputMode("bowl")}
+										isSelected={solidInputMode === "servings"}
+										label="Serving"
+										onPress={() => selectSolidInputMode("servings")}
 									/>
 									<SolidModeButton
 										isSelected={solidInputMode === "grams"}
@@ -387,24 +395,22 @@ export default function AddMealScreen() {
 									/>
 								</View>
 							</View>
-							{solidInputMode === "bowl" ? (
-								<View style={styles.bowlGrid}>
-									{bowlOptions.map((option) => {
-										const isSelected = amountBowl === option.value;
-
-										return (
-											<Pressable
-												accessibilityRole="button"
-												key={option.value}
-												onPress={() => setAmountBowl(option.value)}
-												style={[styles.bowlButton, isSelected && styles.bowlButtonSelected]}
-											>
-												<Text style={[styles.bowlText, isSelected && styles.bowlTextSelected]}>
-													{option.label}
-												</Text>
-											</Pressable>
-										);
-									})}
+							{solidInputMode === "servings" ? (
+								<View style={styles.stepperRow}>
+									<StepperButton icon="remove" onPress={decrementServings} />
+									<StepperNumberInput
+										decimalPlaces={2}
+										onBlur={() =>
+											setAmountServingsText((value) =>
+												formatServingInput(normalizeServingAmount(value)),
+											)
+										}
+										keyboardType="decimal-pad"
+										onChangeText={setAmountServingsText}
+										suffix="servings"
+										value={amountServingsText}
+									/>
+									<StepperButton icon="add" onPress={incrementServings} />
 								</View>
 							) : (
 								<View style={styles.stepperRow}>
@@ -509,12 +515,14 @@ function SolidModeButton({
 
 function StepperNumberInput({
 	keyboardType,
+	decimalPlaces = 1,
 	onBlur,
 	onChangeText,
 	suffix,
 	value,
 }: {
 	keyboardType: "decimal-pad" | "number-pad";
+	decimalPlaces?: number;
 	onBlur: () => void;
 	onChangeText: (value: string) => void;
 	suffix: string;
@@ -528,7 +536,7 @@ function StepperNumberInput({
 				onChangeText={(text) =>
 					onChangeText(
 						keyboardType === "decimal-pad"
-							? sanitizeDecimalInput(text)
+							? sanitizeDecimalInput(text, decimalPlaces)
 							: text.replace(/\D/g, ""),
 					)
 				}
@@ -549,30 +557,6 @@ const styles = StyleSheet.create({
 		flexDirection: "row",
 		gap: spacing.md,
 		justifyContent: "space-between",
-	},
-	bowlButton: {
-		alignItems: "center",
-		borderColor: colors.light.border,
-		borderRadius: 14,
-		borderWidth: 1,
-		flex: 1,
-		paddingVertical: 14,
-	},
-	bowlButtonSelected: {
-		backgroundColor: routineConfig.quickActions.meal.backgroundColor,
-		borderColor: routineConfig.quickActions.meal.accentColor,
-	},
-	bowlGrid: {
-		flexDirection: "row",
-		gap: spacing.sm,
-	},
-	bowlText: {
-		color: colors.light.textPrimary,
-		fontSize: 14,
-		fontWeight: "700",
-	},
-	bowlTextSelected: {
-		color: routineConfig.quickActions.meal.accentColor,
 	},
 	cancelText: {
 		color: colors.light.primary,
@@ -813,11 +797,25 @@ function normalizeOzInput(value: string, fallback: number) {
 	return Math.round(parsed * 10) / 10;
 }
 
-function sanitizeDecimalInput(value: string) {
+function normalizeServingAmount(value: string) {
+	const parsed = Number.parseFloat(value);
+
+	if (!Number.isFinite(parsed) || parsed <= 0) {
+		return DEFAULT_SERVINGS;
+	}
+
+	return Math.round(parsed * 100) / 100;
+}
+
+function formatServingInput(amount: number) {
+	return amount.toFixed(2);
+}
+
+function sanitizeDecimalInput(value: string, decimalPlaces: number) {
 	const normalized = value.replace(/,/g, ".");
 	const [whole = "", ...rest] = normalized.split(".");
 	const wholeDigits = whole.replace(/\D/g, "");
-	const decimalDigits = rest.join("").replace(/\D/g, "").slice(0, 1);
+	const decimalDigits = rest.join("").replace(/\D/g, "").slice(0, decimalPlaces);
 
 	if (normalized.includes(".")) {
 		return `${wholeDigits}.${decimalDigits}`;

@@ -348,7 +348,7 @@ function buildRoutineStatsFromLocalLogs(
 		statsDay.logs = day.timeline.map((event) => {
 			if (event.kind === "meal") {
 				return {
-					amountBowl: event.amountBowl ?? null,
+					amountServings: event.amountServings ?? null,
 					amountGrams: event.amountGrams ?? null,
 					amountMl: event.amountMl ?? null,
 					durationMinutes: event.durationMinutes ?? null,
@@ -431,7 +431,7 @@ function buildRoutineStatsSummary(days: RoutineStatsResponse["days"]): RoutineSt
 		breastfeed: { activeDays: new Set<string>(), count: 0, durationMinutes: 0 },
 		breastMilk: { activeDays: new Set<string>(), amountMl: 0, count: 0 },
 		formula: { activeDays: new Set<string>(), amountMl: 0, count: 0 },
-		solid: { activeDays: new Set<string>(), bowlCount: 0, bowls: 0, count: 0, gramCount: 0, grams: 0 },
+		solid: { activeDays: new Set<string>(), servingCount: 0, servings: 0, count: 0, gramCount: 0, grams: 0 },
 	};
 	const diaperTypeCounts = { both: 0, dirty: 0, dry: 0, wet: 0 };
 	const sleepTypeStats = {
@@ -464,9 +464,9 @@ function buildRoutineStatsSummary(days: RoutineStatsResponse["days"]): RoutineSt
 				} else {
 					mealTypeStats.solid.activeDays.add(day.date);
 					mealTypeStats.solid.count += 1;
-					if (typeof log.amountBowl === "number") {
-						mealTypeStats.solid.bowlCount += 1;
-						mealTypeStats.solid.bowls += log.amountBowl;
+					if (typeof log.amountServings === "number") {
+						mealTypeStats.solid.servingCount += 1;
+						mealTypeStats.solid.servings += log.amountServings;
 					}
 					if (typeof log.amountGrams === "number") {
 						mealTypeStats.solid.gramCount += 1;
@@ -559,14 +559,14 @@ function buildRoutineStatsSummary(days: RoutineStatsResponse["days"]): RoutineSt
 				},
 				solid: {
 					activeDays: mealTypeStats.solid.activeDays.size,
-					totalBowls: mealTypeStats.solid.bowls,
+					totalServings: mealTypeStats.solid.servings,
 					totalGrams: mealTypeStats.solid.grams,
-					bowlEntryCount: mealTypeStats.solid.bowlCount,
+					servingEntryCount: mealTypeStats.solid.servingCount,
 					gramEntryCount: mealTypeStats.solid.gramCount,
 					totalSessions: mealTypeStats.solid.count,
-					avgBowlsPerSession: safeDivide(
-						mealTypeStats.solid.bowls,
-						mealTypeStats.solid.bowlCount,
+					avgServingsPerSession: safeDivide(
+						mealTypeStats.solid.servings,
+						mealTypeStats.solid.servingCount,
 					),
 					avgGramsPerSession: safeDivide(
 						mealTypeStats.solid.grams,
@@ -576,8 +576,8 @@ function buildRoutineStatsSummary(days: RoutineStatsResponse["days"]): RoutineSt
 						mealTypeStats.solid.count,
 						mealTypeStats.solid.activeDays.size,
 					),
-					avgBowlsPerActiveDay: safeDivide(
-						mealTypeStats.solid.bowls,
+					avgServingsPerActiveDay: safeDivide(
+						mealTypeStats.solid.servings,
 						mealTypeStats.solid.activeDays.size,
 					),
 					avgGramsPerActiveDay: safeDivide(
@@ -670,52 +670,79 @@ function createEmptyRoutineStats(startDate: string, endDate: string): RoutineSta
 		summary: {
 			diaper: {
 				activeDays: 0,
+				totalChanges: 0,
 				avgChangesPerActiveDay: 0,
 				byType: {
-					both: { avgChangesPerActiveDay: 0 },
-					dirty: { avgChangesPerActiveDay: 0 },
-					dry: { avgChangesPerActiveDay: 0 },
-					wet: { avgChangesPerActiveDay: 0 },
+					both: { totalChanges: 0, avgChangesPerActiveDay: 0 },
+					dirty: { totalChanges: 0, avgChangesPerActiveDay: 0 },
+					dry: { totalChanges: 0, avgChangesPerActiveDay: 0 },
+					wet: { totalChanges: 0, avgChangesPerActiveDay: 0 },
 				},
 			},
 			meal: {
 				activeDays: 0,
+				totalSessions: 0,
 				avgSessionsPerActiveDay: 0,
 				byType: {
 					breastfeed: {
 						activeDays: 0,
+						totalSessions: 0,
+						totalDurationMinutes: 0,
 						avgDurationMinutesPerSession: 0,
+						avgDurationMinutesPerActiveDay: 0,
 						avgSessionsPerActiveDay: 0,
 					},
 					breastMilk: {
 						activeDays: 0,
+						totalSessions: 0,
+						totalAmountMl: 0,
 						avgAmountMlPerSession: 0,
+						avgAmountMlPerActiveDay: 0,
 						avgSessionsPerActiveDay: 0,
 					},
 					formula: {
 						activeDays: 0,
+						totalSessions: 0,
+						totalAmountMl: 0,
 						avgAmountMlPerSession: 0,
+						avgAmountMlPerActiveDay: 0,
 						avgSessionsPerActiveDay: 0,
 					},
 					solid: {
 						activeDays: 0,
-						avgBowlsPerSession: 0,
+						totalSessions: 0,
+						totalServings: 0,
+						totalGrams: 0,
+						servingEntryCount: 0,
+						gramEntryCount: 0,
+						avgServingsPerSession: 0,
 						avgGramsPerSession: 0,
+						avgServingsPerActiveDay: 0,
+						avgGramsPerActiveDay: 0,
 						avgSessionsPerActiveDay: 0,
 					},
 				},
 			},
 			sleep: {
 				activeDays: 0,
+				totalSessions: 0,
+				totalDurationMinutes: 0,
 				avgDurationMinutesPerActiveDay: 0,
+				avgDurationMinutesPerSession: 0,
 				avgSessionsPerActiveDay: 0,
 				byType: {
 					nap: {
+						totalSessions: 0,
+						totalDurationMinutes: 0,
 						avgDurationMinutesPerActiveDay: 0,
+						avgDurationMinutesPerSession: 0,
 						avgSessionsPerActiveDay: 0,
 					},
 					nighttime: {
+						totalSessions: 0,
+						totalDurationMinutes: 0,
 						avgDurationMinutesPerActiveDay: 0,
+						avgDurationMinutesPerSession: 0,
 						avgSessionsPerActiveDay: 0,
 					},
 				},

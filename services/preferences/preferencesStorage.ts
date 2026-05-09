@@ -4,11 +4,11 @@ import { Platform } from "react-native";
 
 const PREFERENCES_STORAGE_KEY = "milo.preferences";
 const DEFAULT_VOLUME_UNIT: PreferredVolumeUnit = "ml";
-const DEFAULT_SOLID_FOOD_UNIT: PreferredSolidFoodUnit = "bowl";
+const DEFAULT_SOLID_FOOD_UNIT: PreferredSolidFoodUnit = "servings";
 const DEFAULT_LENGTH_UNIT: PreferredLengthUnit = "cm";
 const DEFAULT_WEIGHT_UNIT: PreferredWeightUnit = "kg";
 
-export type PreferredSolidFoodUnit = "bowl" | "grams";
+export type PreferredSolidFoodUnit = "servings" | "grams";
 export type PreferredLengthUnit = "cm" | "in";
 export type PreferredWeightUnit = "kg" | "lb";
 
@@ -67,7 +67,7 @@ function isPreferredVolumeUnit(value: unknown): value is PreferredVolumeUnit {
 }
 
 function isPreferredSolidFoodUnit(value: unknown): value is PreferredSolidFoodUnit {
-	return value === "bowl" || value === "grams";
+	return value === "servings" || value === "grams";
 }
 
 function isPreferredLengthUnit(value: unknown): value is PreferredLengthUnit {

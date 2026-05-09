@@ -24,9 +24,9 @@ function getEventDisplay(
 				? `${event.durationMinutes} min`
 				: event.amountMl
 					? formatVolume(event.amountMl, config.preferredVolumeUnit)
-					: event.amountBowl || event.amountGrams
+					: event.amountServings || event.amountGrams
 						? formatSolidAmount({
-								amountBowl: event.amountBowl,
+								amountServings: event.amountServings,
 								amountGrams: event.amountGrams,
 							})
 						: "";

@@ -31,7 +31,7 @@ export function AppPreferencesProvider({ children }: { children: ReactNode }) {
 	const [preferredVolumeUnit, setPreferredVolumeUnitState] =
 		useState<PreferredVolumeUnit>("ml");
 	const [preferredSolidFoodUnit, setPreferredSolidFoodUnitState] =
-		useState<PreferredSolidFoodUnit>("bowl");
+		useState<PreferredSolidFoodUnit>("servings");
 	const [preferredLengthUnit, setPreferredLengthUnitState] =
 		useState<PreferredLengthUnit>("cm");
 	const [preferredWeightUnit, setPreferredWeightUnitState] =

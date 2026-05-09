@@ -31,7 +31,7 @@ export const homeMockApiResponse = {
                         },
                         solid: {
                             count: 1,
-                            totalBowls: 1
+                            totalServings: 1
                         }
                     }
                 },
@@ -122,7 +122,7 @@ export const homeMockApiResponse = {
                         },
                         solid: {
                             count: 1,
-                            totalBowls: 1
+                            totalServings: 1
                         }
                     }
                 },
@@ -220,7 +220,7 @@ export const homeMockApiResponse = {
                         },
                         solid: {
                             count: 1,
-                            totalBowls: 1
+                            totalServings: 1
                         }
                     }
                 },
@@ -311,7 +311,7 @@ export const homeMockApiResponse = {
                         },
                         solid: {
                             count: 1,
-                            totalBowls: 1
+                            totalServings: 1
                         }
                     }
                 },
@@ -402,7 +402,7 @@ export const homeMockApiResponse = {
                         },
                         solid: {
                             count: 1,
-                            totalBowls: 1
+                            totalServings: 1
                         }
                     }
                 },
