@@ -101,10 +101,10 @@ export default function RoutineTimetableChart({
 	);
 
 	return (
-		<View style={[globalStyles.card, styles.card]}>
+		<View>
 			<View style={globalStyles.rowBetween}>
 				<View>
-					<Text style={styles.title}>Daily Timetable</Text>
+					<Text style={globalStyles.sectionTitleText}>Timeline Pattern</Text>
 				</View>
 				<View style={styles.legendRow}>
 					<LegendDot color={KIND_COLORS.meal} label="Meal" />
@@ -127,7 +127,7 @@ export default function RoutineTimetableChart({
 					noOfSections={4}
 					rulesColor="#EEF0F5"
 					rulesType="solid"
-					scrollToEnd={false}
+					scrollToEnd={true}
 					showScrollIndicator={isScrollable}
 					spacing={spacingValue}
 					stackData={stackData}
@@ -481,9 +481,6 @@ const styles = StyleSheet.create({
 		lineHeight: 11,
 		textAlign: "center",
 	},
-	card: {
-		gap: spacing.md,
-	},
 	chartWrapper: {
 		overflow: "hidden",
 	},
@@ -513,9 +510,5 @@ const styles = StyleSheet.create({
 		...typography.caption,
 		color: colors.light.textSecondary,
 		marginTop: 2,
-	},
-	title: {
-		...typography.sectionTitle,
-		color: colors.light.textPrimary,
 	},
 });

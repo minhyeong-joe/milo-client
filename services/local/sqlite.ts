@@ -82,6 +82,19 @@ async function initLocalDb(db: SQLite.SQLiteDatabase) {
     ON routine_mutation_queue(client_mutation_id)
     WHERE client_mutation_id IS NOT NULL;
 
+    CREATE TABLE IF NOT EXISTS routine_stats_cache (
+      user_id TEXT NOT NULL,
+      baby_id TEXT NOT NULL,
+      start_date TEXT NOT NULL,
+      end_date TEXT NOT NULL,
+      stats_json TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (user_id, baby_id, start_date, end_date)
+    );
+
+    CREATE INDEX IF NOT EXISTS routine_stats_cache_range_idx
+    ON routine_stats_cache(user_id, baby_id, start_date, end_date);
+
     CREATE TABLE IF NOT EXISTS sync_job_queue (
       id TEXT PRIMARY KEY NOT NULL,
       user_id TEXT NOT NULL,

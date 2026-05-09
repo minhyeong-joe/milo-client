@@ -6,6 +6,10 @@ import { Ionicons } from "@expo/vector-icons";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { RoutineIcon } from "@/components/routine/RoutineIcon";
 import RoutineTimetableChart from "@/components/reports/RoutineTimetableChart";
+import SummaryCardButton from "@/components/reports/SummaryCardButton";
+import { RoutineKind } from "@/data/homeData";
+import RoutineDailyStackedChart from "@/components/reports/RoutineDailyStackedChart";
+import AverageSummaryCard from "@/components/reports/AverageSummaryCard";
 
 export default function PatternReportsContent({
 	canShiftNext,
@@ -33,6 +37,7 @@ export default function PatternReportsContent({
 	const [showMeal, setShowMeal] = useState(true);
 	const [showDiaper, setShowDiaper] = useState(true);
 	const [showSleep, setShowSleep] = useState(true);
+	const [selectedRoutineKind, setSelectedRoutineKind] = useState<RoutineKind>("meal");
 
 	return (
 		<ScrollView
@@ -92,7 +97,7 @@ export default function PatternReportsContent({
 			</View>
 
 			<View style={globalStyles.card}>
-				<View style={[globalStyles.rowCenter, { justifyContent: "center", gap: spacing.lg }]}>
+				<View style={[globalStyles.rowCenter, styles.routineToggleButtonGroup]}>
 					<Pressable
 						onPress={() => setShowMeal((prev) => !prev)}
 					>
@@ -101,7 +106,7 @@ export default function PatternReportsContent({
 					<Pressable
 						onPress={() => setShowDiaper((prev) => !prev)}
 					>
-						<RoutineIcon kind="diaper" size={46} customStyle={!showDiaper ? styles.disabledIcon : undefined}/>
+						<RoutineIcon kind="diaper" size={46} customStyle={!showDiaper ? styles.disabledIcon : undefined} />
 					</Pressable>
 					<Pressable
 						onPress={() => setShowSleep((prev) => !prev)}
@@ -109,14 +114,66 @@ export default function PatternReportsContent({
 						<RoutineIcon kind="sleep" size={46} customStyle={!showSleep ? styles.disabledIcon : undefined} />
 					</Pressable>
 				</View>
+				<RoutineTimetableChart
+					days={stats.days}
+					showDiaper={showDiaper}
+					showMeal={showMeal}
+					showSleep={showSleep}
+				/>
 			</View>
 
-			<RoutineTimetableChart
-				days={stats.days}
-				showDiaper={showDiaper}
-				showMeal={showMeal}
-				showSleep={showSleep}
-			/>
+			<View style={globalStyles.card}>
+				<View style={globalStyles.rowBetween}>
+					<Text style={globalStyles.sectionTitleText}>
+						Summary
+					</Text>
+				</View>
+				<View style={styles.summaryCardButtonGroup}>
+					<SummaryCardButton 
+						kind="meal"
+						isSelected={selectedRoutineKind === "meal"}
+						setSelected={(selected) => selected && setSelectedRoutineKind("meal")}
+						summary={stats.summary.meal}
+					/>
+					<SummaryCardButton 
+						kind="diaper"
+						isSelected={selectedRoutineKind === "diaper"}
+						setSelected={(selected) => selected && setSelectedRoutineKind("diaper")}
+						summary={stats.summary.diaper}
+					/>
+					<SummaryCardButton 
+						kind="sleep"
+						isSelected={selectedRoutineKind === "sleep"}
+						setSelected={(selected) => selected && setSelectedRoutineKind("sleep")}
+						summary={stats.summary.sleep}
+					/>
+				</View>
+				<RoutineDailyStackedChart
+					days={stats.days}
+					kind={selectedRoutineKind}
+				/>
+				<View style={{marginTop: spacing.lg}}>
+					<Text style={[globalStyles.sectionTitleText, {marginBottom: spacing.sm}]}>
+						Averages per Logged Day
+					</Text>
+					<AverageSummaryCard
+						title="Meals"
+						kind="meal"
+						summary={stats.summary.meal}
+					/>
+					<AverageSummaryCard
+						title="Diaper"
+						kind="diaper"
+						summary={stats.summary.diaper}
+					/>
+					<AverageSummaryCard
+						title="Sleep"
+						kind="sleep"
+						summary={stats.summary.sleep}
+					/>
+				</View>
+			</View>
+
 		</ScrollView>
 	);
 }
@@ -218,7 +275,18 @@ const styles = StyleSheet.create({
 		padding: spacing.xs,
 		width: 148,
 	},
+	routineToggleButtonGroup: { 
+		justifyContent: "center", 
+		gap: spacing.lg,
+		marginBottom: spacing.sm
+	},
 	disabledIcon: {
 		opacity: 0.35,
+	},
+	summaryCardButtonGroup: {
+		flexDirection: "row",
+		justifyContent: "center",
+		gap: spacing.sm,
+		marginTop: spacing.sm
 	}
 });

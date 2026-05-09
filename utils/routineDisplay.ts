@@ -1,4 +1,5 @@
-import type { PreferredVolumeUnit, RoutineEvent } from "@/data/homeData";
+import type { PreferredVolumeUnit, RoutineEvent, RoutineKind } from "@/data/homeData";
+import { DiaperAverage, MealAverage, RoutineStatsSummary, SleepAverage } from "@/services/api/routine";
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 export const ML_PER_OZ = 29.5735;
@@ -45,9 +46,9 @@ export function formatBabyAge(birthdate: string, today = new Date()) {
 	return `${months} ${monthLabel} • ${days} ${dayLabel}`;
 }
 
-export function formatDuration(totalMinutes: number) {
-	const hours = Math.floor(totalMinutes / 60);
-	const minutes = totalMinutes % 60;
+export function formatDuration(totalMinutes: number | null) {
+	const hours = Math.floor((totalMinutes ?? 0) / 60);
+	const minutes = (totalMinutes ?? 0) % 60;
 
 	if (hours === 0) {
 		return `${minutes}m`;
@@ -57,7 +58,7 @@ export function formatDuration(totalMinutes: number) {
 		return `${hours}h`;
 	}
 
-	return `${hours}h ${minutes}m`;
+	return `${hours}h ${minutes.toFixed(0)}m`;
 }
 
 export function formatVolume(amountMl: number, preferredUnit: PreferredVolumeUnit) {
@@ -160,4 +161,15 @@ export function formatSolidAmount({
 	}
 
 	return parts.join(" + ");
+}
+
+export function getAveragePerActiveDay(
+	kind: RoutineKind,
+	summary: RoutineStatsSummary[RoutineKind],
+) {
+	if (kind === "diaper") {
+		return (summary as DiaperAverage).avgChangesPerActiveDay;
+	}
+
+	return (summary as MealAverage | SleepAverage).avgSessionsPerActiveDay;
 }

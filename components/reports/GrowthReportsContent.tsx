@@ -23,9 +23,9 @@ export default function GrowthReportsContent({
 }) {
     if (!selectedBaby) {
         return (
-            <View style={[globalStyles.card, globalStyles.placeholderCard]}>
-                <Text style={globalStyles.placeholderTitle}>No Baby Selected</Text>
-                <Text style={globalStyles.bodyText}>
+            <View style={globalStyles.card}>
+                <Text style={globalStyles.bodyText}>No Baby Selected</Text>
+                <Text style={globalStyles.mutedText}>
                     Choose or create a baby profile to see growth reports.
                 </Text>
             </View>

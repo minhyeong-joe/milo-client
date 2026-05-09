@@ -6,6 +6,7 @@ export const colors = {
 		border: "#ECEEF3",
 		primary: "#7C5CE7",
 		surface: "#FFFFFF",
+		success: "#92eeb4",
 		textPrimary: "#151827",
 		textSecondary: "#6B7280",
 		error: "#EF4444",
@@ -15,6 +16,7 @@ export const colors = {
 		border: "#2A2D38",
 		primary: "#9B7CFF",
 		surface: "#1A1D26",
+		success: "#71f1a0",
 		textPrimary: "#F7F7FA",
 		textSecondary: "#A8ADBA",
 		error: "#EF4444",
@@ -120,12 +122,4 @@ export const globalStyles = StyleSheet.create({
 		...typography.body,
 		color: colors.light.textSecondary,
 	},
-    placeholderCard: {
-        gap: spacing.sm,
-        marginTop: spacing.lg,
-    },
-    placeholderTitle: {
-        ...typography.sectionTitle,
-        color: colors.light.textPrimary,
-    },
 });

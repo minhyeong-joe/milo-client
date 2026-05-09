@@ -133,46 +133,70 @@ export type RoutineStatsSummary = {
 
 export type MealAverage = {
 	activeDays: number;
+	totalSessions: number;
 	avgSessionsPerActiveDay: number;
 	byType: {
 		breastfeed: {
 			activeDays: number;
-			avgDurationMinutesPerSession: number;
+			totalSessions: number;
+			totalDurationMinutes: number;
 			avgSessionsPerActiveDay: number;
+			avgDurationMinutesPerSession: number;
+			avgDurationMinutesPerActiveDay: number;
 		};
 		breastMilk: {
 			activeDays: number;
-			avgAmountMlPerSession: number;
+			totalSessions: number;
+			totalAmountMl: number;
 			avgSessionsPerActiveDay: number;
+			avgAmountMlPerSession: number;
+			avgAmountMlPerActiveDay: number;
 		};
 		formula: {
 			activeDays: number;
-			avgAmountMlPerSession: number;
+			totalSessions: number;
+			totalAmountMl: number;
 			avgSessionsPerActiveDay: number;
+			avgAmountMlPerSession: number;
+			avgAmountMlPerActiveDay: number;
 		};
 		solid: {
 			activeDays: number;
+			totalSessions: number;
+
+			totalBowls: number;
+			totalGrams: number;
+			bowlEntryCount: number;
+			gramEntryCount: number;
+
+			avgSessionsPerActiveDay: number;
 			avgBowlsPerSession: number;
 			avgGramsPerSession: number;
-			avgSessionsPerActiveDay: number;
+			avgBowlsPerActiveDay: number;
+			avgGramsPerActiveDay: number;
 		};
 	};
 };
 
 export type DiaperAverage = {
 	activeDays: number;
+	totalChanges: number;
 	avgChangesPerActiveDay: number;
 	byType: {
 		both: {
+			totalChanges: number;
 			avgChangesPerActiveDay: number;
 		};
 		dirty: {
+			totalChanges: number;
 			avgChangesPerActiveDay: number;
 		};
 		dry: {
+			totalChanges: number;
 			avgChangesPerActiveDay: number;
 		};
 		wet: {
+			totalChanges: number;
 			avgChangesPerActiveDay: number;
 		};
 	};
@@ -180,16 +204,25 @@ export type DiaperAverage = {
 
 export type SleepAverage = {
 	activeDays: number;
-	avgDurationMinutesPerActiveDay: number;
+	totalSessions: number;
+	totalDurationMinutes: number;
 	avgSessionsPerActiveDay: number;
+	avgDurationMinutesPerSession: number;
+	avgDurationMinutesPerActiveDay: number;
 	byType: {
 		nap: {
-			avgDurationMinutesPerActiveDay: number;
+			totalSessions: number;
+			totalDurationMinutes: number;
 			avgSessionsPerActiveDay: number;
+			avgDurationMinutesPerSession: number;
+			avgDurationMinutesPerActiveDay: number;
 		};
 		nighttime: {
-			avgDurationMinutesPerActiveDay: number;
+			totalSessions: number;
+			totalDurationMinutes: number;
 			avgSessionsPerActiveDay: number;
+			avgDurationMinutesPerSession: number;
+			avgDurationMinutesPerActiveDay: number;
 		};
 	};
 };

@@ -1,5 +1,6 @@
 import { SyncStatusCard } from "@/components/sync/SyncStatusCard";
 import { useAppPreferences } from "@/context/AppPreferencesContext";
+import { useAuthSession } from "@/context/AuthSessionContext";
 import { useBabySelection } from "@/context/BabySelectionContext";
 import { useGrowthData } from "@/context/GrowthDataContext";
 import { useRoutineData } from "@/context/RoutineDataContext";
@@ -11,6 +12,10 @@ import {
 import type { RoutineEvent } from "@/data/homeData";
 import { ApiError } from "@/services/api/httpClient";
 import { getRoutineStats, type RoutineStatsResponse } from "@/services/api/routine";
+import {
+	loadCachedRoutineStats,
+	saveRoutineStatsCache,
+} from "@/services/routine/routineStatsCacheStore";
 import { colors, globalStyles, spacing, typography } from "@/styles/globalStyles";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -34,6 +39,7 @@ const REPORT_SYNC_TIMEOUT_MS = 10000;
 
 export default function ReportsScreen() {
 	const { selectedBaby } = useBabySelection();
+	const { session } = useAuthSession();
 	const {
 		growthRecords,
 		loadGrowthRecords: loadLocalGrowthRecords,
@@ -106,9 +112,13 @@ export default function ReportsScreen() {
 		() => buildRoutineStatsFromLocalLogs(dailyLogs, patternStartDate, patternEndDateKey),
 		[dailyLogs, patternEndDateKey, patternStartDate],
 	);
+	const localPatternDateSet = useMemo(
+		() => new Set(dailyLogs.map((day) => day.date)),
+		[dailyLogs],
+	);
 	const displayedPatternStats = useMemo(
-		() => mergeRoutineStatsForDisplay(localPatternStats, patternStats),
-		[localPatternStats, patternStats],
+		() => mergeRoutineStatsForDisplay(localPatternStats, patternStats, localPatternDateSet),
+		[localPatternDateSet, localPatternStats, patternStats],
 	);
 
 	const loadPatternStats = useCallback(async () => {
@@ -131,6 +141,19 @@ export default function ReportsScreen() {
 		}
 
 		try {
+			if (session) {
+				const cachedStats = await loadCachedRoutineStats({
+					babyId: selectedBaby.id,
+					endDate: patternEndDateKey,
+					startDate: patternStartDate,
+					userId: session.user.id,
+				});
+
+				if (cachedStats) {
+					setPatternStats(cachedStats);
+				}
+			}
+
 			await syncPendingMutations();
 			const response = await withTimeout(
 				getRoutineStats({
@@ -141,6 +164,13 @@ export default function ReportsScreen() {
 				REPORT_SYNC_TIMEOUT_MS,
 			);
 			setPatternStats(response);
+			if (session) {
+				await saveRoutineStatsCache({
+					babyId: selectedBaby.id,
+					stats: response,
+					userId: session.user.id,
+				});
+			}
 			markOnline();
 		} catch (caughtError) {
 			if (isAuthRequiredError(caughtError)) {
@@ -163,6 +193,7 @@ export default function ReportsScreen() {
 		patternStats.endDate,
 		patternStats.startDate,
 		selectedBaby,
+		session,
 		syncPendingMutations,
 	]);
 
@@ -353,6 +384,7 @@ function buildRoutineStatsFromLocalLogs(
 function mergeRoutineStatsForDisplay(
 	localStats: RoutineStatsResponse,
 	apiStats: RoutineStatsResponse,
+	localDateSet: Set<string>,
 ) {
 	if (
 		apiStats.startDate !== localStats.startDate ||
@@ -361,21 +393,236 @@ function mergeRoutineStatsForDisplay(
 		return localStats;
 	}
 
-	return {
-		...apiStats,
-		days: apiStats.days.map((apiDay, index) => {
-			const localDay = localStats.days[index];
-			const logsById = new Map(apiDay.logs.map((log) => [log.id, log]));
+	const days = apiStats.days.map((apiDay, index) => {
+		const localDay = localStats.days[index];
 
-			for (const log of localDay?.logs ?? []) {
-				logsById.set(log.id, log);
-			}
-
+		if (localDateSet.has(apiDay.date)) {
 			return {
 				...apiDay,
-				logs: Array.from(logsById.values()),
+				logs: localDay?.logs ?? [],
 			};
-		}),
+		}
+
+		const logsById = new Map(apiDay.logs.map((log) => [log.id, log]));
+
+		for (const log of localDay?.logs ?? []) {
+			logsById.set(log.id, log);
+		}
+
+		return {
+			...apiDay,
+			logs: Array.from(logsById.values()),
+		};
+	});
+
+	return {
+		...apiStats,
+		days,
+		summary: buildRoutineStatsSummary(days),
+	};
+}
+
+function buildRoutineStatsSummary(days: RoutineStatsResponse["days"]): RoutineStatsResponse["summary"] {
+	const safeDivide = (value: number, divisor: number) => divisor > 0 ? value / divisor : 0;
+	const mealActiveDays = new Set<string>();
+	const diaperActiveDays = new Set<string>();
+	const sleepActiveDays = new Set<string>();
+	const mealTypeStats = {
+		breastfeed: { activeDays: new Set<string>(), count: 0, durationMinutes: 0 },
+		breastMilk: { activeDays: new Set<string>(), amountMl: 0, count: 0 },
+		formula: { activeDays: new Set<string>(), amountMl: 0, count: 0 },
+		solid: { activeDays: new Set<string>(), bowlCount: 0, bowls: 0, count: 0, gramCount: 0, grams: 0 },
+	};
+	const diaperTypeCounts = { both: 0, dirty: 0, dry: 0, wet: 0 };
+	const sleepTypeStats = {
+		nap: { count: 0, durationMinutes: 0 },
+		nighttime: { count: 0, durationMinutes: 0 },
+	};
+	let mealCount = 0;
+	let diaperCount = 0;
+	let sleepCount = 0;
+	let sleepDurationMinutes = 0;
+
+	for (const day of days) {
+		for (const log of day.logs) {
+			if (log.kind === "meal") {
+				mealActiveDays.add(day.date);
+				mealCount += 1;
+
+				if (log.type === "breastfeed") {
+					mealTypeStats.breastfeed.activeDays.add(day.date);
+					mealTypeStats.breastfeed.count += 1;
+					mealTypeStats.breastfeed.durationMinutes += log.durationMinutes ?? 0;
+				} else if (log.type === "breastMilk") {
+					mealTypeStats.breastMilk.activeDays.add(day.date);
+					mealTypeStats.breastMilk.count += 1;
+					mealTypeStats.breastMilk.amountMl += log.amountMl ?? 0;
+				} else if (log.type === "formula") {
+					mealTypeStats.formula.activeDays.add(day.date);
+					mealTypeStats.formula.count += 1;
+					mealTypeStats.formula.amountMl += log.amountMl ?? 0;
+				} else {
+					mealTypeStats.solid.activeDays.add(day.date);
+					mealTypeStats.solid.count += 1;
+					if (typeof log.amountBowl === "number") {
+						mealTypeStats.solid.bowlCount += 1;
+						mealTypeStats.solid.bowls += log.amountBowl;
+					}
+					if (typeof log.amountGrams === "number") {
+						mealTypeStats.solid.gramCount += 1;
+						mealTypeStats.solid.grams += log.amountGrams;
+					}
+				}
+			} else if (log.kind === "diaper") {
+				diaperActiveDays.add(day.date);
+				diaperCount += 1;
+				diaperTypeCounts[log.type] += 1;
+			} else {
+				const durationMinutes = getSleepDurationMinutes(log.startTime, log.endTime);
+
+				sleepActiveDays.add(day.date);
+				sleepCount += 1;
+				sleepDurationMinutes += durationMinutes;
+				sleepTypeStats[log.type].count += 1;
+				sleepTypeStats[log.type].durationMinutes += durationMinutes;
+			}
+		}
+	}
+
+	return {
+		diaper: {
+			activeDays: diaperActiveDays.size,
+			totalChanges: diaperCount,
+			avgChangesPerActiveDay: safeDivide(diaperCount, diaperActiveDays.size),
+			byType: {
+				both: { totalChanges: diaperTypeCounts.both, avgChangesPerActiveDay: safeDivide(diaperTypeCounts.both, diaperActiveDays.size) },
+				dirty: { totalChanges: diaperTypeCounts.dirty, avgChangesPerActiveDay: safeDivide(diaperTypeCounts.dirty, diaperActiveDays.size) },
+				dry: { totalChanges: diaperTypeCounts.dry, avgChangesPerActiveDay: safeDivide(diaperTypeCounts.dry, diaperActiveDays.size) },
+				wet: { totalChanges: diaperTypeCounts.wet, avgChangesPerActiveDay: safeDivide(diaperTypeCounts.wet, diaperActiveDays.size) },
+			},
+		},
+		meal: {
+			activeDays: mealActiveDays.size,
+			avgSessionsPerActiveDay: safeDivide(mealCount, mealActiveDays.size),
+			totalSessions: mealCount,
+			byType: {
+				breastfeed: {
+					activeDays: mealTypeStats.breastfeed.activeDays.size,
+					totalSessions: mealTypeStats.breastfeed.count,
+					totalDurationMinutes: mealTypeStats.breastfeed.durationMinutes,
+					avgDurationMinutesPerSession: safeDivide(
+						mealTypeStats.breastfeed.durationMinutes,
+						mealTypeStats.breastfeed.count,
+					),
+					avgSessionsPerActiveDay: safeDivide(
+						mealTypeStats.breastfeed.count,
+						mealTypeStats.breastfeed.activeDays.size,
+					),
+					avgDurationMinutesPerActiveDay: safeDivide(
+						mealTypeStats.breastfeed.durationMinutes,
+						mealTypeStats.breastfeed.activeDays.size,
+					),
+				},
+				breastMilk: {
+					activeDays: mealTypeStats.breastMilk.activeDays.size,
+					totalAmountMl: mealTypeStats.breastMilk.amountMl,
+					totalSessions: mealTypeStats.breastMilk.count,
+					avgAmountMlPerSession: safeDivide(
+						mealTypeStats.breastMilk.amountMl,
+						mealTypeStats.breastMilk.count,
+					),
+					avgSessionsPerActiveDay: safeDivide(
+						mealTypeStats.breastMilk.count,
+						mealTypeStats.breastMilk.activeDays.size,
+					),
+					avgAmountMlPerActiveDay: safeDivide(
+						mealTypeStats.breastMilk.amountMl,
+						mealTypeStats.breastMilk.activeDays.size,
+					),
+				},
+				formula: {
+					activeDays: mealTypeStats.formula.activeDays.size,
+					totalAmountMl: mealTypeStats.formula.amountMl,
+					totalSessions: mealTypeStats.formula.count,
+					avgAmountMlPerSession: safeDivide(
+						mealTypeStats.formula.amountMl,
+						mealTypeStats.formula.count,
+					),
+					avgSessionsPerActiveDay: safeDivide(
+						mealTypeStats.formula.count,
+						mealTypeStats.formula.activeDays.size,
+					),
+					avgAmountMlPerActiveDay: safeDivide(
+						mealTypeStats.formula.amountMl,
+						mealTypeStats.formula.activeDays.size,
+					),
+				},
+				solid: {
+					activeDays: mealTypeStats.solid.activeDays.size,
+					totalBowls: mealTypeStats.solid.bowls,
+					totalGrams: mealTypeStats.solid.grams,
+					bowlEntryCount: mealTypeStats.solid.bowlCount,
+					gramEntryCount: mealTypeStats.solid.gramCount,
+					totalSessions: mealTypeStats.solid.count,
+					avgBowlsPerSession: safeDivide(
+						mealTypeStats.solid.bowls,
+						mealTypeStats.solid.bowlCount,
+					),
+					avgGramsPerSession: safeDivide(
+						mealTypeStats.solid.grams,
+						mealTypeStats.solid.gramCount,
+					),
+					avgSessionsPerActiveDay: safeDivide(
+						mealTypeStats.solid.count,
+						mealTypeStats.solid.activeDays.size,
+					),
+					avgBowlsPerActiveDay: safeDivide(
+						mealTypeStats.solid.bowls,
+						mealTypeStats.solid.activeDays.size,
+					),
+					avgGramsPerActiveDay: safeDivide(
+						mealTypeStats.solid.grams,
+						mealTypeStats.solid.activeDays.size,
+					),
+				},
+			},
+		},
+		sleep: {
+			activeDays: sleepActiveDays.size,
+			avgDurationMinutesPerActiveDay: safeDivide(sleepDurationMinutes, sleepActiveDays.size),
+			avgSessionsPerActiveDay: safeDivide(sleepCount, sleepActiveDays.size),
+			avgDurationMinutesPerSession: safeDivide(sleepDurationMinutes, sleepCount),
+			totalDurationMinutes: sleepDurationMinutes,
+			totalSessions: sleepCount,
+			byType: {
+				nap: {
+					totalSessions: sleepTypeStats.nap.count,
+					totalDurationMinutes: sleepTypeStats.nap.durationMinutes,
+					avgDurationMinutesPerActiveDay: safeDivide(
+						sleepTypeStats.nap.durationMinutes,
+						sleepActiveDays.size,
+					),
+					avgSessionsPerActiveDay: safeDivide(sleepTypeStats.nap.count, sleepActiveDays.size),
+					avgDurationMinutesPerSession: safeDivide(
+						sleepTypeStats.nap.durationMinutes,
+						sleepTypeStats.nap.count,
+					)
+				},
+				nighttime: {
+					totalSessions: sleepTypeStats.nighttime.count,
+					totalDurationMinutes: sleepTypeStats.nighttime.durationMinutes,
+					avgDurationMinutesPerActiveDay: safeDivide(
+						sleepTypeStats.nighttime.durationMinutes,
+						sleepActiveDays.size,
+					),
+					avgSessionsPerActiveDay: safeDivide(sleepTypeStats.nighttime.count, sleepActiveDays.size),
+					avgDurationMinutesPerSession: safeDivide(
+						sleepTypeStats.nighttime.durationMinutes,
+						sleepTypeStats.nighttime.count,
+					)
+				},
+			},
+		},
 	};
 }
 
@@ -509,6 +756,21 @@ function getInclusiveDayCount(startDate: string, endDate: string) {
 	const end = new Date(`${endDate}T00:00:00.000Z`).getTime();
 
 	return Math.max(1, Math.round((end - start) / 86400000) + 1);
+}
+
+function getSleepDurationMinutes(startTime: string, endTime: string | null) {
+	if (!endTime) {
+		return 0;
+	}
+
+	const start = new Date(startTime).getTime();
+	const end = new Date(endTime).getTime();
+
+	if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
+		return 0;
+	}
+
+	return Math.round((end - start) / 60000);
 }
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number) {
