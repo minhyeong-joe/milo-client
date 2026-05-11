@@ -1,8 +1,10 @@
-import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View, Pressable } from "react-native";
 import { colors, globalStyles, spacing } from "@/styles/globalStyles";
 import { useBabySelection } from "@/context/BabySelectionContext";
 import { type GrowthRecord } from "@/services/api/growth";
 import GrowthChartCard from "./GrowthChartCard";
+import { useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 
 export default function GrowthReportsContent({
     isLoading,
@@ -21,6 +23,8 @@ export default function GrowthReportsContent({
     selectedBaby: ReturnType<typeof useBabySelection>["selectedBaby"];
     weightUnit: "kg" | "lb";
 }) {
+    const router = useRouter();
+
     if (!selectedBaby) {
         return (
             <View style={globalStyles.card}>
@@ -53,6 +57,18 @@ export default function GrowthReportsContent({
             }
             showsVerticalScrollIndicator={false}
         >
+            <Pressable
+                accessibilityRole="button"
+                onPress={() => {
+                    router.push("/baby/growth");
+                }}
+                style={styles.profileActionButton}
+            >
+                <Text style={styles.profileActionText}>
+                    <Ionicons name="analytics-outline" size={20} />
+                    {" "} Growth Entries
+                </Text>
+            </Pressable>
             <GrowthChartCard
                 birthdate={selectedBaby.birthdate}
                 lengthUnit={lengthUnit}
@@ -88,4 +104,17 @@ const styles = StyleSheet.create({
         gap: spacing.md,
         justifyContent: "center",
     },
+	profileActionButton: {
+		alignItems: "center",
+		backgroundColor: colors.light.primary,
+		borderRadius: 12,
+		paddingVertical: 14,
+		width: "100%",
+        marginTop: spacing.md,
+	},
+	profileActionText: {
+		color: colors.light.surface,
+		fontSize: 15,
+		fontWeight: "800",
+	},
 });

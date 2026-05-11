@@ -177,7 +177,9 @@ export function BabyHeader({
 							}}
 							style={styles.profileActionButton}
 						>
-							<Text style={styles.profileActionText}>Edit Profile</Text>
+							<Text style={styles.profileActionText}>
+								<Ionicons name="person-circle-outline" size={20} />
+								{" "} Edit Profile</Text>
 						</Pressable>
 						<Pressable
 							accessibilityRole="button"
@@ -187,7 +189,10 @@ export function BabyHeader({
 							}}
 							style={styles.profileActionButton}
 						>
-							<Text style={styles.profileActionText}>Edit Growth</Text>
+							<Text style={styles.profileActionText}>
+								<Ionicons name="analytics-outline" size={20} />
+								{" "} Growth Entries
+							</Text>
 						</Pressable>
 					</Pressable>
 				</Pressable>

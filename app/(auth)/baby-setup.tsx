@@ -1,9 +1,13 @@
+import {
+	BabyBirthdateField,
+	BabyNameField,
+	BabySexSelector,
+	formatBabyProfileDateKey,
+} from "@/components/baby/BabyProfileFields";
 import { useAuthSession } from "@/context/AuthSessionContext";
-import type { BabyRole } from "@/services/api/babies";
+import type { BabyRole, BabySex } from "@/services/api/babies";
 import { colors, globalStyles, spacing, typography } from "@/styles/globalStyles";
-import DateTimePicker, {
-	type DateTimePickerEvent,
-} from "@react-native-community/datetimepicker";
+import type { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import type { ComponentProps } from "react";
@@ -21,7 +25,6 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 type SetupMode = "addBaby" | "inviteCode";
-type BabySex = "GIRL" | "BOY";
 
 export default function BabySetupScreen() {
 	const router = useRouter();
@@ -48,7 +51,7 @@ export default function BabySetupScreen() {
 		}
 
 		const isComplete = await completeSignupWithBaby({
-			birthdate: formatDateKey(birthdate),
+			birthdate: formatBabyProfileDateKey(birthdate),
 			name: babyName,
 			role,
 			sex,
@@ -116,43 +119,19 @@ export default function BabySetupScreen() {
 					<View style={[globalStyles.card, globalStyles.shadowCard, styles.formCard]}>
 						{setupMode === "addBaby" ? (
 							<>
-								<FormField
-									autoCapitalize="words"
-									label="Baby name"
+								<BabyNameField
 									onChangeText={setBabyName}
 									placeholder="Emma"
 									value={babyName}
 								/>
-								<View style={styles.field}>
-									<Text style={styles.fieldLabel}>Birth Date</Text>
-									<Pressable
-										onPress={() => setIsBirthdatePickerVisible(true)}
-										style={({ pressed }) => [styles.dateButton, pressed && styles.pressedButton]}
-									>
-										<Text style={styles.dateButtonText}>{formatBirthdate(birthdate)}</Text>
-										<Ionicons
-											color={colors.light.textSecondary}
-											name="calendar-outline"
-											size={20}
-										/>
-									</Pressable>
-									{isBirthdatePickerVisible && (
-										<DateTimePicker
-											display={Platform.OS === "ios" ? "spinner" : "default"}
-											maximumDate={new Date()}
-											mode="date"
-											onChange={handleBirthdateChange}
-											value={birthdate}
-										/>
-									)}
-								</View>
-								<View style={styles.field}>
-									<Text style={styles.fieldLabel}>Gender</Text>
-									<View style={styles.sexRow}>
-										<SexButton active={sex === "GIRL"} label="Girl" onPress={() => setSex("GIRL")} />
-										<SexButton active={sex === "BOY"} label="Boy" onPress={() => setSex("BOY")} />
-									</View>
-								</View>
+								<BabyBirthdateField
+									isPickerVisible={isBirthdatePickerVisible}
+									label="Birth Date"
+									onChange={handleBirthdateChange}
+									onOpenPicker={() => setIsBirthdatePickerVisible(true)}
+									value={birthdate}
+								/>
+								<BabySexSelector onChange={setSex} value={sex} />
 								<RoleSelector role={role} onChange={setRole} />
 							</>
 						) : (
@@ -223,29 +202,6 @@ function SetupChoice({
 	);
 }
 
-function SexButton({
-	active,
-	label,
-	onPress,
-}: {
-	active: boolean;
-	label: string;
-	onPress: () => void;
-}) {
-	return (
-		<Pressable
-			onPress={onPress}
-			style={({ pressed }) => [
-				styles.sexButton,
-				active && styles.sexButtonActive,
-				pressed && styles.pressedButton,
-			]}
-		>
-			<Text style={[styles.sexText, active && styles.sexTextActive]}>{label}</Text>
-		</Pressable>
-	);
-}
-
 function FormField({
 	label,
 	...inputProps
@@ -308,22 +264,6 @@ function RoleButton({
 			<Text style={[styles.roleText, active && styles.roleTextActive]}>{label}</Text>
 		</Pressable>
 	);
-}
-
-function formatBirthdate(date: Date) {
-	return new Intl.DateTimeFormat("en-US", {
-		day: "numeric",
-		month: "short",
-		year: "numeric",
-	}).format(date);
-}
-
-function formatDateKey(date: Date) {
-	const year = date.getFullYear();
-	const month = `${date.getMonth() + 1}`.padStart(2, "0");
-	const day = `${date.getDate()}`.padStart(2, "0");
-
-	return `${year}-${month}-${day}`;
 }
 
 const styles = StyleSheet.create({
@@ -402,45 +342,6 @@ const styles = StyleSheet.create({
 		color: colors.light.textPrimary,
 		minHeight: 50,
 		paddingHorizontal: spacing.md,
-	},
-	dateButton: {
-		alignItems: "center",
-		backgroundColor: colors.light.background,
-		borderColor: colors.light.border,
-		borderRadius: 14,
-		borderWidth: 1,
-		flexDirection: "row",
-		justifyContent: "space-between",
-		minHeight: 50,
-		paddingHorizontal: spacing.md,
-	},
-	dateButtonText: {
-		...typography.body,
-		color: colors.light.textPrimary,
-	},
-	sexRow: {
-		backgroundColor: colors.light.background,
-		borderRadius: 14,
-		flexDirection: "row",
-		gap: spacing.sm,
-		padding: spacing.xs,
-	},
-	sexButton: {
-		alignItems: "center",
-		borderRadius: 11,
-		flex: 1,
-		justifyContent: "center",
-		minHeight: 42,
-	},
-	sexButtonActive: {
-		backgroundColor: colors.light.surface,
-	},
-	sexText: {
-		...typography.label,
-		color: colors.light.textSecondary,
-	},
-	sexTextActive: {
-		color: colors.light.primary,
 	},
 	roleRow: {
 		backgroundColor: colors.light.background,
