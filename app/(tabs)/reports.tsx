@@ -54,7 +54,7 @@ export default function ReportsScreen() {
 		markOnline,
 		status: syncStatus,
 	} = useSync();
-	const [activeTab, setActiveTab] = useState<ReportsTab>("growth");
+	const [activeTab, setActiveTab] = useState<ReportsTab>("patterns");
 	const [patternRangeMode, setPatternRangeMode] = useState<PatternRangeMode>("week");
 	const [patternEndDate, setPatternEndDate] = useState<string | null>(null);
 	const initialPatternEndDate = selectedBaby
@@ -275,14 +275,14 @@ export default function ReportsScreen() {
 
 				<View style={styles.segmentedControl}>
 					<TabButton
-						isSelected={activeTab === "growth"}
-						label="Growth"
-						onPress={() => setActiveTab("growth")}
-					/>
-					<TabButton
 						isSelected={activeTab === "patterns"}
 						label="Patterns"
 						onPress={() => setActiveTab("patterns")}
+					/>
+					<TabButton
+						isSelected={activeTab === "growth"}
+						label="Growth"
+						onPress={() => setActiveTab("growth")}
 					/>
 				</View>
 
@@ -298,17 +298,7 @@ export default function ReportsScreen() {
 					/>
 				) : null}
 
-				{activeTab === "growth" ? (
-					<GrowthReportsContent
-						isLoading={isGrowthLoading}
-						isRefreshing={isRefreshing}
-						lengthUnit={preferredLengthUnit}
-						onRefresh={refreshGrowthRecords}
-						records={sortedGrowthRecords}
-						selectedBaby={selectedBaby}
-						weightUnit={preferredWeightUnit}
-					/>
-				) : (
+				{activeTab === "patterns" ? (
 					<PatternReportsContent
 						canShiftNext={patternEndDateKey < (selectedBaby
 							? getDateKeyInTimeZone(new Date(), selectedBaby.timezone)
@@ -323,6 +313,16 @@ export default function ReportsScreen() {
 						selectedBaby={selectedBaby}
 						startDate={patternStartDate}
 						stats={displayedPatternStats}
+					/>
+				) : (
+					<GrowthReportsContent
+						isLoading={isGrowthLoading}
+						isRefreshing={isRefreshing}
+						lengthUnit={preferredLengthUnit}
+						onRefresh={refreshGrowthRecords}
+						records={sortedGrowthRecords}
+						selectedBaby={selectedBaby}
+						weightUnit={preferredWeightUnit}
 					/>
 				)}
 			</View>

@@ -124,9 +124,14 @@ export default function PatternReportsContent({
 
 			<View style={globalStyles.card}>
 				<View style={globalStyles.rowBetween}>
-					<Text style={globalStyles.sectionTitleText}>
-						Summary
-					</Text>
+					<View>
+						<Text style={globalStyles.sectionTitleText}>
+							{rangeMode === "week" ? "Weekly Snapshot" : "Monthly Snapshot"}
+						</Text>
+						<Text style={styles.summarySubtitle}>
+							{formatRangeLabel(startDate, endDate)} · Based on days with entries
+						</Text>
+					</View>
 				</View>
 				<View style={styles.summaryCardButtonGroup}>
 					<SummaryCardButton 
@@ -152,17 +157,23 @@ export default function PatternReportsContent({
 					days={stats.days}
 					kind={selectedRoutineKind}
 				/>
-				<View style={{marginTop: spacing.lg}}>
-					<Text style={[globalStyles.sectionTitleText, {marginBottom: spacing.sm}]}>
-						Averages per Logged Day
-					</Text>
+			</View>
+
+			<View style={globalStyles.card}>
+				<Text style={globalStyles.sectionTitleText}>
+					Typical Logged Day
+				</Text>
+				<Text style={styles.summarySubtitle}>
+					Averages based on days with entries
+				</Text>
+				<View style={styles.averageSummaryList}>
 					<AverageSummaryCard
 						title="Meals"
 						kind="meal"
 						summary={stats.summary.meal}
 					/>
 					<AverageSummaryCard
-						title="Diaper"
+						title="Diapers"
 						kind="diaper"
 						summary={stats.summary.diaper}
 					/>
@@ -171,6 +182,16 @@ export default function PatternReportsContent({
 						kind="sleep"
 						summary={stats.summary.sleep}
 					/>
+				</View>
+				<View style={styles.footnoteRow}>
+					<Ionicons
+						color={colors.light.textSecondary}
+						name="information-circle-outline"
+						size={16}
+					/>
+					<Text style={styles.footnoteText}>
+						Averages exclude days without any entries.
+					</Text>
 				</View>
 			</View>
 
@@ -222,6 +243,10 @@ function parseDateKey(value: string) {
 }
 
 const styles = StyleSheet.create({
+	averageSummaryList: {
+		gap: spacing.sm,
+		marginTop: spacing.md,
+	},
 	chevronButton: {
 		alignItems: "center",
 		borderRadius: 999,
@@ -283,10 +308,26 @@ const styles = StyleSheet.create({
 	disabledIcon: {
 		opacity: 0.35,
 	},
+	footnoteRow: {
+		alignItems: "center",
+		flexDirection: "row",
+		gap: spacing.xs,
+		marginTop: spacing.md,
+	},
+	footnoteText: {
+		...typography.caption,
+		color: colors.light.textSecondary,
+		flex: 1,
+	},
 	summaryCardButtonGroup: {
 		flexDirection: "row",
 		justifyContent: "center",
 		gap: spacing.sm,
-		marginTop: spacing.sm
-	}
+		marginTop: spacing.md
+	},
+	summarySubtitle: {
+		...typography.caption,
+		color: colors.light.textSecondary,
+		marginTop: 2,
+	},
 });
