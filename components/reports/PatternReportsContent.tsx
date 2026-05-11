@@ -254,7 +254,7 @@ export default function PatternReportsContent({
 							</Pressable>
 						</View>
 						<Text style={styles.modalSubtitle}>
-							Choose inclusive dates for Patterns.
+							Choose inclusive dates for report.
 						</Text>
 						<DateField
 							isActive={activeDatePicker === "start"}
