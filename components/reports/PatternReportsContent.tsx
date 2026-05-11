@@ -3,7 +3,17 @@ import type { PatternRangeMode } from "@/app/(tabs)/reports";
 import type { RoutineStatsResponse } from "@/services/api/routine";
 import { colors, globalStyles, spacing, typography } from "@/styles/globalStyles";
 import { Ionicons } from "@expo/vector-icons";
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import DateTimePicker, { type DateTimePickerEvent } from "@react-native-community/datetimepicker";
+import {
+	Modal,
+	Platform,
+	Pressable,
+	RefreshControl,
+	ScrollView,
+	StyleSheet,
+	Text,
+	View,
+} from "react-native";
 import { RoutineIcon } from "@/components/routine/RoutineIcon";
 import RoutineTimetableChart from "@/components/reports/RoutineTimetableChart";
 import SummaryCardButton from "@/components/reports/SummaryCardButton";
@@ -15,6 +25,8 @@ export default function PatternReportsContent({
 	canShiftNext,
 	endDate,
 	isRefreshing,
+	maxDate,
+	onCustomRangeApply,
 	onRefresh,
 	onRangeModeChange,
 	onShiftRange,
@@ -26,6 +38,8 @@ export default function PatternReportsContent({
 	endDate: string;
 	isLoading: boolean;
 	isRefreshing: boolean;
+	maxDate: string;
+	onCustomRangeApply: (startDate: string, endDate: string) => void;
 	onRefresh: () => Promise<void>;
 	onRangeModeChange: (mode: PatternRangeMode) => void;
 	onShiftRange: (direction: -1 | 1) => void;
@@ -38,6 +52,18 @@ export default function PatternReportsContent({
 	const [showDiaper, setShowDiaper] = useState(true);
 	const [showSleep, setShowSleep] = useState(true);
 	const [selectedRoutineKind, setSelectedRoutineKind] = useState<RoutineKind>("meal");
+	const [isCustomRangeModalVisible, setIsCustomRangeModalVisible] = useState(false);
+	const [draftStartDate, setDraftStartDate] = useState(() => parseDateKey(startDate));
+	const [draftEndDate, setDraftEndDate] = useState(() => parseDateKey(endDate));
+	const [activeDatePicker, setActiveDatePicker] = useState<"end" | "start" | null>(null);
+	const isDraftRangeValid = getDateKey(draftStartDate) <= getDateKey(draftEndDate);
+
+	const openCustomRangeModal = () => {
+		setDraftStartDate(parseDateKey(startDate));
+		setDraftEndDate(parseDateKey(endDate));
+		setActiveDatePicker(null);
+		setIsCustomRangeModalVisible(true);
+	};
 
 	return (
 		<ScrollView
@@ -64,7 +90,18 @@ export default function PatternReportsContent({
 							size={20}
 						/>
 					</Pressable>
-					<Text style={styles.rangeLabel}>{formatRangeLabel(startDate, endDate)}</Text>
+					<Pressable
+						accessibilityRole="button"
+						style={styles.rangeLabelButton}
+						onPress={openCustomRangeModal}
+					>
+						<Text style={styles.rangeLabel}>{formatRangeLabel(startDate, endDate)}</Text>
+						<Ionicons
+							color={colors.light.textSecondary}
+							name="calendar-outline"
+							size={15}
+						/>
+					</Pressable>
 					<Pressable
 						accessibilityRole="button"
 						disabled={!canShiftNext}
@@ -126,10 +163,10 @@ export default function PatternReportsContent({
 				<View style={globalStyles.rowBetween}>
 					<View>
 						<Text style={globalStyles.sectionTitleText}>
-							{rangeMode === "week" ? "Weekly Snapshot" : "Monthly Snapshot"}
+							{getSnapshotTitle(rangeMode)}
 						</Text>
 						<Text style={styles.summarySubtitle}>
-							{formatRangeLabel(startDate, endDate)} · Based on days with entries
+							{formatRangeLabel(startDate, endDate)} - Based on days with entries
 						</Text>
 					</View>
 				</View>
@@ -195,7 +232,122 @@ export default function PatternReportsContent({
 				</View>
 			</View>
 
+			<Modal
+				animationType="fade"
+				onRequestClose={() => setIsCustomRangeModalVisible(false)}
+				transparent
+				visible={isCustomRangeModalVisible}
+			>
+				<View style={styles.modalBackdrop}>
+					<View style={styles.modalCard}>
+						<View style={globalStyles.rowBetween}>
+							<Text style={globalStyles.sectionTitleText}>Choose date range</Text>
+							<Pressable
+								accessibilityRole="button"
+								onPress={() => setIsCustomRangeModalVisible(false)}
+							>
+								<Ionicons
+									color={colors.light.textSecondary}
+									name="close"
+									size={22}
+								/>
+							</Pressable>
+						</View>
+						<Text style={styles.modalSubtitle}>
+							Choose inclusive dates for Patterns.
+						</Text>
+						<DateField
+							isActive={activeDatePicker === "start"}
+							label="From"
+							onPress={() => setActiveDatePicker((current) => current === "start" ? null : "start")}
+							value={draftStartDate}
+						/>
+						<DateField
+							isActive={activeDatePicker === "end"}
+							label="To"
+							onPress={() => setActiveDatePicker((current) => current === "end" ? null : "end")}
+							value={draftEndDate}
+						/>
+						{activeDatePicker ? (
+							<DateTimePicker
+								display={Platform.OS === "ios" ? "spinner" : "default"}
+								maximumDate={parseDateKey(maxDate)}
+								mode="date"
+								onChange={(event, selectedDate) =>
+									handleDatePickerChange({
+										event,
+										maxDate,
+										selectedDate,
+										setActiveDatePicker,
+										setDraftEndDate,
+										setDraftStartDate,
+										target: activeDatePicker,
+									})
+								}
+								value={activeDatePicker === "start" ? draftStartDate : draftEndDate}
+							/>
+						) : null}
+						{!isDraftRangeValid ? (
+							<Text style={styles.validationText}>To date must be on or after From date.</Text>
+						) : null}
+						<View style={styles.modalActions}>
+							<Pressable
+								accessibilityRole="button"
+								style={styles.cancelButton}
+								onPress={() => setIsCustomRangeModalVisible(false)}
+							>
+								<Text style={styles.cancelButtonText}>Cancel</Text>
+							</Pressable>
+							<Pressable
+								accessibilityRole="button"
+								disabled={!isDraftRangeValid}
+								style={[
+									styles.applyButton,
+									!isDraftRangeValid && styles.applyButtonDisabled,
+								]}
+								onPress={() => {
+									onCustomRangeApply(getDateKey(draftStartDate), getDateKey(draftEndDate));
+									setIsCustomRangeModalVisible(false);
+									setActiveDatePicker(null);
+								}}
+							>
+								<Text style={styles.applyButtonText}>Apply</Text>
+							</Pressable>
+						</View>
+					</View>
+				</View>
+			</Modal>
 		</ScrollView>
+	);
+}
+
+function DateField({
+	isActive,
+	label,
+	onPress,
+	value,
+}: {
+	isActive: boolean;
+	label: string;
+	onPress: () => void;
+	value: Date;
+}) {
+	return (
+		<Pressable
+			accessibilityRole="button"
+			style={[styles.dateField, isActive && styles.dateFieldActive]}
+			onPress={onPress}
+		>
+			<View>
+				<Text style={styles.dateFieldLabel}>{label}</Text>
+				<Text style={styles.dateFieldValue}>{formatFullDate(value)}</Text>
+			</View>
+			<Ionicons
+				color={colors.light.textSecondary}
+				name="calendar-outline"
+				size={20}
+			/>
+		</Pressable>
 	);
 }
 
@@ -220,6 +372,12 @@ function RangeButton({
 	);
 }
 
+function getSnapshotTitle(rangeMode: PatternRangeMode) {
+	if (rangeMode === "custom") return "Custom Date Snapshot";
+	if (rangeMode === "month") return "Monthly Snapshot";
+	return "Weekly Snapshot";
+}
+
 function formatRangeLabel(startDate: string, endDate: string) {
 	const start = parseDateKey(startDate);
 	const end = parseDateKey(endDate);
@@ -236,16 +394,96 @@ function formatRangeLabel(startDate: string, endDate: string) {
 	return `${startLabel} - ${endLabel}`;
 }
 
+function formatFullDate(value: Date) {
+	return new Intl.DateTimeFormat("en-US", {
+		day: "numeric",
+		month: "short",
+		year: "numeric",
+	}).format(value);
+}
+
 function parseDateKey(value: string) {
 	const [year, month, day] = value.split("-").map(Number);
 
 	return new Date(year, month - 1, day);
 }
 
+function getDateKey(value: Date) {
+	const year = value.getFullYear();
+	const month = String(value.getMonth() + 1).padStart(2, "0");
+	const day = String(value.getDate()).padStart(2, "0");
+
+	return `${year}-${month}-${day}`;
+}
+
+function handleDatePickerChange({
+	event,
+	maxDate,
+	selectedDate,
+	setActiveDatePicker,
+	setDraftEndDate,
+	setDraftStartDate,
+	target,
+}: {
+	event: DateTimePickerEvent;
+	maxDate: string;
+	selectedDate?: Date;
+	setActiveDatePicker: (value: "end" | "start" | null) => void;
+	setDraftEndDate: (value: Date) => void;
+	setDraftStartDate: (value: Date) => void;
+	target: "end" | "start";
+}) {
+	if (Platform.OS === "android") {
+		setActiveDatePicker(null);
+	}
+
+	if (event.type === "dismissed" || !selectedDate) {
+		return;
+	}
+
+	const cappedDate = getDateKey(selectedDate) > maxDate
+		? parseDateKey(maxDate)
+		: selectedDate;
+
+	if (target === "start") {
+		setDraftStartDate(cappedDate);
+	} else {
+		setDraftEndDate(cappedDate);
+	}
+}
+
 const styles = StyleSheet.create({
+	applyButton: {
+		alignItems: "center",
+		backgroundColor: colors.light.primary,
+		borderRadius: 12,
+		flex: 1,
+		paddingVertical: spacing.md,
+	},
+	applyButtonDisabled: {
+		opacity: 0.45,
+	},
+	applyButtonText: {
+		color: colors.light.surface,
+		fontSize: 15,
+		fontWeight: "800",
+	},
 	averageSummaryList: {
 		gap: spacing.sm,
 		marginTop: spacing.md,
+	},
+	cancelButton: {
+		alignItems: "center",
+		borderColor: colors.light.border,
+		borderRadius: 12,
+		borderWidth: 1,
+		flex: 1,
+		paddingVertical: spacing.md,
+	},
+	cancelButtonText: {
+		color: colors.light.textPrimary,
+		fontSize: 15,
+		fontWeight: "800",
 	},
 	chevronButton: {
 		alignItems: "center",
@@ -256,6 +494,28 @@ const styles = StyleSheet.create({
 	},
 	chevronButtonDisabled: {
 		opacity: 0.35,
+	},
+	dateField: {
+		alignItems: "center",
+		borderColor: colors.light.border,
+		borderRadius: 14,
+		borderWidth: 1,
+		flexDirection: "row",
+		justifyContent: "space-between",
+		padding: spacing.md,
+	},
+	dateFieldActive: {
+		backgroundColor: "#F7F3FF",
+		borderColor: colors.light.primary,
+	},
+	dateFieldLabel: {
+		...typography.caption,
+		color: colors.light.textSecondary,
+	},
+	dateFieldValue: {
+		...typography.label,
+		color: colors.light.textPrimary,
+		marginTop: 2,
 	},
 	rangeButton: {
 		alignItems: "center",
@@ -283,8 +543,17 @@ const styles = StyleSheet.create({
 	rangeLabel: {
 		...typography.label,
 		color: colors.light.textPrimary,
-		minWidth: 118,
 		textAlign: "center",
+	},
+	rangeLabelButton: {
+		alignItems: "center",
+		borderRadius: 999,
+		flexDirection: "row",
+		gap: spacing.xs,
+		justifyContent: "center",
+		minWidth: 142,
+		paddingHorizontal: spacing.xs,
+		paddingVertical: spacing.xs,
 	},
 	rangeNavigator: {
 		alignItems: "center",
@@ -299,6 +568,29 @@ const styles = StyleSheet.create({
 		gap: spacing.xs,
 		padding: spacing.xs,
 		width: 148,
+	},
+	modalActions: {
+		flexDirection: "row",
+		gap: spacing.sm,
+		marginTop: spacing.md,
+	},
+	modalBackdrop: {
+		alignItems: "center",
+		backgroundColor: "rgba(21, 24, 39, 0.32)",
+		flex: 1,
+		justifyContent: "center",
+		padding: spacing.lg,
+	},
+	modalCard: {
+		backgroundColor: colors.light.surface,
+		borderRadius: 20,
+		gap: spacing.md,
+		padding: spacing.lg,
+		width: "100%",
+	},
+	modalSubtitle: {
+		...typography.caption,
+		color: colors.light.textSecondary,
 	},
 	routineToggleButtonGroup: { 
 		justifyContent: "center", 
@@ -329,5 +621,10 @@ const styles = StyleSheet.create({
 		...typography.caption,
 		color: colors.light.textSecondary,
 		marginTop: 2,
+	},
+	validationText: {
+		color: colors.light.error,
+		fontSize: 12,
+		fontWeight: "700",
 	},
 });

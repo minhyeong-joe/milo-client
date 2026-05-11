@@ -29,9 +29,9 @@ import GrowthReportsContent from "@/components/reports/GrowthReportsContent";
 import PatternReportsContent from "@/components/reports/PatternReportsContent";
 
 type ReportsTab = "growth" | "patterns";
-export type PatternRangeMode = "week" | "month";
+export type PatternRangeMode = "custom" | "week" | "month";
 
-const PATTERN_RANGE_DAYS: Record<PatternRangeMode, number> = {
+const PRESET_PATTERN_RANGE_DAYS: Record<Exclude<PatternRangeMode, "custom">, number> = {
 	month: 30,
 	week: 7,
 };
@@ -57,12 +57,14 @@ export default function ReportsScreen() {
 	const [activeTab, setActiveTab] = useState<ReportsTab>("patterns");
 	const [patternRangeMode, setPatternRangeMode] = useState<PatternRangeMode>("week");
 	const [patternEndDate, setPatternEndDate] = useState<string | null>(null);
+	const [customPatternStartDate, setCustomPatternStartDate] = useState<string | null>(null);
+	const [customPatternEndDate, setCustomPatternEndDate] = useState<string | null>(null);
 	const initialPatternEndDate = selectedBaby
 		? getDateKeyInTimeZone(new Date(), selectedBaby.timezone)
 		: getDateKey(new Date());
 	const initialPatternStartDate = addDays(
 		initialPatternEndDate,
-		-(PATTERN_RANGE_DAYS.week - 1),
+		-(PRESET_PATTERN_RANGE_DAYS.week - 1),
 	);
 	const [patternStats, setPatternStats] = useState<RoutineStatsResponse>(() =>
 		createEmptyRoutineStats(initialPatternStartDate, initialPatternEndDate),
@@ -101,13 +103,21 @@ export default function ReportsScreen() {
 		}
 	}, [loadLocalGrowthRecords, markAuthRequired, markOffline, markOnline, selectedBaby]);
 
-	const patternDayCount = PATTERN_RANGE_DAYS[patternRangeMode];
+	const todayDateKey = selectedBaby
+		? getDateKeyInTimeZone(new Date(), selectedBaby.timezone)
+		: getDateKey(new Date());
 	const patternEndDateKey =
-		patternEndDate ??
-		(selectedBaby
-			? getDateKeyInTimeZone(new Date(), selectedBaby.timezone)
-			: getDateKey(new Date()));
-	const patternStartDate = addDays(patternEndDateKey, -(patternDayCount - 1));
+		patternRangeMode === "custom"
+			? customPatternEndDate ?? todayDateKey
+			: patternEndDate ?? todayDateKey;
+	const patternDayCount =
+		patternRangeMode === "custom"
+			? getInclusiveDayCount(customPatternStartDate ?? patternEndDateKey, patternEndDateKey)
+			: PRESET_PATTERN_RANGE_DAYS[patternRangeMode];
+	const patternStartDate =
+		patternRangeMode === "custom"
+			? customPatternStartDate ?? patternEndDateKey
+			: addDays(patternEndDateKey, -(patternDayCount - 1));
 	const localPatternStats = useMemo(
 		() => buildRoutineStatsFromLocalLogs(dailyLogs, patternStartDate, patternEndDateKey),
 		[dailyLogs, patternEndDateKey, patternStartDate],
@@ -216,13 +226,40 @@ export default function ReportsScreen() {
 			setIsRefreshing(false);
 		}
 	}, [loadPatternStats]);
+	const changePatternRangeMode = useCallback((mode: PatternRangeMode) => {
+		if (mode === "custom") {
+			setPatternRangeMode("custom");
+			return;
+		}
+
+		setPatternRangeMode(mode);
+		setPatternEndDate(todayDateKey);
+	}, [todayDateKey]);
+	const applyCustomPatternRange = useCallback((startDate: string, endDate: string) => {
+		const cappedEndDate = endDate > todayDateKey ? todayDateKey : endDate;
+		const cappedStartDate = startDate > cappedEndDate ? cappedEndDate : startDate;
+
+		setCustomPatternStartDate(cappedStartDate);
+		setCustomPatternEndDate(cappedEndDate);
+		setPatternRangeMode("custom");
+	}, [todayDateKey]);
 	const shiftPatternRange = useCallback((direction: -1 | 1) => {
 		if (!selectedBaby) {
 			return;
 		}
 
 		const today = getDateKeyInTimeZone(new Date(), selectedBaby.timezone);
-		const shiftDays = PATTERN_RANGE_DAYS[patternRangeMode] * direction;
+		const shiftDays = patternDayCount * direction;
+
+		if (patternRangeMode === "custom") {
+			const shiftedEndDate = addDays(patternEndDateKey, shiftDays);
+			const nextEndDate = direction > 0 && shiftedEndDate > today ? today : shiftedEndDate;
+			const nextStartDate = addDays(nextEndDate, -(patternDayCount - 1));
+
+			setCustomPatternStartDate(nextStartDate);
+			setCustomPatternEndDate(nextEndDate);
+			return;
+		}
 
 		setPatternEndDate((current) => {
 			const currentEndDate = current ?? today;
@@ -230,7 +267,7 @@ export default function ReportsScreen() {
 
 			return direction > 0 && shiftedEndDate > today ? today : shiftedEndDate;
 		});
-	}, [patternRangeMode, selectedBaby]);
+	}, [patternDayCount, patternEndDateKey, patternRangeMode, selectedBaby]);
 
 	useEffect(() => {
 		if (activeTab === "growth") {
@@ -247,10 +284,15 @@ export default function ReportsScreen() {
 	useEffect(() => {
 		if (!selectedBaby) {
 			setPatternEndDate(null);
+			setCustomPatternStartDate(null);
+			setCustomPatternEndDate(null);
 			return;
 		}
 
 		setPatternEndDate(getDateKeyInTimeZone(new Date(), selectedBaby.timezone));
+		setCustomPatternStartDate(null);
+		setCustomPatternEndDate(null);
+		setPatternRangeMode("week");
 	}, [selectedBaby]);
 
 	const sortedGrowthRecords = useMemo(
@@ -306,8 +348,10 @@ export default function ReportsScreen() {
 						endDate={patternEndDateKey}
 						isLoading={isPatternLoading}
 						isRefreshing={isRefreshing}
+						maxDate={todayDateKey}
+						onCustomRangeApply={applyCustomPatternRange}
 						onRefresh={refreshLogStats}
-						onRangeModeChange={setPatternRangeMode}
+						onRangeModeChange={changePatternRangeMode}
 						onShiftRange={shiftPatternRange}
 						rangeMode={patternRangeMode}
 						selectedBaby={selectedBaby}

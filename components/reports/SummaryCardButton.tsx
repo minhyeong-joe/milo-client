@@ -1,5 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { colors, globalStyles, spacing, typography } from "@/styles/globalStyles";
+import { colors, globalStyles, spacing } from "@/styles/globalStyles";
 import { RoutineIcon } from "../routine/RoutineIcon";
 import { type RoutineKind, routineConfig } from "@/data/homeData";
 import {
