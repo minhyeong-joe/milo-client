@@ -1,4 +1,4 @@
-import { apiGet, apiPatch, apiPost } from "@/services/api/httpClient";
+import { apiDelete, apiGet, apiPatch, apiPost } from "@/services/api/httpClient";
 
 export type BabySex = "GIRL" | "BOY";
 
@@ -9,6 +9,7 @@ export type Baby = {
 	sex: BabySex;
 	timezone: string;
 	avatarObjectKey: string | null;
+	avatarUrl: string | null;
 	createdAt: string;
 	updatedAt: string;
 };
@@ -52,6 +53,20 @@ export type UpdateBabyResponse = {
 	baby: Baby;
 };
 
+export type CreateBabyAvatarUploadRequest = {
+	contentType: "image/jpeg" | "image/png" | "image/webp";
+};
+
+export type CreateBabyAvatarUploadResponse = {
+	objectKey: string;
+	uploadUrl: string;
+	expiresIn: number;
+};
+
+export type ConfirmBabyAvatarRequest = {
+	objectKey: string;
+};
+
 export type GetBabiesResponse = {
 	babies: BabyListItem[];
 };
@@ -70,6 +85,31 @@ export function createBaby(input: CreateBabyRequest) {
 
 export function updateBaby(babyId: string, input: UpdateBabyRequest) {
 	return apiPatch<UpdateBabyResponse, UpdateBabyRequest>(`/babies/${babyId}`, input, {
+		auth: true,
+	});
+}
+
+export function createBabyAvatarUpload(
+	babyId: string,
+	input: CreateBabyAvatarUploadRequest,
+) {
+	return apiPost<CreateBabyAvatarUploadResponse, CreateBabyAvatarUploadRequest>(
+		`/babies/${babyId}/avatar/presign-upload`,
+		input,
+		{ auth: true },
+	);
+}
+
+export function confirmBabyAvatar(babyId: string, input: ConfirmBabyAvatarRequest) {
+	return apiPost<UpdateBabyResponse, ConfirmBabyAvatarRequest>(
+		`/babies/${babyId}/avatar/confirm`,
+		input,
+		{ auth: true },
+	);
+}
+
+export function removeBabyAvatar(babyId: string) {
+	return apiDelete<UpdateBabyResponse>(`/babies/${babyId}/avatar`, {
 		auth: true,
 	});
 }

@@ -2,17 +2,133 @@ import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker, {
 	type DateTimePickerEvent,
 } from "@react-native-community/datetimepicker";
+import * as ImagePicker from "expo-image-picker";
 import type { ComponentProps } from "react";
-import { Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Image, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import type { BabySex } from "@/services/api/babies";
+import { confirmBabyAvatar, createBabyAvatarUpload, removeBabyAvatar } from "@/services/api/babies";
 import { colors, spacing, typography } from "@/styles/globalStyles";
 
 type IoniconName = ComponentProps<typeof Ionicons>["name"];
+type AvatarContentType = "image/jpeg" | "image/png" | "image/webp";
+
+const fallbackBabyAvatar = require("@/assets/images/baby.png");
+
+export function BabyAvatarField({
+	avatarObjectKey,
+	avatarUrl,
+	babyId,
+	disabled = false,
+	onAvatarChanged,
+}: {
+	avatarObjectKey?: string | null;
+	avatarUrl?: string | null;
+	babyId?: string;
+	disabled?: boolean;
+	onAvatarChanged?: () => Promise<void> | void;
+}) {
+	const canEdit = Boolean(babyId) && !disabled;
+
+	const changeAvatar = async () => {
+		if (!babyId || disabled) {
+			return;
+		}
+
+		const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+		if (!permission.granted) {
+			Alert.alert(
+				"Photos permission needed",
+				"Allow photo library access to choose a profile picture.",
+			);
+			return;
+		}
+
+		const result = await ImagePicker.launchImageLibraryAsync({
+			allowsEditing: true,
+			aspect: [1, 1],
+			mediaTypes: ["images"],
+			quality: 0.85,
+		});
+
+		if (result.canceled || !result.assets[0]) {
+			return;
+		}
+
+		try {
+			const asset = result.assets[0];
+			const contentType = getAvatarContentType(asset);
+			const upload = await createBabyAvatarUpload(babyId, { contentType });
+			const imageResponse = await fetch(asset.uri);
+			const imageBlob = await imageResponse.blob();
+			const uploadResponse = await fetch(upload.uploadUrl, {
+				body: imageBlob,
+				headers: {
+					"Content-Type": contentType,
+				},
+				method: "PUT",
+			});
+
+			if (!uploadResponse.ok) {
+				throw new Error("Could not upload profile picture. Please try again.");
+			}
+
+			await confirmBabyAvatar(babyId, { objectKey: upload.objectKey });
+			await onAvatarChanged?.();
+		} catch (error) {
+			Alert.alert("Upload failed", getAvatarErrorMessage(error));
+		}
+	};
+
+	const removeAvatar = async () => {
+		if (!babyId || disabled || !avatarObjectKey) {
+			return;
+		}
+
+		try {
+			await removeBabyAvatar(babyId);
+			await onAvatarChanged?.();
+		} catch (error) {
+			Alert.alert("Remove failed", getAvatarErrorMessage(error));
+		}
+	};
+
+	return (
+		<View style={styles.field}>
+			<Pressable
+				accessibilityRole="button"
+				disabled={!canEdit}
+				onPress={changeAvatar}
+			>
+				<Image
+					source={avatarUrl ? { uri: avatarUrl } : fallbackBabyAvatar}
+					style={styles.avatarPreview}
+				/>
+			</Pressable>
+			
+			{avatarObjectKey ? (
+				<View>
+					<Pressable
+						accessibilityRole="button"
+						disabled={!canEdit}
+						onPress={removeAvatar}
+						style={({ pressed }) => [
+							styles.avatarRemoveButton,
+							pressed && canEdit && styles.pressedButton,
+						]}
+					>
+						<Text style={styles.avatarRemoveText}>Remove picture</Text>
+					</Pressable>
+				</View>
+			) : null}
+		</View>
+	);
+}
 
 export function BabyNameField({
 	label = "Baby name",
 	onChangeText,
-	placeholder = "Emma",
+	placeholder = "Elliot",
 	value,
 }: {
 	label?: string;
@@ -154,7 +270,66 @@ export function formatBirthdate(date: Date) {
 	}).format(date);
 }
 
+function getAvatarContentType(asset: ImagePicker.ImagePickerAsset): AvatarContentType {
+	if (
+		asset.mimeType === "image/png" ||
+		asset.mimeType === "image/webp" ||
+		asset.mimeType === "image/jpeg"
+	) {
+		return asset.mimeType;
+	}
+
+	const extension = asset.uri.split("?")[0]?.split(".").pop()?.toLowerCase();
+
+	if (extension === "png") {
+		return "image/png";
+	}
+
+	if (extension === "webp") {
+		return "image/webp";
+	}
+
+	return "image/jpeg";
+}
+
+function getAvatarErrorMessage(error: unknown) {
+	if (error instanceof Error) {
+		return error.message;
+	}
+
+	return "Could not update profile picture. Please try again.";
+}
+
 const styles = StyleSheet.create({
+	avatarButton: {
+		alignItems: "center",
+		backgroundColor: colors.light.primary,
+		borderRadius: 12,
+		paddingVertical: 12,
+	},
+	avatarButtonDisabled: {
+		opacity: 0.45,
+	},
+	avatarButtonText: {
+		...typography.label,
+		color: colors.light.surface,
+	},
+	avatarPreview: {
+		backgroundColor: "#D9BFAE",
+		borderColor: colors.light.border,
+		borderRadius: 10,
+		borderWidth: 1,
+		height: 300,
+		width: '100%',
+	},
+	avatarRemoveButton: {
+		alignItems: "center",
+		paddingVertical: 8,
+	},
+	avatarRemoveText: {
+		...typography.label,
+		color: colors.light.error,
+	},
 	dateButton: {
 		alignItems: "center",
 		backgroundColor: colors.light.background,

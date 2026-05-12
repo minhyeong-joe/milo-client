@@ -5,7 +5,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
-	Alert,
 	FlatList,
 	Image,
 	Modal,
@@ -18,11 +17,9 @@ import {
 const fallbackBabyAvatar = require("@/assets/images/baby.png");
 
 function BabyAvatar({ baby }: { baby: BabyListItem }) {
-	const avatarUri = getBabyAvatarUri(baby.avatarObjectKey);
-
 	return (
 		<Image
-			source={avatarUri ? { uri: avatarUri } : fallbackBabyAvatar}
+			source={baby.avatarUrl ? { uri: baby.avatarUrl } : fallbackBabyAvatar}
 			style={styles.avatar}
 		/>
 	);
@@ -42,19 +39,13 @@ export function BabyHeader({
 	const router = useRouter();
 	const [isSelectorOpen, setIsSelectorOpen] = useState(false);
 	const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+	const [isAvatarPreviewOpen, setIsAvatarPreviewOpen] = useState(false);
 	const currentDate = new Date();
 
 	const handleSelectBaby = (babyId: string) => {
 		onSelectBaby(babyId);
 		setIsSelectorOpen(false);
 	};
-
-	const onImagePress = () => {
-		Alert.alert(
-			"Change profile picture",
-			"TODO: Implement profile picture change flow"
-		);
-	}
 
 	return (
 		<View style={[globalStyles.rowBetween, styles.header]}>
@@ -161,11 +152,15 @@ export function BabyHeader({
 					<Pressable style={[globalStyles.shadowCard, styles.profilePanel]}>
 						<Pressable
 							accessibilityRole="button"
-							onPress={onImagePress}
+							onPress={() => {
+								if (baby.avatarUrl) {
+									setIsAvatarPreviewOpen(true);
+								}
+							}}
 							style={styles.largeAvatarButton}
 						>
 							<Image
-								source={getBabyAvatarUri(baby.avatarObjectKey) ? { uri: getBabyAvatarUri(baby.avatarObjectKey) } : fallbackBabyAvatar}
+								source={baby.avatarUrl ? { uri: baby.avatarUrl } : fallbackBabyAvatar}
 								style={styles.largeAvatar}
 							/>
 						</Pressable>
@@ -197,26 +192,24 @@ export function BabyHeader({
 					</Pressable>
 				</Pressable>
 			</Modal>
+			<Modal
+				animationType="fade"
+				onRequestClose={() => setIsAvatarPreviewOpen(false)}
+				transparent
+				visible={isAvatarPreviewOpen}
+			>
+				<Pressable
+					accessibilityRole="button"
+					onPress={() => setIsAvatarPreviewOpen(false)}
+					style={styles.avatarPreviewBackdrop}
+				>
+					{baby.avatarUrl ? (
+						<Image source={{ uri: baby.avatarUrl }} style={styles.avatarPreviewImage} />
+					) : null}
+				</Pressable>
+			</Modal>
 		</View>
 	);
-}
-
-function getBabyAvatarUri(avatarObjectKey: string | null) {
-	const bucketUrl = process.env.EXPO_PUBLIC_S3_BUCKET_URL;
-
-	if (!avatarObjectKey || !bucketUrl) {
-		return null;
-	}
-
-	return `${trimTrailingSlashes(bucketUrl)}/${trimLeadingSlashes(avatarObjectKey)}`;
-}
-
-function trimTrailingSlashes(value: string) {
-	return value.replace(/\/+$/, "");
-}
-
-function trimLeadingSlashes(value: string) {
-	return value.replace(/^\/+/, "");
 }
 
 const styles = StyleSheet.create({
@@ -239,6 +232,17 @@ const styles = StyleSheet.create({
 		color: colors.light.textPrimary,
 		fontSize: 24,
 		fontWeight: "800",
+	},
+	avatarPreviewBackdrop: {
+		alignItems: "center",
+		backgroundColor: "rgba(0, 0, 0, 0.9)",
+		flex: 1,
+		justifyContent: "center",
+		padding: spacing.lg,
+	},
+	avatarPreviewImage: {
+		aspectRatio: 1,
+		width: "100%",
 	},
 	header: {
 		marginBottom: spacing.md,
@@ -342,10 +346,5 @@ const styles = StyleSheet.create({
 		gap: spacing.md,
 		padding: spacing.lg,
 		width: "100%",
-	},
-	uploadHint: {
-		color: colors.light.textSecondary,
-		fontSize: 12,
-		fontWeight: "700",
 	},
 });

@@ -1,4 +1,5 @@
 import {
+	BabyAvatarField,
 	BabyBirthdateField,
 	BabyNameField,
 	BabySexSelector,
@@ -119,6 +120,7 @@ export default function BabySetupScreen() {
 					<View style={[globalStyles.card, globalStyles.shadowCard, styles.formCard]}>
 						{setupMode === "addBaby" ? (
 							<>
+								<BabyAvatarField />
 								<BabyNameField
 									onChangeText={setBabyName}
 									placeholder="Emma"

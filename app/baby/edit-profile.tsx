@@ -1,4 +1,5 @@
 import {
+	BabyAvatarField,
 	BabyBirthdateField,
 	BabyNameField,
 	BabySexSelector,
@@ -89,6 +90,13 @@ export default function EditBabyProfileScreen() {
 					<View style={styles.headerButton} />
 				</View>
 				<ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+					<BabyAvatarField
+						avatarObjectKey={selectedBaby?.avatarObjectKey}
+						avatarUrl={selectedBaby?.avatarUrl}
+						babyId={selectedBaby?.id}
+						disabled={isSaving}
+						onAvatarChanged={refreshBabies}
+					/>
 					<BabyNameField
 						label="Name"
 						onChangeText={setName}
