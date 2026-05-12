@@ -163,14 +163,14 @@ function formatSolidAverage(summary: MealAverage) {
     const solid = summary.byType.solid;
 
     if (solid.avgServingsPerActiveDay > 0) {
-        parts.push(`${solid.avgServingsPerActiveDay.toFixed(2)} servings / day`);
+        parts.push(`${solid.avgServingsPerActiveDay.toFixed(2)} servings`);
     }
 
     if (solid.avgGramsPerActiveDay > 0) {
-        parts.push(`${solid.avgGramsPerActiveDay.toFixed(0)} g / day`);
+        parts.push(`${solid.avgGramsPerActiveDay.toFixed(0)} g`);
     }
 
-    return parts.join(" + ");
+    return parts.join(" + ") + (parts.length > 0 ? " / day" : "");
 }
 
 const styles = StyleSheet.create({

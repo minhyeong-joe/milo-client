@@ -303,7 +303,7 @@ function formatSegmentDetail(
 
 		const totalMl = mealLogs.reduce((total, log) => total + (log.amountMl ?? 0), 0);
 		const formattedVolume = formatVolume(totalMl, preferredVolumeUnit);
-		return `${formattedVolume} ${preferredVolumeUnit} total`;
+		return `${formattedVolume} total`;
 	}
 
 	if (kind === "sleep") {
@@ -356,7 +356,7 @@ function findLatestSegment(
 function getSelectedDetail(days: AggregatedDay[], selected: SelectedSegment) {
 	const day = days.find((candidate) => candidate.date === selected.date);
 	const segment = day?.segments.find((candidate) => candidate.type === selected.type);
-
+	
 	if (!day || !segment) {
 		return null;
 	}
