@@ -3,6 +3,7 @@ import { DiaryMediaPreview } from "@/components/diary/DiaryMediaPreview";
 import { DiaryTagPill } from "@/components/diary/DiaryTagPill";
 import { ConfirmDeleteModal } from "@/components/routine/ConfirmDeleteModal";
 import { useBabySelection } from "@/context/BabySelectionContext";
+import { useDiaryCache } from "@/context/DiaryCacheContext";
 import { deleteDiaryEntry, type DiaryEntry } from "@/services/api/diary";
 import { colors, globalStyles, spacing, typography } from "@/styles/globalStyles";
 import { Ionicons } from "@expo/vector-icons";
@@ -15,7 +16,12 @@ export default function DiaryDetailScreen() {
 	const router = useRouter();
 	const params = useLocalSearchParams<{ diaryId: string; entry?: string }>();
 	const { selectedBaby } = useBabySelection();
-	const entry = parseEntryParam(params.entry);
+	const { getDiaryCache, removeDiaryEntryFromCache } = useDiaryCache();
+	const parsedEntry = parseEntryParam(params.entry);
+	const cachedEntry = selectedBaby
+		? getDiaryCache(selectedBaby.id).entries.find((item) => item.id === params.diaryId)
+		: null;
+	const entry = cachedEntry ?? parsedEntry;
 	const [isActionsVisible, setIsActionsVisible] = useState(false);
 	const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
 	const [isMetadataVisible, setIsMetadataVisible] = useState(false);
@@ -51,6 +57,7 @@ export default function DiaryDetailScreen() {
 
 		try {
 			await deleteDiaryEntry(selectedBaby.id, entry.id);
+			removeDiaryEntryFromCache(selectedBaby.id, entry.id);
 			setIsDeleteModalVisible(false);
 			router.replace("/(tabs)/diary");
 		} catch (error) {

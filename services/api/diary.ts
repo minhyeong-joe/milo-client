@@ -17,12 +17,14 @@ export type DiaryMedia = {
 	fileType: string;
 	id: string;
 	mediaUrl: string | null;
+	mediaUrlExpiresAt: string | null;
 	objectKey: string;
 	sizeBytes: number;
 	thumbnailFileType: string | null;
 	thumbnailObjectKey: string | null;
 	thumbnailSizeBytes: number | null;
 	thumbnailUrl: string | null;
+	thumbnailUrlExpiresAt: string | null;
 };
 
 export type DiaryEntryUser = {

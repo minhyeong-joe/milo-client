@@ -1,6 +1,7 @@
 import { AppPreferencesProvider } from "@/context/AppPreferencesContext";
 import { AuthSessionProvider } from "@/context/AuthSessionContext";
 import { BabySelectionProvider } from "@/context/BabySelectionContext";
+import { DiaryCacheProvider } from "@/context/DiaryCacheContext";
 import { GrowthDataProvider } from "@/context/GrowthDataContext";
 import { RoutineDataProvider } from "@/context/RoutineDataContext";
 import { SyncProvider } from "@/context/SyncContext";
@@ -17,22 +18,24 @@ export default function RootLayout() {
         <BabySelectionProvider>
           <RoutineDataProvider>
             <GrowthDataProvider>
-              <SyncProvider>
-                <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
-                <Stack screenOptions={{ headerShown: false }}>
-                  <Stack.Screen name="(auth)" />
-                  <Stack.Screen name="(tabs)" />
-                  <Stack.Screen name="baby/add-measurement" />
-                  <Stack.Screen name="baby/edit-profile" />
-                  <Stack.Screen name="baby/growth" />
-                  <Stack.Screen name="diary/[diaryId]" />
-                  <Stack.Screen name="diary/add" />
-                  <Stack.Screen name="diary/edit" />
-                  <Stack.Screen name="routine/add-diaper" />
-                  <Stack.Screen name="routine/add-meal" />
-                  <Stack.Screen name="routine/add-sleep" />
-                </Stack>
-              </SyncProvider>
+              <DiaryCacheProvider>
+                <SyncProvider>
+                  <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
+                  <Stack screenOptions={{ headerShown: false }}>
+                    <Stack.Screen name="(auth)" />
+                    <Stack.Screen name="(tabs)" />
+                    <Stack.Screen name="baby/add-measurement" />
+                    <Stack.Screen name="baby/edit-profile" />
+                    <Stack.Screen name="baby/growth" />
+                    <Stack.Screen name="diary/[diaryId]" />
+                    <Stack.Screen name="diary/add" />
+                    <Stack.Screen name="diary/edit" />
+                    <Stack.Screen name="routine/add-diaper" />
+                    <Stack.Screen name="routine/add-meal" />
+                    <Stack.Screen name="routine/add-sleep" />
+                  </Stack>
+                </SyncProvider>
+              </DiaryCacheProvider>
             </GrowthDataProvider>
           </RoutineDataProvider>
         </BabySelectionProvider>

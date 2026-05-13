@@ -9,6 +9,7 @@ import {
 	type UploadedDiaryMedia,
 } from "@/components/diary/DiaryEntryForm";
 import { useBabySelection } from "@/context/BabySelectionContext";
+import { useDiaryCache } from "@/context/DiaryCacheContext";
 import {
 	removeDiaryMediaUpload,
 	updateDiaryEntry,
@@ -25,6 +26,7 @@ export default function EditDiaryScreen() {
 	const params = useLocalSearchParams<{ entry?: string }>();
 	const entry = parseEntryParam(params.entry);
 	const { selectedBaby } = useBabySelection();
+	const { replaceDiaryEntryInCache } = useDiaryCache();
 	const [error, setError] = useState<string | null>(null);
 	const [isCreatingTag, setIsCreatingTag] = useState(false);
 	const [isSaving, setIsSaving] = useState(false);
@@ -130,6 +132,7 @@ export default function EditDiaryScreen() {
 				tagIds: input.tagIds,
 			});
 			await cleanupRemovedPersistedMedia(selectedBaby.id, entry.media, input.media);
+			replaceDiaryEntryInCache(selectedBaby.id, response.diaryEntry);
 			router.replace({
 				pathname: "/diary/[diaryId]",
 				params: {

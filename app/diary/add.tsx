@@ -6,6 +6,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { DiaryEntryForm } from "@/components/diary/DiaryEntryForm";
 import { useBabySelection } from "@/context/BabySelectionContext";
+import { useDiaryCache } from "@/context/DiaryCacheContext";
 import { createDiaryEntry, type DiaryTag } from "@/services/api/diary";
 import { ApiError } from "@/services/api/httpClient";
 import { createTag, listTags } from "@/services/api/tags";
@@ -14,6 +15,7 @@ import { colors, globalStyles, spacing, typography } from "@/styles/globalStyles
 export default function AddDiaryScreen() {
 	const router = useRouter();
 	const { selectedBaby } = useBabySelection();
+	const { replaceDiaryEntryInCache } = useDiaryCache();
 	const [error, setError] = useState<string | null>(null);
 	const [isCreatingTag, setIsCreatingTag] = useState(false);
 	const [isSaving, setIsSaving] = useState(false);
@@ -112,12 +114,13 @@ export default function AddDiaryScreen() {
 		setError(null);
 
 		try {
-			await createDiaryEntry(selectedBaby.id, {
+			const response = await createDiaryEntry(selectedBaby.id, {
 				content: input.content,
 				diaryDate: input.diaryDate,
 				media: input.media,
 				tagIds: input.tagIds,
 			});
+			replaceDiaryEntryInCache(selectedBaby.id, response.diaryEntry);
 			router.back();
 		} catch (caughtError) {
 			setError(getErrorMessage(caughtError));

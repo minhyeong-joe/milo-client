@@ -2,6 +2,7 @@ import { DiaryEntryCard } from "@/components/diary/DiaryEntryCard";
 import { DiaryActionsModal } from "@/components/diary/DiaryActionsModal";
 import { ConfirmDeleteModal } from "@/components/routine/ConfirmDeleteModal";
 import { useBabySelection } from "@/context/BabySelectionContext";
+import { useDiaryCache } from "@/context/DiaryCacheContext";
 import {
 	deleteDiaryEntry,
 	listDiaryEntries,
@@ -27,8 +28,13 @@ const PAGE_SIZE = 10;
 export default function DiaryScreen() {
 	const router = useRouter();
 	const { selectedBaby } = useBabySelection();
-	const [entries, setEntries] = useState<DiaryEntry[]>([]);
-	const [nextCursor, setNextCursor] = useState<string | null>(null);
+	const {
+		appendDiaryPage,
+		getDiaryCache,
+		removeDiaryEntryFromCache,
+		setDiaryFirstPage,
+		shouldRefreshDiaryCache,
+	} = useDiaryCache();
 	const [error, setError] = useState<string | null>(null);
 	const [isLoading, setIsLoading] = useState(false);
 	const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -36,6 +42,9 @@ export default function DiaryScreen() {
 	const [actionEntry, setActionEntry] = useState<DiaryEntry | null>(null);
 	const [deleteEntry, setDeleteEntry] = useState<DiaryEntry | null>(null);
 	const [isDeleting, setIsDeleting] = useState(false);
+	const diaryCache = selectedBaby ? getDiaryCache(selectedBaby.id) : null;
+	const entries = diaryCache?.entries ?? [];
+	const nextCursor = diaryCache?.nextCursor ?? null;
 
 	const todayDate = useMemo(
 		() => getDateKeyInTimeZone(new Date(), selectedBaby?.timezone),
@@ -45,8 +54,6 @@ export default function DiaryScreen() {
 	const loadFirstPage = useCallback(
 		async ({ refreshing = false }: { refreshing?: boolean } = {}) => {
 			if (!selectedBaby) {
-				setEntries([]);
-				setNextCursor(null);
 				setError(null);
 				return;
 			}
@@ -64,8 +71,7 @@ export default function DiaryScreen() {
 					endDate: getDateKeyInTimeZone(new Date(), selectedBaby.timezone),
 					take: PAGE_SIZE,
 				});
-				setEntries(response.diaryEntries);
-				setNextCursor(response.nextCursor);
+				setDiaryFirstPage(selectedBaby.id, response);
 			} catch {
 				setError("Could not load diary entries. Pull to refresh or try again.");
 			} finally {
@@ -73,7 +79,7 @@ export default function DiaryScreen() {
 				setIsRefreshing(false);
 			}
 		},
-		[selectedBaby],
+		[selectedBaby, setDiaryFirstPage],
 	);
 
 	const loadMore = useCallback(async () => {
@@ -88,19 +94,22 @@ export default function DiaryScreen() {
 				cursor: nextCursor,
 				take: PAGE_SIZE,
 			});
-			setEntries((currentEntries) => mergeEntries(currentEntries, response.diaryEntries));
-			setNextCursor(response.nextCursor);
+			appendDiaryPage(selectedBaby.id, response);
 		} catch (caughtError) {
 			console.warn(caughtError);
 		} finally {
 			setIsLoadingMore(false);
 		}
-	}, [isLoading, isLoadingMore, nextCursor, selectedBaby]);
+	}, [appendDiaryPage, isLoading, isLoadingMore, nextCursor, selectedBaby]);
 
 	useFocusEffect(
 		useCallback(() => {
+			if (!selectedBaby || !shouldRefreshDiaryCache(selectedBaby.id)) {
+				return;
+			}
+
 			void loadFirstPage();
-		}, [loadFirstPage]),
+		}, [loadFirstPage, selectedBaby, shouldRefreshDiaryCache]),
 	);
 
 	const openEntry = (entry: DiaryEntry) => {
@@ -137,9 +146,7 @@ export default function DiaryScreen() {
 
 		try {
 			await deleteDiaryEntry(selectedBaby.id, deleteEntry.id);
-			setEntries((currentEntries) =>
-				currentEntries.filter((entry) => entry.id !== deleteEntry.id),
-			);
+			removeDiaryEntryFromCache(selectedBaby.id, deleteEntry.id);
 			setDeleteEntry(null);
 		} catch (caughtError) {
 			console.warn(caughtError);
@@ -282,20 +289,6 @@ function DiaryEmptyState({
 			) : null}
 		</View>
 	);
-}
-
-function mergeEntries(currentEntries: DiaryEntry[], nextEntries: DiaryEntry[]) {
-	const seenIds = new Set(currentEntries.map((entry) => entry.id));
-	const mergedEntries = [...currentEntries];
-
-	for (const entry of nextEntries) {
-		if (!seenIds.has(entry.id)) {
-			seenIds.add(entry.id);
-			mergedEntries.push(entry);
-		}
-	}
-
-	return mergedEntries;
 }
 
 function getDateKeyInTimeZone(value: Date, timeZone?: string | null) {
