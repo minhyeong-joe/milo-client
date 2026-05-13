@@ -1,0 +1,114 @@
+import { apiDelete, apiGet, apiPatch, apiPost } from "@/services/api/httpClient";
+
+export type DiaryTag = {
+	babyId: string | null;
+	color: string;
+	createdAt: string;
+	id: string;
+	name: string;
+	scope: "custom" | "global";
+	type: string;
+	updatedAt: string;
+};
+
+export type DiaryMedia = {
+	description: string | null;
+	diaryId: string;
+	fileType: string;
+	id: string;
+	objectKey: string;
+	sizeBytes: number;
+};
+
+export type DiaryEntryUser = {
+	displayName: string | null;
+	email: string;
+	id: string;
+};
+
+export type DiaryEntry = {
+	babyId: string;
+	content: string;
+	createdAt: string;
+	createdBy?: DiaryEntryUser | null;
+	createdById: string;
+	diaryDate: string;
+	id: string;
+	media: DiaryMedia[];
+	tags: DiaryTag[];
+	updatedAt: string;
+	updatedBy?: DiaryEntryUser | null;
+	updatedById: string;
+};
+
+export type ListDiaryEntriesResponse = {
+	diaryEntries: DiaryEntry[];
+	nextCursor: string | null;
+};
+
+export type DiaryMediaInput = {
+	description?: string | null;
+	fileType: string;
+	objectKey: string;
+	sizeBytes: number;
+};
+
+export type CreateDiaryEntryInput = {
+	content: string;
+	diaryDate: string;
+	media?: DiaryMediaInput[];
+	tagIds?: string[];
+};
+
+export type UpdateDiaryEntryInput = Partial<CreateDiaryEntryInput>;
+
+export type DiaryEntryResponse = {
+	diaryEntry: DiaryEntry;
+};
+
+export function listDiaryEntries({
+	babyId,
+	cursor,
+	endDate,
+	take = 10,
+}: {
+	babyId: string;
+	cursor?: string | null;
+	endDate?: string;
+	take?: number;
+}) {
+	return apiGet<ListDiaryEntriesResponse>(`/babies/${babyId}/diaries`, {
+		auth: true,
+		query: {
+			cursor: cursor ?? undefined,
+			endDate: cursor ? undefined : endDate,
+			take,
+		},
+	});
+}
+
+export function createDiaryEntry(babyId: string, input: CreateDiaryEntryInput) {
+	return apiPost<DiaryEntryResponse, CreateDiaryEntryInput>(
+		`/babies/${babyId}/diaries`,
+		input,
+		{ auth: true },
+	);
+}
+
+export function updateDiaryEntry(
+	babyId: string,
+	diaryId: string,
+	input: UpdateDiaryEntryInput,
+) {
+	return apiPatch<DiaryEntryResponse, UpdateDiaryEntryInput>(
+		`/babies/${babyId}/diaries/${diaryId}`,
+		input,
+		{ auth: true },
+	);
+}
+
+export function deleteDiaryEntry(babyId: string, diaryId: string) {
+	return apiDelete<void>(`/babies/${babyId}/diaries/${diaryId}`, {
+		auth: true,
+	});
+}
