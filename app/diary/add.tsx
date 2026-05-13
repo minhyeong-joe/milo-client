@@ -100,6 +100,7 @@ export default function AddDiaryScreen() {
 	const handleSubmit = async (input: {
 		content: string;
 		diaryDate: string;
+		media: Parameters<typeof createDiaryEntry>[1]["media"];
 		tagIds: string[];
 	}) => {
 		if (!selectedBaby) {
@@ -114,7 +115,7 @@ export default function AddDiaryScreen() {
 			await createDiaryEntry(selectedBaby.id, {
 				content: input.content,
 				diaryDate: input.diaryDate,
-				media: [],
+				media: input.media,
 				tagIds: input.tagIds,
 			});
 			router.back();
@@ -142,6 +143,7 @@ export default function AddDiaryScreen() {
 
 			{selectedBaby ? (
 				<DiaryEntryForm
+					babyId={selectedBaby.id}
 					error={error}
 					isCreatingTag={isCreatingTag}
 					isSaving={isSaving}

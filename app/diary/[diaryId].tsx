@@ -4,7 +4,7 @@ import type { DiaryEntry } from "@/services/api/diary";
 import { colors, globalStyles, spacing, typography } from "@/styles/globalStyles";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function DiaryDetailScreen() {
@@ -38,7 +38,6 @@ export default function DiaryDetailScreen() {
 				{entry ? (
 					<View style={[globalStyles.card, globalStyles.shadowCard, styles.detailCard]}>
 						<Text style={styles.dateText}>{formatDateLabel(entry.diaryDate)}</Text>
-						<Text style={styles.contentText}>{entry.content}</Text>
 
 						{entry.tags.length > 0 ? (
 							<View style={styles.tagRow}>
@@ -48,9 +47,10 @@ export default function DiaryDetailScreen() {
 							</View>
 						) : null}
 
+						<Text style={styles.contentText}>{entry.content}</Text>
+
 						{entry.media.length > 0 ? (
 							<View>
-								<Text style={styles.sectionLabel}>Media</Text>
 								<DiaryMediaPreview media={entry.media} variant="detail" />
 							</View>
 						) : null}

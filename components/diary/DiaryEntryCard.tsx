@@ -19,6 +19,8 @@ export function DiaryEntryCard({
 	onPress,
 	todayDate,
 }: DiaryEntryCardProps) {
+	const hasSingleMedia = entry.media.length === 1;
+
 	return (
 		<Pressable
 			accessibilityRole="button"
@@ -47,11 +49,42 @@ export function DiaryEntryCard({
 					<Ionicons color={colors.light.textSecondary} name="ellipsis-horizontal" size={18} />
 				</Pressable>
 			</View>
+			{hasSingleMedia ? (
+				<View style={styles.singleMediaLayout}>
+					<View style={styles.singleMediaTextColumn}>
+						<CardTextContent
+							entry={entry}
+							onMorePress={onMorePress}
+							todayDate={todayDate}
+						/>
+					</View>
+					<DiaryMediaPreview media={entry.media} variant="singleCard" />
+				</View>
+			) : (
+				<>
+					<CardTextContent
+						entry={entry}
+						onMorePress={onMorePress}
+						todayDate={todayDate}
+					/>
+					{entry.media.length > 1 ? <DiaryMediaPreview media={entry.media} /> : null}
+				</>
+			)}
+		</Pressable>
+	);
+}
 
-			<Text numberOfLines={3} style={styles.contentText}>
-				{entry.content}
-			</Text>
-
+function CardTextContent({
+	entry,
+	onMorePress,
+	todayDate,
+}: {
+	entry: DiaryEntry;
+	onMorePress?: (entry: DiaryEntry) => void;
+	todayDate: string;
+}) {
+	return (
+		<>
 			{entry.tags.length > 0 ? (
 				<View style={styles.tagRow}>
 					{entry.tags.slice(0, 4).map((tag) => (
@@ -60,8 +93,10 @@ export function DiaryEntryCard({
 				</View>
 			) : null}
 
-			<DiaryMediaPreview media={entry.media} />
-		</Pressable>
+			<Text numberOfLines={3} style={styles.contentText}>
+				{entry.content}
+			</Text>
+		</>
 	);
 }
 
@@ -101,6 +136,16 @@ const styles = StyleSheet.create({
 	},
 	pressed: {
 		opacity: 0.82,
+	},
+	singleMediaLayout: {
+		alignItems: "stretch",
+		flexDirection: "row",
+		gap: spacing.md,
+	},
+	singleMediaTextColumn: {
+		flex: 1,
+		gap: spacing.sm,
+		minWidth: 0,
 	},
 	tagRow: {
 		flexDirection: "row",

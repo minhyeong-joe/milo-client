@@ -1,4 +1,4 @@
-import { apiDelete, apiGet, apiPatch, apiPost } from "@/services/api/httpClient";
+import { apiDelete, apiGet, apiPatch, apiPost, apiRequest } from "@/services/api/httpClient";
 
 export type DiaryTag = {
 	babyId: string | null;
@@ -16,8 +16,13 @@ export type DiaryMedia = {
 	diaryId: string;
 	fileType: string;
 	id: string;
+	mediaUrl: string | null;
 	objectKey: string;
 	sizeBytes: number;
+	thumbnailFileType: string | null;
+	thumbnailObjectKey: string | null;
+	thumbnailSizeBytes: number | null;
+	thumbnailUrl: string | null;
 };
 
 export type DiaryEntryUser = {
@@ -51,6 +56,9 @@ export type DiaryMediaInput = {
 	fileType: string;
 	objectKey: string;
 	sizeBytes: number;
+	thumbnailFileType?: string | null;
+	thumbnailObjectKey?: string | null;
+	thumbnailSizeBytes?: number | null;
 };
 
 export type CreateDiaryEntryInput = {
@@ -64,6 +72,22 @@ export type UpdateDiaryEntryInput = Partial<CreateDiaryEntryInput>;
 
 export type DiaryEntryResponse = {
 	diaryEntry: DiaryEntry;
+};
+
+export type CreateDiaryMediaUploadRequest = {
+	fileType: string;
+	sizeBytes: number;
+	uploadPurpose?: "media" | "thumbnail";
+};
+
+export type CreateDiaryMediaUploadResponse = {
+	expiresIn: number;
+	objectKey: string;
+	uploadUrl: string;
+};
+
+export type RemoveDiaryMediaUploadRequest = {
+	objectKey: string;
 };
 
 export function listDiaryEntries({
@@ -93,6 +117,28 @@ export function createDiaryEntry(babyId: string, input: CreateDiaryEntryInput) {
 		input,
 		{ auth: true },
 	);
+}
+
+export function createDiaryMediaUpload(
+	babyId: string,
+	input: CreateDiaryMediaUploadRequest,
+) {
+	return apiPost<CreateDiaryMediaUploadResponse, CreateDiaryMediaUploadRequest>(
+		`/babies/${babyId}/diaries/media/presign-upload`,
+		input,
+		{ auth: true },
+	);
+}
+
+export function removeDiaryMediaUpload(
+	babyId: string,
+	input: RemoveDiaryMediaUploadRequest,
+) {
+	return apiRequest<void, RemoveDiaryMediaUploadRequest>(`/babies/${babyId}/diaries/media`, {
+		auth: true,
+		body: input,
+		method: "DELETE",
+	});
 }
 
 export function updateDiaryEntry(
