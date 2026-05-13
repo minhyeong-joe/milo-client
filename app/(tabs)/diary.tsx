@@ -1,6 +1,9 @@
 import { DiaryEntryCard } from "@/components/diary/DiaryEntryCard";
+import { DiaryActionsModal } from "@/components/diary/DiaryActionsModal";
+import { ConfirmDeleteModal } from "@/components/routine/ConfirmDeleteModal";
 import { useBabySelection } from "@/context/BabySelectionContext";
 import {
+	deleteDiaryEntry,
 	listDiaryEntries,
 	type DiaryEntry,
 } from "@/services/api/diary";
@@ -30,6 +33,9 @@ export default function DiaryScreen() {
 	const [isLoading, setIsLoading] = useState(false);
 	const [isLoadingMore, setIsLoadingMore] = useState(false);
 	const [isRefreshing, setIsRefreshing] = useState(false);
+	const [actionEntry, setActionEntry] = useState<DiaryEntry | null>(null);
+	const [deleteEntry, setDeleteEntry] = useState<DiaryEntry | null>(null);
+	const [isDeleting, setIsDeleting] = useState(false);
 
 	const todayDate = useMemo(
 		() => getDateKeyInTimeZone(new Date(), selectedBaby?.timezone),
@@ -107,6 +113,42 @@ export default function DiaryScreen() {
 		});
 	};
 
+	const openEdit = (entry: DiaryEntry) => {
+		setActionEntry(null);
+		router.push({
+			pathname: "/diary/edit",
+			params: {
+				entry: encodeURIComponent(JSON.stringify(entry)),
+			},
+		});
+	};
+
+	const requestDelete = (entry: DiaryEntry) => {
+		setActionEntry(null);
+		setDeleteEntry(entry);
+	};
+
+	const confirmDelete = async () => {
+		if (!selectedBaby || !deleteEntry) {
+			return;
+		}
+
+		setIsDeleting(true);
+
+		try {
+			await deleteDiaryEntry(selectedBaby.id, deleteEntry.id);
+			setEntries((currentEntries) =>
+				currentEntries.filter((entry) => entry.id !== deleteEntry.id),
+			);
+			setDeleteEntry(null);
+		} catch (caughtError) {
+			console.warn(caughtError);
+			setError("Could not delete diary entry. Please try again.");
+		} finally {
+			setIsDeleting(false);
+		}
+	};
+
 	return (
 		<SafeAreaView edges={["top", "left", "right"]} style={globalStyles.screen}>
 			<View style={globalStyles.screenContent}>
@@ -169,7 +211,7 @@ export default function DiaryScreen() {
 						renderItem={({ item }) => (
 							<DiaryEntryCard
 								entry={item}
-								onMorePress={() => undefined}
+								onMorePress={setActionEntry}
 								onPress={openEntry}
 								todayDate={todayDate}
 							/>
@@ -185,6 +227,20 @@ export default function DiaryScreen() {
 					</View>
 				)}
 			</View>
+			<DiaryActionsModal
+				onClose={() => setActionEntry(null)}
+				onDelete={() => actionEntry && requestDelete(actionEntry)}
+				onEdit={() => actionEntry && openEdit(actionEntry)}
+				visible={Boolean(actionEntry)}
+			/>
+			<ConfirmDeleteModal
+				confirmLabel={isDeleting ? "Deleting..." : "Delete"}
+				message="Are you sure you want to delete this diary entry permanently?"
+				onCancel={() => setDeleteEntry(null)}
+				onConfirm={() => void confirmDelete()}
+				title="Delete diary entry?"
+				visible={Boolean(deleteEntry)}
+			/>
 		</SafeAreaView>
 	);
 }

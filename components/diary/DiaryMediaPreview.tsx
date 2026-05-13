@@ -1,13 +1,16 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useEffect, useMemo, useState } from "react";
+import { VideoView, useVideoPlayer } from "expo-video";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
 	Image,
-	Linking,
 	Modal,
+	type NativeScrollEvent,
+	type NativeSyntheticEvent,
 	Pressable,
 	ScrollView,
 	StyleSheet,
 	Text,
+	useWindowDimensions,
 	View,
 } from "react-native";
 
@@ -34,6 +37,7 @@ export type DiaryMediaPreviewItem = Pick<
 
 type DiaryMediaPreviewProps = {
 	media: DiaryMediaPreviewItem[];
+	onMediaPress?: (item: DiaryMediaPreviewItem) => void;
 	onRemove?: (objectKey: string) => void;
 	variant?: "card" | "detail" | "form" | "singleCard";
 };
@@ -42,10 +46,13 @@ type ImageRatioBucket = "horizontal" | "square" | "vertical";
 
 export function DiaryMediaPreview({
 	media,
+	onMediaPress,
 	onRemove,
 	variant = "card",
 }: DiaryMediaPreviewProps) {
 	const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
+	const [selectedVideoUri, setSelectedVideoUri] = useState<string | null>(null);
+	const [selectedGalleryIndex, setSelectedGalleryIndex] = useState<number | null>(null);
 
 	if (media.length === 0) {
 		return null;
@@ -56,11 +63,15 @@ export function DiaryMediaPreview({
 	const hiddenCount = limit ? Math.max(media.length - visibleMedia.length, 0) : 0;
 	const content = (
 		<>
-			{visibleMedia.map((item) => (
+			{visibleMedia.map((item, index) => (
 				<MediaTile
+					index={index}
 					item={item}
 					key={item.id ?? item.objectKey}
+					onOpenGallery={setSelectedGalleryIndex}
+					onMediaPress={onMediaPress}
 					onOpenImage={setSelectedImageUri}
+					onOpenVideo={setSelectedVideoUri}
 					onRemove={onRemove}
 					variant={variant}
 				/>
@@ -75,16 +86,24 @@ export function DiaryMediaPreview({
 
 	return (
 		<>
-			{variant === "form" ? (
+			{variant === "form" || variant === "detail" ? (
 				<ScrollView
-					contentContainerStyle={styles.formContainer}
+					contentContainerStyle={[
+						styles.formContainer,
+						variant === "detail" && styles.detailScrollContainer,
+					]}
 					horizontal
 					showsHorizontalScrollIndicator={false}
 				>
 					{content}
 				</ScrollView>
 			) : (
-				<View style={[styles.container, variant === "singleCard" && styles.singleContainer]}>
+				<View
+					style={[
+						styles.container,
+						variant === "singleCard" && styles.singleContainer,
+					]}
+				>
 					{content}
 				</View>
 			)}
@@ -104,40 +123,72 @@ export function DiaryMediaPreview({
 					) : null}
 				</Pressable>
 			</Modal>
+			{selectedVideoUri ? (
+				<VideoModal onClose={() => setSelectedVideoUri(null)} uri={selectedVideoUri} />
+			) : null}
+			{selectedGalleryIndex !== null ? (
+				<FullscreenMediaGallery
+					index={selectedGalleryIndex}
+					media={media}
+					onClose={() => setSelectedGalleryIndex(null)}
+					onIndexChange={setSelectedGalleryIndex}
+				/>
+			) : null}
 		</>
 	);
 }
 
 function MediaTile({
+	index,
 	item,
+	onMediaPress,
+	onOpenGallery,
 	onOpenImage,
+	onOpenVideo,
 	onRemove,
 	variant,
 }: {
+	index: number;
 	item: DiaryMediaPreviewItem;
+	onMediaPress?: (item: DiaryMediaPreviewItem) => void;
+	onOpenGallery: (index: number) => void;
 	onOpenImage: (uri: string) => void;
+	onOpenVideo: (uri: string) => void;
 	onRemove?: (objectKey: string) => void;
 	variant: NonNullable<DiaryMediaPreviewProps["variant"]>;
 }) {
 	const imageUri = !isVideo(item.fileType)
 		? item.mediaUrl ?? item.localUri ?? null
 		: item.thumbnailUrl ?? item.thumbnailLocalUri ?? null;
-	const ratioBucket = useImageRatioBucket(imageUri);
+	const ratio = useImageRatio(imageUri);
+	const ratioBucket = getImageRatioBucket(ratio);
 	const tileStyle = useMemo(
 		() => [
-			styles.mediaCard,
+			variant === "detail" ? styles.detailMediaTile : styles.mediaCard,
 			getVariantStyle(variant),
-			getRatioStyle(variant, ratioBucket),
+			variant === "detail"
+				? getDetailRatioStyle(ratio)
+				: getRatioStyle(variant, ratioBucket),
 		],
-		[ratioBucket, variant],
+		[ratio, ratioBucket, variant],
 	);
 
 	return (
 		<Pressable
 			onPress={() => {
+				if ((variant === "card" || variant === "singleCard") && onMediaPress) {
+					onMediaPress(item);
+					return;
+				}
+
 				if (variant === "detail" || variant === "form") {
+					if (variant === "detail") {
+						onOpenGallery(index);
+						return;
+					}
+
 					if (isVideo(item.fileType) && item.mediaUrl) {
-						void Linking.openURL(item.mediaUrl);
+						onOpenVideo(item.mediaUrl);
 						return;
 					}
 	
@@ -149,7 +200,13 @@ function MediaTile({
 			style={tileStyle}
 		>
 			{imageUri ? (
-				<Image source={{ uri: imageUri }} style={styles.previewImage} />
+				<Image
+					source={{ uri: imageUri }}
+					style={[
+						styles.previewImage,
+						variant === "detail" && styles.detailPreviewImage,
+					]}
+				/>
 			) : (
 				<Ionicons
 					color={colors.light.textSecondary}
@@ -158,9 +215,16 @@ function MediaTile({
 				/>
 			)}
 			{isVideo(item.fileType) ? (
-				<View style={styles.videoBadge}>
-					<Ionicons color={colors.light.surface} name="play" size={12} />
-					<Text style={styles.videoBadgeText}>Video</Text>
+				<View
+					style={[
+						styles.videoBadgeAnchor,
+						variant === "detail" && styles.detailVideoBadgeAnchor,
+					]}
+				>
+					<View style={styles.videoBadge}>
+						<Ionicons color={colors.light.surface} name="play" size={12} />
+						<Text style={styles.videoBadgeText}>Video</Text>
+					</View>
 				</View>
 			) : null}
 			{onRemove ? (
@@ -174,6 +238,195 @@ function MediaTile({
 			) : null}
 		</Pressable>
 	);
+}
+
+function FullscreenMediaGallery({
+	index,
+	media,
+	onClose,
+	onIndexChange,
+}: {
+	index: number;
+	media: DiaryMediaPreviewItem[];
+	onClose: () => void;
+	onIndexChange: (index: number) => void;
+}) {
+	const item = media[index];
+	const canGoPrevious = index > 0;
+	const canGoNext = index < media.length - 1;
+	const scrollViewRef = useRef<ScrollView | null>(null);
+	const { width } = useWindowDimensions();
+
+	useEffect(() => {
+		requestAnimationFrame(() => {
+			scrollViewRef.current?.scrollTo({
+				animated: false,
+				x: index * width,
+			});
+		});
+	}, [index, width]);
+
+	const handleMomentumScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+		const nextIndex = Math.round(event.nativeEvent.contentOffset.x / width);
+
+		if (nextIndex !== index && nextIndex >= 0 && nextIndex < media.length) {
+			onIndexChange(nextIndex);
+		}
+	};
+
+	if (!item) {
+		return null;
+	}
+
+	return (
+		<Modal animationType="fade" onRequestClose={onClose} transparent visible>
+			<View style={styles.galleryBackdrop}>
+				<ScrollView
+					horizontal
+					onMomentumScrollEnd={handleMomentumScrollEnd}
+					pagingEnabled
+					ref={scrollViewRef}
+					scrollEventThrottle={16}
+					showsHorizontalScrollIndicator={false}
+					style={styles.galleryPager}
+				>
+					{media.map((galleryItem, galleryIndex) => (
+						<View
+							key={galleryItem.id ?? galleryItem.objectKey}
+							style={[styles.galleryPage, { width }]}
+						>
+							<FullscreenMediaContent
+								isActive={galleryIndex === index}
+								item={galleryItem}
+							/>
+						</View>
+					))}
+				</ScrollView>
+				<Pressable
+					accessibilityLabel="Close media viewer"
+					accessibilityRole="button"
+					onPress={onClose}
+					style={styles.videoCloseButton}
+				>
+					<Ionicons color={colors.light.surface} name="close" size={22} />
+				</Pressable>
+
+				{canGoPrevious ? (
+					<Pressable
+						accessibilityLabel="Previous media"
+						accessibilityRole="button"
+						onPress={() => onIndexChange(index - 1)}
+						style={[styles.galleryNavButton, styles.galleryPreviousButton]}
+					>
+						<Ionicons color={colors.light.surface} name="chevron-back" size={34} />
+					</Pressable>
+				) : null}
+
+				{canGoNext ? (
+					<Pressable
+						accessibilityLabel="Next media"
+						accessibilityRole="button"
+						onPress={() => onIndexChange(index + 1)}
+						style={[styles.galleryNavButton, styles.galleryNextButton]}
+					>
+						<Ionicons color={colors.light.surface} name="chevron-forward" size={34} />
+					</Pressable>
+				) : null}
+			</View>
+		</Modal>
+	);
+}
+
+function FullscreenMediaContent({
+	isActive,
+	item,
+}: {
+	isActive: boolean;
+	item: DiaryMediaPreviewItem;
+}) {
+	if (isVideo(item.fileType) && item.mediaUrl) {
+		return <FullscreenVideo isActive={isActive} key={item.objectKey} uri={item.mediaUrl} />;
+	}
+
+	const imageUri = item.mediaUrl ?? item.localUri ?? item.thumbnailUrl ?? item.thumbnailLocalUri;
+
+	return imageUri ? (
+		<Image source={{ uri: imageUri }} style={styles.fullImage} />
+	) : (
+		<Ionicons color={colors.light.surface} name="image-outline" size={42} />
+	);
+}
+
+function FullscreenVideo({ isActive, uri }: { isActive: boolean; uri: string }) {
+	const player = useVideoPlayer(uri, (playerInstance) => {
+		playerInstance.loop = false;
+	});
+
+	useEffect(() => {
+		if (isActive) {
+			player.play();
+		} else {
+			player.pause();
+		}
+	}, [isActive, player]);
+
+	return (
+		<VideoView
+			contentFit="contain"
+			fullscreenOptions={{ enable: true }}
+			nativeControls
+			player={player}
+			style={styles.fullVideo}
+		/>
+	);
+}
+
+function VideoModal({ onClose, uri }: { onClose: () => void; uri: string }) {
+	const player = useVideoPlayer(uri, (playerInstance) => {
+		playerInstance.loop = false;
+	});
+
+	useEffect(() => {
+		player.play();
+	}, [player]);
+
+	return (
+		<Modal animationType="fade" onRequestClose={onClose} transparent visible>
+			<View style={styles.videoModalBackdrop}>
+				<Pressable
+					accessibilityLabel="Close video"
+					accessibilityRole="button"
+					onPress={onClose}
+					style={styles.videoCloseButton}
+				>
+					<Ionicons color={colors.light.surface} name="close" size={22} />
+				</Pressable>
+				<VideoView
+					contentFit="contain"
+					fullscreenOptions={{ enable: true }}
+					nativeControls
+					player={player}
+					style={styles.fullVideo}
+				/>
+			</View>
+		</Modal>
+	);
+}
+
+const DETAIL_MEDIA_HEIGHT = 164;
+const DETAIL_MIN_MEDIA_WIDTH = 110;
+const DETAIL_MAX_MEDIA_WIDTH = 280;
+
+function getDetailRatioStyle(ratio: number | null) {
+	const normalizedRatio = ratio && Number.isFinite(ratio) ? ratio : 1;
+
+	return {
+		height: DETAIL_MEDIA_HEIGHT,
+		width: Math.min(
+			DETAIL_MAX_MEDIA_WIDTH,
+			Math.max(DETAIL_MIN_MEDIA_WIDTH, Math.round(DETAIL_MEDIA_HEIGHT * normalizedRatio)),
+		),
+	};
 }
 
 function getRatioStyle(
@@ -239,12 +492,28 @@ function isVideo(fileType: string) {
 	return fileType.toLowerCase().startsWith("video/");
 }
 
-function useImageRatioBucket(uri: string | null): ImageRatioBucket {
-	const [ratioBucket, setRatioBucket] = useState<ImageRatioBucket>("square");
+function getImageRatioBucket(ratio: number | null): ImageRatioBucket {
+	if (!ratio) {
+		return "square";
+	}
+
+	if (ratio > 1.25) {
+		return "horizontal";
+	}
+
+	if (ratio < 0.8) {
+		return "vertical";
+	}
+
+	return "square";
+}
+
+function useImageRatio(uri: string | null): number | null {
+	const [ratio, setRatio] = useState<number | null>(null);
 
 	useEffect(() => {
 		if (!uri) {
-			setRatioBucket("square");
+			setRatio(null);
 			return;
 		}
 
@@ -257,18 +526,11 @@ function useImageRatioBucket(uri: string | null): ImageRatioBucket {
 					return;
 				}
 
-				const ratio = width / height;
-				if (ratio > 1.25) {
-					setRatioBucket("horizontal");
-				} else if (ratio < 0.8) {
-					setRatioBucket("vertical");
-				} else {
-					setRatioBucket("square");
-				}
+				setRatio(width / height);
 			},
 			() => {
 				if (isMounted) {
-					setRatioBucket("square");
+					setRatio(null);
 				}
 			},
 		);
@@ -278,7 +540,7 @@ function useImageRatioBucket(uri: string | null): ImageRatioBucket {
 		};
 	}, [uri]);
 
-	return ratioBucket;
+	return ratio;
 }
 
 const styles = StyleSheet.create({
@@ -308,16 +570,42 @@ const styles = StyleSheet.create({
 		color: colors.light.textPrimary,
 	},
 	detailHorizontalMedia: {
-		height: 180,
-		width: "100%",
+		aspectRatio: 4 / 3,
+		width: "48%",
+	},
+	detailContainer: {
+		alignItems: "flex-start",
+		gap: spacing.md,
+		justifyContent: "space-between",
+		marginTop: 0,
+	},
+	detailMediaTile: {
+		alignItems: "center",
+		justifyContent: "center",
+		position: "relative",
+	},
+	detailPreviewImage: {
+		borderRadius: 10,
+		resizeMode: "contain",
+	},
+	detailScrollContainer: {
+		gap: spacing.md,
+		marginTop: 0,
+		paddingRight: spacing.md,
 	},
 	detailSquareMedia: {
 		aspectRatio: 1,
 		width: "48%",
 	},
 	detailVerticalMedia: {
-		aspectRatio: 0.72,
+		aspectRatio: 3 / 4,
 		width: "48%",
+	},
+	detailVideoBadgeAnchor: {
+		alignItems: "center",
+		bottom: spacing.sm,
+		left: 0,
+		right: 0,
 	},
 	formContainer: {
 		gap: spacing.sm,
@@ -340,6 +628,41 @@ const styles = StyleSheet.create({
 		height: "100%",
 		resizeMode: "contain",
 		width: "100%",
+	},
+	fullVideo: {
+		height: "78%",
+		width: "100%",
+	},
+	galleryBackdrop: {
+		alignItems: "center",
+		backgroundColor: "rgba(0, 0, 0, 0.94)",
+		flex: 1,
+		justifyContent: "center",
+		padding: spacing.lg,
+	},
+	galleryNavButton: {
+		alignItems: "center",
+		backgroundColor: "rgba(255, 255, 255, 0.14)",
+		borderRadius: 999,
+		height: 64,
+		justifyContent: "center",
+		position: "absolute",
+		top: "48%",
+		width: 48,
+	},
+	galleryNextButton: {
+		right: spacing.md,
+	},
+	galleryPage: {
+		alignItems: "center",
+		justifyContent: "center",
+		padding: spacing.lg,
+	},
+	galleryPager: {
+		...StyleSheet.absoluteFillObject,
+	},
+	galleryPreviousButton: {
+		left: spacing.md,
 	},
 	imageModalBackdrop: {
 		alignItems: "center",
@@ -374,6 +697,25 @@ const styles = StyleSheet.create({
 		top: spacing.xs,
 		width: 24,
 	},
+	videoCloseButton: {
+		alignItems: "center",
+		backgroundColor: "rgba(255, 255, 255, 0.18)",
+		borderRadius: 999,
+		height: 44,
+		justifyContent: "center",
+		position: "absolute",
+		right: spacing.lg,
+		top: spacing.xl,
+		width: 44,
+		zIndex: 1,
+	},
+	videoModalBackdrop: {
+		alignItems: "center",
+		backgroundColor: "rgba(0, 0, 0, 0.94)",
+		flex: 1,
+		justifyContent: "center",
+		padding: spacing.lg,
+	},
 	singleCardMedia: {
 		height: 112,
 		marginTop: 0,
@@ -387,11 +729,13 @@ const styles = StyleSheet.create({
 		alignItems: "center",
 		backgroundColor: "rgba(21, 24, 39, 0.72)",
 		borderRadius: 999,
-		bottom: spacing.xs,
 		flexDirection: "row",
 		gap: 2,
 		paddingHorizontal: spacing.sm,
 		paddingVertical: 3,
+	},
+	videoBadgeAnchor: {
+		bottom: spacing.xs,
 		position: "absolute",
 		right: spacing.xs,
 	},

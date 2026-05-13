@@ -58,7 +58,11 @@ export function DiaryEntryCard({
 							todayDate={todayDate}
 						/>
 					</View>
-					<DiaryMediaPreview media={entry.media} variant="singleCard" />
+					<DiaryMediaPreview
+						media={entry.media}
+						onMediaPress={() => onPress(entry)}
+						variant="singleCard"
+					/>
 				</View>
 			) : (
 				<>
@@ -67,7 +71,12 @@ export function DiaryEntryCard({
 						onMorePress={onMorePress}
 						todayDate={todayDate}
 					/>
-					{entry.media.length > 1 ? <DiaryMediaPreview media={entry.media} /> : null}
+					{entry.media.length > 1 ? (
+						<DiaryMediaPreview
+							media={entry.media}
+							onMediaPress={() => onPress(entry)}
+						/>
+					) : null}
 				</>
 			)}
 		</Pressable>

@@ -57,6 +57,7 @@ module.exports = ({ config }) => {
 				},
 			],
 			"expo-sqlite",
+			"expo-video",
 		],
 	};
 };

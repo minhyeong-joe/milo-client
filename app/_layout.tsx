@@ -27,6 +27,7 @@ export default function RootLayout() {
                   <Stack.Screen name="baby/growth" />
                   <Stack.Screen name="diary/[diaryId]" />
                   <Stack.Screen name="diary/add" />
+                  <Stack.Screen name="diary/edit" />
                   <Stack.Screen name="routine/add-diaper" />
                   <Stack.Screen name="routine/add-meal" />
                   <Stack.Screen name="routine/add-sleep" />

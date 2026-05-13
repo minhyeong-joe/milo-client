@@ -50,9 +50,12 @@ type DiaryEntryFormSubmitInput = {
 	tagIds: string[];
 };
 
-type UploadedDiaryMedia = DiaryMediaInput & {
+export type UploadedDiaryMedia = DiaryMediaInput & {
+	isNew?: boolean;
 	localUri: string;
+	mediaUrl?: string | null;
 	thumbnailLocalUri?: string | null;
+	thumbnailUrl?: string | null;
 };
 
 type PendingMediaUpload = {
@@ -235,11 +238,26 @@ export function DiaryEntryForm({
 			content: trimmedContent,
 			diaryDate: toDateKey(date),
 			media: uploadedMedia.map(
-				({ localUri: _localUri, thumbnailLocalUri: _thumbnailLocalUri, ...media }) =>
+				({
+					isNew: _isNew,
+					localUri: _localUri,
+					mediaUrl: _mediaUrl,
+					thumbnailLocalUri: _thumbnailLocalUri,
+					thumbnailUrl: _thumbnailUrl,
+					...media
+				}) =>
 					media,
 			),
 			tagIds: selectedTags.map((tag) => tag.id),
 		});
+	};
+
+	const handleCancel = async () => {
+		if (babyId) {
+			await cleanupNewMediaUploads(babyId, uploadedMedia);
+		}
+
+		onCancel();
 	};
 
 	const selectTag = (tag: DiaryTag) => {
@@ -340,6 +358,7 @@ export function DiaryEntryForm({
 				nextMedia.push({
 					description: null,
 					fileType: pendingUpload.fileType,
+					isNew: true,
 					localUri: pendingUpload.localUri,
 					objectKey: upload.objectKey,
 					sizeBytes: pendingUpload.sizeBytes,
@@ -395,7 +414,7 @@ export function DiaryEntryForm({
 		);
 		setMediaError(null);
 
-		if (!babyId) {
+		if (!babyId || !removedMedia?.isNew) {
 			return;
 		}
 
@@ -585,7 +604,7 @@ export function DiaryEntryForm({
 				) : null}
 
 				<View style={[styles.footerRow, { marginBottom: footerBottomPadding }]}>
-					<Pressable onPress={onCancel} style={[styles.footerButton, styles.secondaryButton]}>
+					<Pressable onPress={() => void handleCancel()} style={[styles.footerButton, styles.secondaryButton]}>
 						<Text style={styles.secondaryButtonText}>Cancel</Text>
 					</Pressable>
 					<Pressable
@@ -752,6 +771,25 @@ function getMediaErrorMessage(error: unknown) {
 	return "Could not upload diary media.";
 }
 
+async function cleanupNewMediaUploads(babyId: string, media: UploadedDiaryMedia[]) {
+	await Promise.all(
+		media
+			.filter((item) => item.isNew)
+			.flatMap((item) => [item.objectKey, item.thumbnailObjectKey].filter(isString))
+			.map(async (objectKey) => {
+				try {
+					await removeDiaryMediaUpload(babyId, { objectKey });
+				} catch (error) {
+					console.warn("Could not cleanup unsaved diary media.", error);
+				}
+			}),
+	);
+}
+
+function isString(value: string | null | undefined): value is string {
+	return typeof value === "string" && value.length > 0;
+}
+
 function getMediaKind(fileType: string) {
 	if (isDiaryPhotoContentType(fileType)) {
 		return "photo";
@@ -813,12 +851,14 @@ function toMediaPreviewItem(media: UploadedDiaryMedia): DiaryMediaPreviewItem {
 		description: media.description ?? null,
 		fileType: media.fileType,
 		localUri: media.localUri,
+		mediaUrl: media.mediaUrl ?? null,
 		objectKey: media.objectKey,
 		sizeBytes: media.sizeBytes,
 		thumbnailFileType: media.thumbnailFileType ?? null,
 		thumbnailLocalUri: media.thumbnailLocalUri,
 		thumbnailObjectKey: media.thumbnailObjectKey ?? null,
 		thumbnailSizeBytes: media.thumbnailSizeBytes ?? null,
+		thumbnailUrl: media.thumbnailUrl ?? null,
 	};
 }
 
