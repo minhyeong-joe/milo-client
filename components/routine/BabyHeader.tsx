@@ -38,8 +38,6 @@ export function BabyHeader({
 }) {
 	const router = useRouter();
 	const [isSelectorOpen, setIsSelectorOpen] = useState(false);
-	const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
-	const [isAvatarPreviewOpen, setIsAvatarPreviewOpen] = useState(false);
 	const currentDate = new Date();
 
 	const handleSelectBaby = (babyId: string) => {
@@ -53,7 +51,9 @@ export function BabyHeader({
 				<Pressable
 					accessibilityRole="button"
 					accessibilityLabel="Open baby profile actions"
-					onPress={() => setIsProfileModalOpen(true)}
+					onPress={() => {
+						router.push("/baby/edit-profile")}
+					}
 				>
 					<BabyAvatar baby={baby} />
 				</Pressable>
@@ -138,76 +138,6 @@ export function BabyHeader({
 					</Pressable>
 				</Pressable>
 			</Modal>
-			<Modal
-				animationType="fade"
-				onRequestClose={() => setIsProfileModalOpen(false)}
-				transparent
-				visible={isProfileModalOpen}
-			>
-				<Pressable
-					accessibilityRole="button"
-					onPress={() => setIsProfileModalOpen(false)}
-					style={styles.profileModalBackdrop}
-				>
-					<Pressable style={[globalStyles.shadowCard, styles.profilePanel]}>
-						<Pressable
-							accessibilityRole="button"
-							onPress={() => {
-								if (baby.avatarUrl) {
-									setIsAvatarPreviewOpen(true);
-								}
-							}}
-							style={styles.largeAvatarButton}
-						>
-							<Image
-								source={baby.avatarUrl ? { uri: baby.avatarUrl } : fallbackBabyAvatar}
-								style={styles.largeAvatar}
-							/>
-						</Pressable>
-						<Pressable
-							accessibilityRole="button"
-							onPress={() => {
-								setIsProfileModalOpen(false);
-								router.push("/baby/edit-profile");
-							}}
-							style={styles.profileActionButton}
-						>
-							<Text style={styles.profileActionText}>
-								<Ionicons name="person-circle-outline" size={20} />
-								{" "} Edit Profile</Text>
-						</Pressable>
-						<Pressable
-							accessibilityRole="button"
-							onPress={() => {
-								setIsProfileModalOpen(false);
-								router.push("/baby/growth");
-							}}
-							style={styles.profileActionButton}
-						>
-							<Text style={styles.profileActionText}>
-								<Ionicons name="analytics-outline" size={20} />
-								{" "} Growth Entries
-							</Text>
-						</Pressable>
-					</Pressable>
-				</Pressable>
-			</Modal>
-			<Modal
-				animationType="fade"
-				onRequestClose={() => setIsAvatarPreviewOpen(false)}
-				transparent
-				visible={isAvatarPreviewOpen}
-			>
-				<Pressable
-					accessibilityRole="button"
-					onPress={() => setIsAvatarPreviewOpen(false)}
-					style={styles.avatarPreviewBackdrop}
-				>
-					{baby.avatarUrl ? (
-						<Image source={{ uri: baby.avatarUrl }} style={styles.avatarPreviewImage} />
-					) : null}
-				</Pressable>
-			</Modal>
 		</View>
 	);
 }
@@ -255,17 +185,6 @@ const styles = StyleSheet.create({
 	},
 	profileRow: {
 		gap: spacing.md,
-	},
-	largeAvatar: {
-		borderColor: colors.light.border,
-		borderRadius: 72,
-		borderWidth: 1,
-		height: 144,
-		width: 144,
-	},
-	largeAvatarButton: {
-		alignItems: "center",
-		gap: spacing.sm,
 	},
 	modalBackdrop: {
 		backgroundColor: "rgba(21, 24, 39, 0.22)",
@@ -317,34 +236,5 @@ const styles = StyleSheet.create({
 		paddingHorizontal: spacing.md,
 		paddingVertical: spacing.sm,
 		textTransform: "uppercase",
-	},
-	profileActionButton: {
-		alignItems: "center",
-		backgroundColor: colors.light.primary,
-		borderRadius: 12,
-		paddingVertical: 14,
-		width: "100%",
-	},
-	profileActionText: {
-		color: colors.light.surface,
-		fontSize: 15,
-		fontWeight: "800",
-	},
-	profileModalBackdrop: {
-		alignItems: "center",
-		backgroundColor: "rgba(21, 24, 39, 0.32)",
-		flex: 1,
-		justifyContent: "center",
-		padding: spacing.lg,
-	},
-	profilePanel: {
-		alignItems: "center",
-		backgroundColor: colors.light.surface,
-		borderColor: colors.light.border,
-		borderRadius: 16,
-		borderWidth: 1,
-		gap: spacing.md,
-		padding: spacing.lg,
-		width: "100%",
 	},
 });
