@@ -104,6 +104,7 @@ export default function AddDiaryScreen() {
 		diaryDate: string;
 		media: Parameters<typeof createDiaryEntry>[1]["media"];
 		tagIds: string[];
+		title: string | null;
 	}) => {
 		if (!selectedBaby) {
 			setError("Choose a baby before saving a diary entry.");
@@ -119,6 +120,7 @@ export default function AddDiaryScreen() {
 				diaryDate: input.diaryDate,
 				media: input.media,
 				tagIds: input.tagIds,
+				title: input.title,
 			});
 			replaceDiaryEntryInCache(selectedBaby.id, response.diaryEntry);
 			router.back();

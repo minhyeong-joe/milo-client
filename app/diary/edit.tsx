@@ -115,6 +115,7 @@ export default function EditDiaryScreen() {
 		diaryDate: string;
 		media: DiaryMediaInput[];
 		tagIds: string[];
+		title: string | null;
 	}) => {
 		if (!selectedBaby || !entry) {
 			setError("Choose a baby before saving this diary entry.");
@@ -130,6 +131,7 @@ export default function EditDiaryScreen() {
 				diaryDate: input.diaryDate,
 				media: input.media,
 				tagIds: input.tagIds,
+				title: input.title,
 			});
 			await cleanupRemovedPersistedMedia(selectedBaby.id, entry.media, input.media);
 			replaceDiaryEntryInCache(selectedBaby.id, response.diaryEntry);
@@ -170,6 +172,7 @@ export default function EditDiaryScreen() {
 					initialDate={dateFromKey(entry.diaryDate)}
 					initialMedia={entry.media.map(toUploadedDiaryMedia)}
 					initialSelectedTags={entry.tags}
+					initialTitle={entry.title}
 					isCreatingTag={isCreatingTag}
 					isSaving={isSaving}
 					isSearchingTags={isSearchingTags}
@@ -215,6 +218,7 @@ function toUploadedDiaryMedia(media: DiaryEntry["media"][number]): UploadedDiary
 		mediaUrl: media.mediaUrl,
 		objectKey: media.objectKey,
 		sizeBytes: media.sizeBytes,
+		sortOrder: media.sortOrder,
 		thumbnailFileType: media.thumbnailFileType,
 		thumbnailLocalUri: null,
 		thumbnailObjectKey: media.thumbnailObjectKey,

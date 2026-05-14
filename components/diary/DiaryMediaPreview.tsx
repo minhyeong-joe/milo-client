@@ -53,12 +53,13 @@ export function DiaryMediaPreview({
 	const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
 	const [selectedVideoUri, setSelectedVideoUri] = useState<string | null>(null);
 	const [selectedGalleryIndex, setSelectedGalleryIndex] = useState<number | null>(null);
+	const cardVisibleMediaLimit = useCardVisibleMediaLimit(media, variant);
 
 	if (media.length === 0) {
 		return null;
 	}
 
-	const limit = getVisibleMediaLimit(variant);
+	const limit = cardVisibleMediaLimit ?? getVisibleMediaLimit(variant);
 	const visibleMedia = limit ? media.slice(0, limit) : media;
 	const hiddenCount = limit ? Math.max(media.length - visibleMedia.length, 0) : 0;
 	const content = (
@@ -138,6 +139,101 @@ export function DiaryMediaPreview({
 	);
 }
 
+export function DiaryHeroCarousel({ media }: { media: DiaryMediaPreviewItem[] }) {
+	const [activeIndex, setActiveIndex] = useState(0);
+	const [selectedGalleryIndex, setSelectedGalleryIndex] = useState<number | null>(null);
+	const { width } = useWindowDimensions();
+	const heroWidth = Math.max(width - spacing.md * 2, 280);
+
+	if (media.length === 0) {
+		return null;
+	}
+
+	const handleMomentumScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+		const nextIndex = Math.round(event.nativeEvent.contentOffset.x / heroWidth);
+
+		if (nextIndex >= 0 && nextIndex < media.length) {
+			setActiveIndex(nextIndex);
+		}
+	};
+
+	return (
+		<View style={styles.heroWrap}>
+			<ScrollView
+				horizontal
+				onMomentumScrollEnd={handleMomentumScrollEnd}
+				pagingEnabled
+				scrollEventThrottle={16}
+				showsHorizontalScrollIndicator={false}
+				style={styles.heroPager}
+			>
+				{media.map((item, index) => (
+					<Pressable
+						accessibilityRole="imagebutton"
+						key={item.id ?? item.objectKey}
+						onPress={() => setSelectedGalleryIndex(index)}
+						style={[styles.heroPage, { width: heroWidth }]}
+					>
+						<HeroMedia item={item} />
+						<View style={styles.heroCountBadge}>
+							<Text style={styles.heroCountText}>
+								{index + 1} / {media.length}
+							</Text>
+						</View>
+					</Pressable>
+				))}
+			</ScrollView>
+			{media.length > 1 ? (
+				<View style={styles.heroDots}>
+					{media.map((item, index) => (
+						<View
+							key={item.id ?? item.objectKey}
+							style={[
+								styles.heroDot,
+								index === activeIndex && styles.heroDotActive,
+							]}
+						/>
+					))}
+				</View>
+			) : null}
+			{selectedGalleryIndex !== null ? (
+				<FullscreenMediaGallery
+					index={selectedGalleryIndex}
+					media={media}
+					onClose={() => setSelectedGalleryIndex(null)}
+					onIndexChange={(index) => {
+						setActiveIndex(index);
+						setSelectedGalleryIndex(index);
+					}}
+				/>
+			) : null}
+		</View>
+	);
+}
+
+function HeroMedia({ item }: { item: DiaryMediaPreviewItem }) {
+	const imageUri = getMediaPreviewUri(item);
+
+	return (
+		<View style={styles.heroMedia}>
+			{imageUri ? (
+				<Image source={{ uri: imageUri }} style={styles.heroImage} />
+			) : (
+				<Ionicons
+					color={colors.light.textSecondary}
+					name={isVideo(item.fileType) ? "play-circle-outline" : "image-outline"}
+					size={42}
+				/>
+			)}
+			{isVideo(item.fileType) ? (
+				<View style={styles.heroPlayBadge}>
+					<Ionicons color={colors.light.surface} name="play" size={24} />
+				</View>
+			) : null}
+		</View>
+	);
+}
+
 function MediaTile({
 	index,
 	item,
@@ -157,9 +253,7 @@ function MediaTile({
 	onRemove?: (objectKey: string) => void;
 	variant: NonNullable<DiaryMediaPreviewProps["variant"]>;
 }) {
-	const imageUri = !isVideo(item.fileType)
-		? item.mediaUrl ?? item.localUri ?? null
-		: item.thumbnailUrl ?? item.thumbnailLocalUri ?? null;
+	const imageUri = getMediaPreviewUri(item);
 	const ratio = useImageRatio(imageUri);
 	const ratioBucket = getImageRatioBucket(ratio);
 	const tileStyle = useMemo(
@@ -357,6 +451,14 @@ function FullscreenMediaContent({
 	);
 }
 
+function getMediaPreviewUri(item: DiaryMediaPreviewItem) {
+	if (isVideo(item.fileType)) {
+		return item.thumbnailUrl ?? item.thumbnailLocalUri ?? null;
+	}
+
+	return item.mediaUrl ?? item.localUri ?? null;
+}
+
 function FullscreenVideo({ isActive, uri }: { isActive: boolean; uri: string }) {
 	const player = useVideoPlayer(uri, (playerInstance) => {
 		playerInstance.loop = false;
@@ -486,6 +588,76 @@ function getVisibleMediaLimit(variant: NonNullable<DiaryMediaPreviewProps["varia
 	}
 
 	return null;
+}
+
+function useCardVisibleMediaLimit(
+	media: DiaryMediaPreviewItem[],
+	variant: NonNullable<DiaryMediaPreviewProps["variant"]>,
+) {
+	const firstThreeMedia = useMemo(() => media.slice(0, 3), [media]);
+	const firstThreeKey = useMemo(
+		() => firstThreeMedia.map((item) => item.id ?? item.objectKey).join("|"),
+		[firstThreeMedia],
+	);
+	const [firstThreeRatios, setFirstThreeRatios] = useState<Record<string, number | null>>({});
+
+	useEffect(() => {
+		if (variant !== "card" || firstThreeMedia.length < 3) {
+			setFirstThreeRatios({});
+			return;
+		}
+
+		let isMounted = true;
+		const nextRatios: Record<string, number | null> = {};
+
+		firstThreeMedia.forEach((item) => {
+			const key = item.id ?? item.objectKey;
+			const uri = getMediaPreviewUri(item);
+
+			if (!uri) {
+				nextRatios[key] = null;
+				if (Object.keys(nextRatios).length === firstThreeMedia.length && isMounted) {
+					setFirstThreeRatios({ ...nextRatios });
+				}
+				return;
+			}
+
+			Image.getSize(
+				uri,
+				(width, height) => {
+					nextRatios[key] = width > 0 && height > 0 ? width / height : null;
+					if (Object.keys(nextRatios).length === firstThreeMedia.length && isMounted) {
+						setFirstThreeRatios({ ...nextRatios });
+					}
+				},
+				() => {
+					nextRatios[key] = null;
+					if (Object.keys(nextRatios).length === firstThreeMedia.length && isMounted) {
+						setFirstThreeRatios({ ...nextRatios });
+					}
+				},
+			);
+		});
+
+		return () => {
+			isMounted = false;
+		};
+	}, [firstThreeKey, firstThreeMedia, variant]);
+
+	if (variant !== "card") {
+		return null;
+	}
+
+	if (media.length < 3) {
+		return 2;
+	}
+
+	const allFirstThreePortrait = firstThreeMedia.every((item) => {
+		const ratio = firstThreeRatios[item.id ?? item.objectKey];
+		return typeof ratio === "number" && ratio < 1;
+	});
+
+	return allFirstThreePortrait ? 3 : 2;
 }
 
 function isVideo(fileType: string) {
@@ -663,6 +835,74 @@ const styles = StyleSheet.create({
 	},
 	galleryPreviousButton: {
 		left: spacing.md,
+	},
+	heroCountBadge: {
+		backgroundColor: "rgba(21, 24, 39, 0.72)",
+		borderRadius: 999,
+		paddingHorizontal: spacing.sm,
+		paddingVertical: spacing.xs,
+		position: "absolute",
+		right: spacing.md,
+		top: spacing.md,
+	},
+	heroCountText: {
+		...typography.caption,
+		color: colors.light.surface,
+		fontWeight: "700",
+	},
+	heroDot: {
+		backgroundColor: colors.light.border,
+		borderRadius: 999,
+		height: 7,
+		width: 7,
+	},
+	heroDotActive: {
+		backgroundColor: colors.light.primary,
+		width: 18,
+	},
+	heroDots: {
+		alignItems: "center",
+		flexDirection: "row",
+		gap: spacing.xs,
+		justifyContent: "center",
+		marginTop: spacing.sm,
+	},
+	heroImage: {
+		height: "100%",
+		resizeMode: "cover",
+		width: "100%",
+	},
+	heroMedia: {
+		alignItems: "center",
+		backgroundColor: "#F7F8FC",
+		borderColor: colors.light.border,
+		borderRadius: 24,
+		borderWidth: 1,
+		height: 300,
+		justifyContent: "center",
+		overflow: "hidden",
+		width: "100%",
+	},
+	heroPage: {
+		paddingHorizontal: 0,
+		position: "relative",
+	},
+	heroPager: {
+		borderRadius: 24,
+	},
+	heroPlayBadge: {
+		alignItems: "center",
+		backgroundColor: "rgba(21, 24, 39, 0.72)",
+		borderRadius: 999,
+		bottom: spacing.lg,
+		height: 58,
+		justifyContent: "center",
+		left: spacing.lg,
+		position: "absolute",
+		width: 58,
+	},
+	heroWrap: {
+		marginTop: spacing.md,
 	},
 	imageModalBackdrop: {
 		alignItems: "center",

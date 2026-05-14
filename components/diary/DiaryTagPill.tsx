@@ -22,11 +22,11 @@ const styles = StyleSheet.create({
 	pill: {
 		alignSelf: "flex-start",
 		borderRadius: 999,
-		paddingHorizontal: spacing.sm,
+		paddingHorizontal: spacing.md,
 		paddingVertical: spacing.xs,
 	},
 	text: {
 		...typography.caption,
-		fontSize: 11,
+		fontSize: 14,
 	},
 });

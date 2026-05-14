@@ -20,6 +20,7 @@ export type DiaryMedia = {
 	mediaUrlExpiresAt: string | null;
 	objectKey: string;
 	sizeBytes: number;
+	sortOrder: number;
 	thumbnailFileType: string | null;
 	thumbnailObjectKey: string | null;
 	thumbnailSizeBytes: number | null;
@@ -43,6 +44,7 @@ export type DiaryEntry = {
 	id: string;
 	media: DiaryMedia[];
 	tags: DiaryTag[];
+	title: string | null;
 	updatedAt: string;
 	updatedBy?: DiaryEntryUser | null;
 	updatedById: string;
@@ -58,6 +60,7 @@ export type DiaryMediaInput = {
 	fileType: string;
 	objectKey: string;
 	sizeBytes: number;
+	sortOrder?: number;
 	thumbnailFileType?: string | null;
 	thumbnailObjectKey?: string | null;
 	thumbnailSizeBytes?: number | null;
@@ -68,6 +71,7 @@ export type CreateDiaryEntryInput = {
 	diaryDate: string;
 	media?: DiaryMediaInput[];
 	tagIds?: string[];
+	title?: string | null;
 };
 
 export type UpdateDiaryEntryInput = Partial<CreateDiaryEntryInput>;

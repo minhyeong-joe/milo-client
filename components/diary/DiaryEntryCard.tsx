@@ -52,11 +52,7 @@ export function DiaryEntryCard({
 			{hasSingleMedia ? (
 				<View style={styles.singleMediaLayout}>
 					<View style={styles.singleMediaTextColumn}>
-						<CardTextContent
-							entry={entry}
-							onMorePress={onMorePress}
-							todayDate={todayDate}
-						/>
+						<CardTextContent entry={entry} />
 					</View>
 					<DiaryMediaPreview
 						media={entry.media}
@@ -66,11 +62,7 @@ export function DiaryEntryCard({
 				</View>
 			) : (
 				<>
-					<CardTextContent
-						entry={entry}
-						onMorePress={onMorePress}
-						todayDate={todayDate}
-					/>
+					<CardTextContent entry={entry} />
 					{entry.media.length > 1 ? (
 						<DiaryMediaPreview
 							media={entry.media}
@@ -83,17 +75,21 @@ export function DiaryEntryCard({
 	);
 }
 
-function CardTextContent({
-	entry,
-	onMorePress,
-	todayDate,
-}: {
-	entry: DiaryEntry;
-	onMorePress?: (entry: DiaryEntry) => void;
-	todayDate: string;
-}) {
+function CardTextContent({ entry }: { entry: DiaryEntry }) {
+	const title = entry.title?.trim();
+
 	return (
 		<>
+			{title ? (
+				<Text numberOfLines={2} style={styles.titleText}>
+					{title}
+				</Text>
+			) : null}
+
+			<Text numberOfLines={3} style={styles.contentText}>
+				{entry.content}
+			</Text>
+
 			{entry.tags.length > 0 ? (
 				<View style={styles.tagRow}>
 					{entry.tags.slice(0, 4).map((tag) => (
@@ -101,10 +97,6 @@ function CardTextContent({
 					))}
 				</View>
 			) : null}
-
-			<Text numberOfLines={3} style={styles.contentText}>
-				{entry.content}
-			</Text>
 		</>
 	);
 }
@@ -160,5 +152,12 @@ const styles = StyleSheet.create({
 		flexDirection: "row",
 		flexWrap: "wrap",
 		gap: spacing.sm,
+		marginTop: spacing.xs,
+	},
+	titleText: {
+		...typography.label,
+		color: colors.light.textPrimary,
+		fontSize: 16,
+		fontWeight: "800",
 	},
 });

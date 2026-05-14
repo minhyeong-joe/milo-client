@@ -39,6 +39,7 @@ import {
 import { colors, globalStyles, spacing, typography } from "@/styles/globalStyles";
 
 const MAX_CONTENT_LENGTH = 500;
+const MAX_TITLE_LENGTH = 80;
 const MIN_TAG_SEARCH_LENGTH = 3;
 const MAX_VISIBLE_TAG_SUGGESTIONS = 5;
 const TAG_SEARCH_DELAY_MS = 300;
@@ -48,6 +49,7 @@ type DiaryEntryFormSubmitInput = {
 	diaryDate: string;
 	media: DiaryMediaInput[];
 	tagIds: string[];
+	title: string | null;
 };
 
 export type UploadedDiaryMedia = DiaryMediaInput & {
@@ -79,6 +81,7 @@ type DiaryEntryFormProps = {
 	initialDate?: Date;
 	initialMedia?: UploadedDiaryMedia[];
 	initialSelectedTags?: DiaryTag[];
+	initialTitle?: string | null;
 	isCreatingTag?: boolean;
 	isSaving?: boolean;
 	isSearchingTags?: boolean;
@@ -97,6 +100,7 @@ export function DiaryEntryForm({
 	initialDate = new Date(),
 	initialMedia = [],
 	initialSelectedTags = [],
+	initialTitle = "",
 	isCreatingTag = false,
 	isSaving = false,
 	isSearchingTags = false,
@@ -112,6 +116,7 @@ export function DiaryEntryForm({
 	const tagsCardYRef = useRef(0);
 	const [content, setContent] = useState(initialContent);
 	const [date, setDate] = useState(initialDate);
+	const [title, setTitle] = useState(initialTitle ?? "");
 	const [showDatePicker, setShowDatePicker] = useState(false);
 	const [selectedTags, setSelectedTags] = useState<DiaryTag[]>(initialSelectedTags);
 	const [tagInput, setTagInput] = useState("");
@@ -128,6 +133,7 @@ export function DiaryEntryForm({
 	} | null>(null);
 
 	const trimmedContent = content.trim();
+	const trimmedTitle = title.trim();
 	const trimmedTagInput = tagInput.trim();
 	const canSubmit = trimmedContent.length > 0 && trimmedContent.length <= MAX_CONTENT_LENGTH;
 	const footerBottomPadding = Math.max(insets.bottom, 12);
@@ -245,10 +251,13 @@ export function DiaryEntryForm({
 					thumbnailLocalUri: _thumbnailLocalUri,
 					thumbnailUrl: _thumbnailUrl,
 					...media
-				}) =>
-					media,
+				}, index) => ({
+					...media,
+					sortOrder: index,
+				}),
 			),
 			tagIds: selectedTags.map((tag) => tag.id),
+			title: trimmedTitle.length > 0 ? trimmedTitle : null,
 		});
 	};
 
@@ -338,7 +347,7 @@ export function DiaryEntryForm({
 			const nextMedia: UploadedDiaryMedia[] = [];
 			setMediaUploadProgress({ completed: 0, total: pendingUploads.length });
 
-			for (const pendingUpload of pendingUploads) {
+			for (const [index, pendingUpload] of pendingUploads.entries()) {
 				const upload = await createDiaryMediaUpload(babyId, {
 					fileType: pendingUpload.fileType,
 					sizeBytes: pendingUpload.sizeBytes,
@@ -362,6 +371,7 @@ export function DiaryEntryForm({
 					localUri: pendingUpload.localUri,
 					objectKey: upload.objectKey,
 					sizeBytes: pendingUpload.sizeBytes,
+					sortOrder: uploadedMedia.length + index,
 				});
 				const uploadedItem = nextMedia[nextMedia.length - 1];
 
@@ -464,6 +474,23 @@ export function DiaryEntryForm({
 							value={date}
 						/>
 					) : null}
+				</View>
+
+				<View style={globalStyles.card}>
+					<View style={styles.labelRow}>
+						<Text style={styles.label}>Title</Text>
+						<Text style={styles.countText}>
+							{title.length}/{MAX_TITLE_LENGTH}
+						</Text>
+					</View>
+					<TextInput
+						maxLength={MAX_TITLE_LENGTH}
+						onChangeText={setTitle}
+						placeholder="Give this memory a title"
+						placeholderTextColor={colors.light.textSecondary}
+						style={styles.titleInput}
+						value={title}
+					/>
 				</View>
 
 				<View style={globalStyles.card}>
@@ -1023,6 +1050,15 @@ const styles = StyleSheet.create({
 		color: colors.light.textPrimary,
 		marginTop: spacing.sm,
 		minHeight: 150,
+		padding: spacing.md,
+	},
+	titleInput: {
+		...typography.body,
+		borderColor: colors.light.border,
+		borderRadius: 12,
+		borderWidth: 1,
+		color: colors.light.textPrimary,
+		marginTop: spacing.sm,
 		padding: spacing.md,
 	},
 	uploadProgressFill: {

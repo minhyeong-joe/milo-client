@@ -1,5 +1,5 @@
 import { DiaryActionsModal } from "@/components/diary/DiaryActionsModal";
-import { DiaryMediaPreview } from "@/components/diary/DiaryMediaPreview";
+import { DiaryHeroCarousel } from "@/components/diary/DiaryMediaPreview";
 import { DiaryTagPill } from "@/components/diary/DiaryTagPill";
 import { ConfirmDeleteModal } from "@/components/routine/ConfirmDeleteModal";
 import { useBabySelection } from "@/context/BabySelectionContext";
@@ -85,9 +85,13 @@ export default function DiaryDetailScreen() {
 					style={styles.dateButton}
 				>
 					<Text style={styles.headerTitle}>
-						{entry ? formatDateLabel(entry.diaryDate) : "Diary"}
+						{entry ? formatHeaderDate(entry.diaryDate) : "Diary"}
 					</Text>
-					<Ionicons color={colors.light.textSecondary} name="information-circle-outline" size={16} />
+					{entry ? (
+						<Text style={styles.headerSubtitle}>
+							{formatHeaderSubtitle(entry.diaryDate, selectedBaby?.birthdate)}
+						</Text>
+					) : null}
 				</Pressable>
 				<Pressable
 					accessibilityLabel="Diary actions"
@@ -102,22 +106,39 @@ export default function DiaryDetailScreen() {
 			<ScrollView contentContainerStyle={[globalStyles.scrollContent, styles.content]}>
 				{entry ? (
 					<>
-						<View style={[globalStyles.card, globalStyles.shadowCard, styles.detailCard]}>
-							{entry.tags.length > 0 ? (
-								<View style={styles.tagRow}>
-									{entry.tags.map((tag) => (
-										<DiaryTagPill key={tag.id} tag={tag} />
-									))}
-								</View>
-							) : null}
-
-							<Text style={styles.contentText}>{entry.content}</Text>
-						</View>
 						{entry.media.length > 0 ? (
-							<View style={styles.mediaSection}>
-								<DiaryMediaPreview media={entry.media} variant="detail" />
-							</View>
+							<DiaryHeroCarousel media={entry.media} />
 						) : null}
+						<View style={[globalStyles.card, globalStyles.shadowCard, styles.storyCard]}>
+							
+							<View style={styles.storyHeaderRow}>
+								<View style={styles.quoteBadge}>
+									<Text style={styles.quoteText}>“</Text>
+								</View>
+								<View style={styles.storyHeaderText}>
+									{entry.title?.trim() ? (
+										<Text style={styles.storyTitle}>{entry.title.trim()}</Text>
+									) : null}
+									<Text style={styles.contentText}>{entry.content}</Text>
+								</View>
+							</View>
+						</View>
+						{entry.tags.length > 0 ? (
+										<View style={styles.tagRow}>
+											{entry.tags.map((tag) => (
+												<DiaryTagPill key={tag.id} tag={tag} />
+											))}
+										</View>
+									) : null}
+						<View style={[globalStyles.card, styles.aiCard]}>
+							<View style={styles.aiHeader}>
+								<Ionicons color={colors.light.primary} name="sparkles" size={22} />
+								<Text style={styles.aiTitle}>AI Reflection</Text>
+							</View>
+							<Text style={styles.aiText}>
+								A gentle reflection will appear here after AI diary insights are added.
+							</Text>
+						</View>
 					</>
 				) : (
 					<View style={globalStyles.card}>
@@ -207,15 +228,68 @@ function formatDateTime(value: string) {
 	}).format(date);
 }
 
-function formatDateLabel(dateKey: string) {
+function formatHeaderDate(dateKey: string) {
 	const [year, month, day] = dateKey.split("-").map(Number);
 	const date = new Date(year, month - 1, day);
 	return new Intl.DateTimeFormat(undefined, {
 		day: "numeric",
 		month: "long",
-		weekday: "long",
 		year: "numeric",
 	}).format(date);
+}
+
+function formatHeaderSubtitle(dateKey: string, birthdate?: string) {
+	const [year, month, day] = dateKey.split("-").map(Number);
+	const entryDate = new Date(year, month - 1, day);
+	const weekday = new Intl.DateTimeFormat(undefined, { weekday: "long" }).format(entryDate);
+	const ageLabel = birthdate ? formatBabyAgeAtDate(birthdate, dateKey) : null;
+
+	return ageLabel ? `${weekday} · ${ageLabel}` : weekday;
+}
+
+function formatBabyAgeAtDate(birthdate: string, dateKey: string) {
+	const [birthYear, birthMonth, birthDay] = birthdate.split("-").map(Number);
+	const [entryYear, entryMonth, entryDay] = dateKey.split("-").map(Number);
+	const birthDate = new Date(birthYear, birthMonth - 1, birthDay);
+	const entryDate = new Date(entryYear, entryMonth - 1, entryDay);
+
+	if (Number.isNaN(birthDate.getTime()) || Number.isNaN(entryDate.getTime())) {
+		return null;
+	}
+
+	let months =
+		(entryDate.getFullYear() - birthDate.getFullYear()) * 12 +
+		entryDate.getMonth() -
+		birthDate.getMonth();
+	let anchorDate = new Date(
+		birthDate.getFullYear(),
+		birthDate.getMonth() + months,
+		birthDate.getDate(),
+	);
+
+	if (anchorDate > entryDate) {
+		months -= 1;
+		anchorDate = new Date(
+			birthDate.getFullYear(),
+			birthDate.getMonth() + months,
+			birthDate.getDate(),
+		);
+	}
+
+	const days = Math.max(
+		0,
+		Math.floor((entryDate.getTime() - anchorDate.getTime()) / (24 * 60 * 60 * 1000)),
+	);
+
+	if (months <= 0) {
+		return `${days} ${days === 1 ? "day" : "days"} old`;
+	}
+
+	if (days === 0) {
+		return `${months} ${months === 1 ? "month" : "months"} old`;
+	}
+
+	return `${months} ${months === 1 ? "month" : "months"} · ${days} ${days === 1 ? "day" : "days"} old`;
 }
 
 function formatUser(
@@ -250,14 +324,10 @@ const styles = StyleSheet.create({
 	},
 	dateButton: {
 		alignItems: "center",
-		flexDirection: "row",
 		flex: 1,
 		gap: spacing.xs,
 		justifyContent: "center",
 		minWidth: 0,
-	},
-	detailCard: {
-		gap: spacing.md,
 	},
 	header: {
 		alignItems: "center",
@@ -272,14 +342,38 @@ const styles = StyleSheet.create({
 		flexShrink: 1,
 		textAlign: "center",
 	},
+	headerSubtitle: {
+		...typography.caption,
+		color: colors.light.textSecondary,
+		textAlign: "center",
+	},
 	iconButton: {
 		alignItems: "center",
 		height: 44,
 		justifyContent: "center",
 		width: 44,
 	},
-	mediaSection: {
+	aiCard: {
+		backgroundColor: "#F8F3FF",
+		borderColor: "#ECE0FF",
+		borderWidth: 1,
+		gap: spacing.sm,
 		marginTop: spacing.md,
+	},
+	aiHeader: {
+		alignItems: "center",
+		flexDirection: "row",
+		gap: spacing.sm,
+	},
+	aiText: {
+		...typography.body,
+		color: colors.light.textPrimary,
+		lineHeight: 22,
+	},
+	aiTitle: {
+		...typography.label,
+		color: colors.light.primary,
+		fontWeight: "800",
 	},
 	metadataBackdrop: {
 		alignItems: "center",
@@ -313,6 +407,39 @@ const styles = StyleSheet.create({
 	sectionLabel: {
 		...typography.label,
 		color: colors.light.textPrimary,
+	},
+	quoteBadge: {
+		alignItems: "center",
+		backgroundColor: "#F0E5FF",
+		borderRadius: 999,
+		height: 40,
+		justifyContent: "center",
+		width: 40,
+	},
+	quoteText: {
+		color: colors.light.primary,
+		fontSize: 34,
+		fontWeight: "800",
+		lineHeight: 50,
+	},
+	storyCard: {
+		gap: spacing.md,
+		marginTop: spacing.md,
+	},
+	storyHeaderRow: {
+		alignItems: "flex-start",
+		flexDirection: "row",
+		gap: spacing.md,
+	},
+	storyHeaderText: {
+		flex: 1,
+		gap: spacing.sm,
+	},
+	storyTitle: {
+		...typography.sectionTitle,
+		color: colors.light.textPrimary,
+		fontSize: 22,
+		lineHeight: 28,
 	},
 	tagRow: {
 		flexDirection: "row",
