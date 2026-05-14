@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -18,49 +18,35 @@ export default function AddDiaryScreen() {
 	const { replaceDiaryEntryInCache } = useDiaryCache();
 	const [error, setError] = useState<string | null>(null);
 	const [isCreatingTag, setIsCreatingTag] = useState(false);
+	const [isLoadingTags, setIsLoadingTags] = useState(false);
 	const [isSaving, setIsSaving] = useState(false);
-	const [isSearchingTags, setIsSearchingTags] = useState(false);
-	const [tagSuggestions, setTagSuggestions] = useState<DiaryTag[]>([]);
-	const tagSearchRequestId = useRef(0);
+	const [availableTags, setAvailableTags] = useState<DiaryTag[]>([]);
 
-	const handleSearchTags = useCallback(async (search: string) => {
+	const loadTags = useCallback(async () => {
 		if (!selectedBaby) {
-			setTagSuggestions([]);
+			setAvailableTags([]);
 			return;
 		}
 
-		const trimmedSearch = search.trim();
-		const requestId = tagSearchRequestId.current + 1;
-		tagSearchRequestId.current = requestId;
-
-		if (trimmedSearch.length < 3) {
-			setTagSuggestions([]);
-			setIsSearchingTags(false);
-			return;
-		}
-
-		setIsSearchingTags(true);
+		setIsLoadingTags(true);
 
 		try {
 			const response = await listTags({
 				babyId: selectedBaby.id,
-				search: trimmedSearch,
 			});
 
-			if (tagSearchRequestId.current === requestId) {
-				setTagSuggestions(response.tags);
-			}
+			setAvailableTags(response.tags);
 		} catch (caughtError) {
 			console.warn(caughtError);
-			if (tagSearchRequestId.current === requestId) {
-				setTagSuggestions([]);
-			}
+			setAvailableTags([]);
 		} finally {
-			if (tagSearchRequestId.current === requestId) {
-				setIsSearchingTags(false);
-			}
+			setIsLoadingTags(false);
 		}
 	}, [selectedBaby]);
+
+	useEffect(() => {
+		void loadTags();
+	}, [loadTags]);
 
 	const handleCreateTag = useCallback(async (name: string) => {
 		if (!selectedBaby) {
@@ -75,20 +61,18 @@ export default function AddDiaryScreen() {
 				name: trimmedName,
 				type: "custom",
 			});
-			setTagSuggestions((currentTags) => mergeTags(currentTags, [response.tag]));
+			setAvailableTags((currentTags) => mergeTags(currentTags, [response.tag]));
+			void loadTags();
 			return response.tag;
 		} catch (caughtError) {
 			if (caughtError instanceof ApiError && caughtError.code === "TAG_EXISTS") {
-				const response = await listTags({
-					babyId: selectedBaby.id,
-					search: trimmedName,
-				});
+				const response = await listTags({ babyId: selectedBaby.id });
+				setAvailableTags(response.tags);
 				const matchingTag = response.tags.find(
 					(tag) => normalizeTagName(tag.name) === normalizeTagName(trimmedName),
 				);
 
 				if (matchingTag) {
-					setTagSuggestions((currentTags) => mergeTags(currentTags, response.tags));
 					return matchingTag;
 				}
 			}
@@ -97,7 +81,7 @@ export default function AddDiaryScreen() {
 		} finally {
 			setIsCreatingTag(false);
 		}
-	}, [selectedBaby]);
+	}, [loadTags, selectedBaby]);
 
 	const handleSubmit = async (input: {
 		content: string;
@@ -148,17 +132,16 @@ export default function AddDiaryScreen() {
 
 			{selectedBaby ? (
 				<DiaryEntryForm
+					availableTags={availableTags}
 					babyId={selectedBaby.id}
 					error={error}
 					isCreatingTag={isCreatingTag}
+					isLoadingTags={isLoadingTags}
 					isSaving={isSaving}
-					isSearchingTags={isSearchingTags}
 					onCancel={() => router.back()}
 					onCreateTag={handleCreateTag}
-					onSearchTags={handleSearchTags}
 					onSubmit={handleSubmit}
 					submitLabel="Save"
-					tagSuggestions={tagSuggestions}
 				/>
 			) : (
 				<View style={globalStyles.screenContent}>

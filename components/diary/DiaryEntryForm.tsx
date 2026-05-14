@@ -40,9 +40,22 @@ import { colors, globalStyles, spacing, typography } from "@/styles/globalStyles
 
 const MAX_CONTENT_LENGTH = 500;
 const MAX_TITLE_LENGTH = 80;
-const MIN_TAG_SEARCH_LENGTH = 3;
-const MAX_VISIBLE_TAG_SUGGESTIONS = 5;
-const TAG_SEARCH_DELAY_MS = 300;
+
+type TagFilterKey = "milestone" | "emotion" | "event" | "custom";
+
+const TAG_FILTERS: { color: string; key: TagFilterKey; label: string }[] = [
+	{ color: "#F59E0B", key: "milestone", label: "Milestone" },
+	{ color: "#EC4899", key: "emotion", label: "Emotions" },
+	{ color: "#38BDF8", key: "event", label: "Events" },
+	{ color: "#64748B", key: "custom", label: "Custom" },
+];
+
+const DEFAULT_TAG_FILTERS: Record<TagFilterKey, boolean> = {
+	custom: true,
+	emotion: true,
+	event: true,
+	milestone: true,
+};
 
 type DiaryEntryFormSubmitInput = {
 	content: string;
@@ -83,14 +96,13 @@ type DiaryEntryFormProps = {
 	initialSelectedTags?: DiaryTag[];
 	initialTitle?: string | null;
 	isCreatingTag?: boolean;
+	isLoadingTags?: boolean;
 	isSaving?: boolean;
-	isSearchingTags?: boolean;
 	onCancel: () => void;
 	onCreateTag: (name: string) => Promise<DiaryTag>;
-	onSearchTags: (search: string) => void;
 	onSubmit: (input: DiaryEntryFormSubmitInput) => Promise<void> | void;
 	submitLabel?: string;
-	tagSuggestions: DiaryTag[];
+	availableTags: DiaryTag[];
 };
 
 export function DiaryEntryForm({
@@ -102,14 +114,13 @@ export function DiaryEntryForm({
 	initialSelectedTags = [],
 	initialTitle = "",
 	isCreatingTag = false,
+	isLoadingTags = false,
 	isSaving = false,
-	isSearchingTags = false,
 	onCancel,
 	onCreateTag,
-	onSearchTags,
 	onSubmit,
 	submitLabel = "Save",
-	tagSuggestions,
+	availableTags,
 }: DiaryEntryFormProps) {
 	const insets = useSafeAreaInsets();
 	const scrollViewRef = useRef<ScrollView | null>(null);
@@ -120,6 +131,9 @@ export function DiaryEntryForm({
 	const [showDatePicker, setShowDatePicker] = useState(false);
 	const [selectedTags, setSelectedTags] = useState<DiaryTag[]>(initialSelectedTags);
 	const [tagInput, setTagInput] = useState("");
+	const [tagFilters, setTagFilters] =
+		useState<Record<TagFilterKey, boolean>>(DEFAULT_TAG_FILTERS);
+	const [isTagPoolExpanded, setIsTagPoolExpanded] = useState(false);
 	const [validationError, setValidationError] = useState<string | null>(null);
 	const [tagError, setTagError] = useState<string | null>(null);
 	const [isTagInputFocused, setIsTagInputFocused] = useState(false);
@@ -174,32 +188,20 @@ export function DiaryEntryForm({
 		};
 	}, [isTagInputFocused, scrollTagsIntoViewAfterKeyboard]);
 
-	useEffect(() => {
-		const search = trimmedTagInput;
+	const visibleTags = useMemo(() => {
+		const normalizedSearch = normalizeTagName(trimmedTagInput);
+		const selectedTagIds = new Set(selectedTags.map((tag) => tag.id));
 
-		if (search.length < MIN_TAG_SEARCH_LENGTH) {
-			onSearchTags("");
-			return;
-		}
-
-		scrollTagsIntoViewAfterKeyboard();
-
-		const timeoutId = setTimeout(() => {
-			onSearchTags(search);
-		}, TAG_SEARCH_DELAY_MS);
-
-		return () => clearTimeout(timeoutId);
-	}, [onSearchTags, scrollTagsIntoViewAfterKeyboard, trimmedTagInput]);
-
-	const visibleSuggestions = useMemo(
-		() => tagSuggestions.filter((tag) => !selectedTags.some((selected) => selected.id === tag.id)),
-		[selectedTags, tagSuggestions],
-	);
-	const displayedSuggestions = visibleSuggestions.slice(0, MAX_VISIBLE_TAG_SUGGESTIONS);
-	const hiddenSuggestionCount = Math.max(
-		visibleSuggestions.length - displayedSuggestions.length,
-		0,
-	);
+		return availableTags
+			.filter((tag) => !selectedTagIds.has(tag.id))
+			.filter((tag) => isTagFilterEnabled(tag, tagFilters))
+			.filter((tag) =>
+				normalizedSearch.length > 0
+					? normalizeTagName(tag.name).includes(normalizedSearch)
+					: true,
+			)
+			.sort((left, right) => left.name.localeCompare(right.name));
+	}, [availableTags, selectedTags, tagFilters, trimmedTagInput]);
 
 	const hasExactMatch = useMemo(() => {
 		const normalizedInput = normalizeTagName(trimmedTagInput);
@@ -207,21 +209,20 @@ export function DiaryEntryForm({
 			return false;
 		}
 
-		return [...tagSuggestions, ...selectedTags].some(
+		return [...availableTags, ...selectedTags].some(
 			(tag) => normalizeTagName(tag.name) === normalizedInput,
 		);
-	}, [selectedTags, tagSuggestions, trimmedTagInput]);
+	}, [availableTags, selectedTags, trimmedTagInput]);
 
-	const canCreateTag = trimmedTagInput.length >= MIN_TAG_SEARCH_LENGTH && !hasExactMatch;
+	const canCreateTag = trimmedTagInput.length > 0 && !hasExactMatch;
+	const shouldCollapseTagPool = trimmedTagInput.length === 0 && !isTagPoolExpanded;
+	const canToggleTagPool = trimmedTagInput.length === 0 && visibleTags.length > 12;
 
 	useEffect(() => {
-		if (
-			trimmedTagInput.length >= MIN_TAG_SEARCH_LENGTH &&
-			(visibleSuggestions.length > 0 || canCreateTag)
-		) {
+		if (isTagInputFocused) {
 			scrollTagsIntoViewAfterKeyboard();
 		}
-	}, [canCreateTag, scrollTagsIntoViewAfterKeyboard, trimmedTagInput.length, visibleSuggestions.length]);
+	}, [isTagInputFocused, scrollTagsIntoViewAfterKeyboard, trimmedTagInput.length, visibleTags.length]);
 
 	const handleDateChange = (_event: DateTimePickerEvent, selectedDate?: Date) => {
 		if (Platform.OS === "android") {
@@ -278,7 +279,6 @@ export function DiaryEntryForm({
 		setTagInput("");
 		setTagError(null);
 		setIsTagInputFocused(false);
-		onSearchTags("");
 	};
 
 	const removeTag = (tagId: string) => {
@@ -298,6 +298,13 @@ export function DiaryEntryForm({
 		} catch (caughtError) {
 			setTagError(getTagErrorMessage(caughtError));
 		}
+	};
+
+	const toggleTagFilter = (filter: TagFilterKey) => {
+		setTagFilters((currentFilters) => ({
+			...currentFilters,
+			[filter]: !currentFilters[filter],
+		}));
 	};
 
 	const addMedia = async () => {
@@ -512,81 +519,6 @@ export function DiaryEntryForm({
 					/>
 				</View>
 
-				<View
-					onLayout={(event) => {
-						tagsCardYRef.current = event.nativeEvent.layout.y;
-					}}
-					style={globalStyles.card}
-				>
-					<Text style={styles.label}>Tags</Text>
-					{selectedTags.length > 0 ? (
-						<View style={styles.selectedTagRow}>
-							{selectedTags.map((tag) => (
-								<Pressable
-									accessibilityLabel={`Remove ${tag.name}`}
-									key={tag.id}
-									onPress={() => removeTag(tag.id)}
-									style={styles.selectedTag}
-								>
-									<DiaryTagPill tag={tag} />
-									<Ionicons color={colors.light.textSecondary} name="close-circle" size={16} />
-								</Pressable>
-							))}
-						</View>
-					) : null}
-
-					<View style={styles.tagInputRow}>
-						<Ionicons color={colors.light.textSecondary} name="pricetag-outline" size={18} />
-						<TextInput
-							autoCapitalize="words"
-							onChangeText={setTagInput}
-							onFocus={() => {
-								setIsTagInputFocused(true);
-								scrollTagsIntoViewAfterKeyboard();
-							}}
-							placeholder="Search or create a tag"
-							placeholderTextColor={colors.light.textSecondary}
-							style={styles.tagInput}
-							value={tagInput}
-						/>
-						{isSearchingTags ? (
-							<Text style={styles.helperText}>Searching...</Text>
-						) : null}
-					</View>
-
-					{trimmedTagInput.length >= MIN_TAG_SEARCH_LENGTH ? (
-						<View style={styles.suggestionList}>
-							{displayedSuggestions.map((tag) => (
-								<Pressable
-									key={tag.id}
-									onPress={() => selectTag(tag)}
-									style={styles.suggestionRow}
-								>
-									<DiaryTagPill tag={tag} />
-									<Text style={styles.scopeText}>{tag.scope === "global" ? "Default" : "Custom"}</Text>
-								</Pressable>
-							))}
-							{hiddenSuggestionCount > 0 ? (
-								<Text style={styles.helperText}>Showing top 5 matches</Text>
-							) : null}
-							{canCreateTag ? (
-								<Pressable
-									disabled={isCreatingTag}
-									onPress={handleCreateTag}
-									style={styles.createTagButton}
-								>
-									<Ionicons color={colors.light.primary} name="add-circle-outline" size={18} />
-									<Text style={styles.createTagText}>
-										{isCreatingTag ? "Creating..." : `Create "${trimmedTagInput}"`}
-									</Text>
-								</Pressable>
-							) : null}
-						</View>
-					) : null}
-
-					{tagError ? <Text style={styles.errorText}>{tagError}</Text> : null}
-				</View>
-
 				<View style={globalStyles.card}>
 					<Pressable
 						accessibilityRole="button"
@@ -624,6 +556,128 @@ export function DiaryEntryForm({
 						variant="form"
 					/>
 					{mediaError ? <Text style={styles.errorText}>{mediaError}</Text> : null}
+				</View>
+
+				<View
+					onLayout={(event) => {
+						tagsCardYRef.current = event.nativeEvent.layout.y;
+					}}
+					style={globalStyles.card}
+				>
+					<View style={styles.labelRow}>
+						<Text style={styles.label}>Tags</Text>
+						{isLoadingTags ? <Text style={styles.helperText}>Loading...</Text> : null}
+					</View>
+					{selectedTags.length > 0 ? (
+						<View style={styles.selectedTagRow}>
+							{selectedTags
+								.slice()
+								.sort((left, right) => left.name.localeCompare(right.name))
+								.map((tag) => (
+									<Pressable
+										accessibilityLabel={`Remove ${tag.name}`}
+										key={tag.id}
+										onPress={() => removeTag(tag.id)}
+										style={styles.selectedTag}
+									>
+										<DiaryTagPill tag={tag} />
+										<Ionicons color={colors.light.textSecondary} name="close-circle" size={16} />
+									</Pressable>
+								))}
+						</View>
+					) : null}
+
+					<View style={styles.tagFilterRow}>
+						{TAG_FILTERS.map((filter) => (
+							<Pressable
+								accessibilityRole="button"
+								key={filter.key}
+								onPress={() => toggleTagFilter(filter.key)}
+								style={[
+									styles.tagFilterButton,
+									{ borderColor: filter.color },
+									tagFilters[filter.key] && {
+										backgroundColor: getTagFilterBackground(filter.color),
+									},
+								]}
+							>
+								<Text
+									style={[
+										styles.tagFilterText,
+										{ color: filter.color },
+									]}
+								>
+									{filter.label}
+								</Text>
+							</Pressable>
+						))}
+					</View>
+
+					<View style={styles.tagInputRow}>
+						<Ionicons color={colors.light.textSecondary} name="search-outline" size={18} />
+						<TextInput
+							autoCapitalize="words"
+							onChangeText={setTagInput}
+							onFocus={() => {
+								setIsTagInputFocused(true);
+								scrollTagsIntoViewAfterKeyboard();
+							}}
+							placeholder="Search or create a tag"
+							placeholderTextColor={colors.light.textSecondary}
+							style={styles.tagInput}
+							value={tagInput}
+						/>
+					</View>
+
+					<View
+						style={[
+							styles.suggestionList,
+							shouldCollapseTagPool && styles.suggestionListCollapsed,
+						]}
+					>
+						{visibleTags.map((tag) => (
+							<Pressable
+								key={tag.id}
+								onPress={() => selectTag(tag)}
+								style={styles.suggestionRow}
+							>
+								<DiaryTagPill tag={tag} />
+							</Pressable>
+						))}
+						{visibleTags.length === 0 && !canCreateTag ? (
+							<Text style={styles.helperText}>No matching tags.</Text>
+						) : null}
+						{canCreateTag ? (
+							<Pressable
+								disabled={isCreatingTag}
+								onPress={handleCreateTag}
+								style={styles.createTagButton}
+							>
+								<Ionicons color={colors.light.primary} name="add-circle-outline" size={18} />
+								<Text style={styles.createTagText}>
+									{isCreatingTag ? "Creating..." : `Create "${trimmedTagInput}"`}
+								</Text>
+							</Pressable>
+						) : null}
+					</View>
+					{canToggleTagPool ? (
+						<Pressable
+							accessibilityRole="button"
+							onPress={() => setIsTagPoolExpanded((currentValue) => !currentValue)}
+							style={styles.showMoreTagsButton}
+						>
+							<Text style={styles.showMoreTagsText}>
+								{isTagPoolExpanded ? "Show less" : "Show more"}
+							</Text>
+							<Ionicons
+								color={colors.light.primary}
+								name={isTagPoolExpanded ? "chevron-up" : "chevron-down"}
+								size={16}
+							/>
+						</Pressable>
+					) : null}
+
+					{tagError ? <Text style={styles.errorText}>{tagError}</Text> : null}
 				</View>
 
 				{validationError || error ? (
@@ -893,6 +947,33 @@ function normalizeTagName(value: string) {
 	return value.trim().toLocaleLowerCase();
 }
 
+function getTagFilterBackground(color: string) {
+	return `${color}1F`;
+}
+
+function isTagFilterEnabled(
+	tag: DiaryTag,
+	filters: Record<TagFilterKey, boolean>,
+) {
+	if (tag.scope === "custom") {
+		return filters.custom;
+	}
+
+	if (tag.type === "milestone") {
+		return filters.milestone;
+	}
+
+	if (tag.type === "emotion") {
+		return filters.emotion;
+	}
+
+	if (tag.type === "event") {
+		return filters.event;
+	}
+
+	return false;
+}
+
 function toDateKey(date: Date) {
 	const year = date.getFullYear();
 	const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -988,10 +1069,6 @@ const styles = StyleSheet.create({
 		...typography.label,
 		color: colors.light.surface,
 	},
-	scopeText: {
-		...typography.caption,
-		color: colors.light.textSecondary,
-	},
 	secondaryButton: {
 		backgroundColor: colors.light.surface,
 		borderColor: colors.light.border,
@@ -1016,15 +1093,33 @@ const styles = StyleSheet.create({
 		gap: spacing.sm,
 		marginTop: spacing.sm,
 	},
+	showMoreTagsButton: {
+		alignItems: "center",
+		alignSelf: "center",
+		flexDirection: "row",
+		gap: spacing.xs,
+		marginTop: spacing.sm,
+		paddingHorizontal: spacing.md,
+		paddingVertical: spacing.xs,
+	},
+	showMoreTagsText: {
+		...typography.caption,
+		color: colors.light.primary,
+		fontWeight: "800",
+	},
 	suggestionList: {
+		flexDirection: "row",
+		flexWrap: "wrap",
 		gap: spacing.sm,
 		marginTop: spacing.md,
 	},
+	suggestionListCollapsed: {
+		maxHeight: 104,
+		overflow: "hidden",
+	},
 	suggestionRow: {
 		alignItems: "center",
-		flexDirection: "row",
-		justifyContent: "space-between",
-		paddingVertical: spacing.xs,
+		alignSelf: "flex-start",
 	},
 	tagInput: {
 		...typography.body,
@@ -1041,6 +1136,22 @@ const styles = StyleSheet.create({
 		gap: spacing.sm,
 		marginTop: spacing.sm,
 		padding: spacing.md,
+	},
+	tagFilterButton: {
+		borderRadius: 999,
+		borderWidth: 1,
+		paddingHorizontal: spacing.md,
+		paddingVertical: spacing.sm,
+	},
+	tagFilterRow: {
+		flexDirection: "row",
+		flexWrap: "wrap",
+		gap: spacing.sm,
+		marginTop: spacing.md,
+	},
+	tagFilterText: {
+		...typography.caption,
+		fontWeight: "700",
 	},
 	textInput: {
 		...typography.body,
