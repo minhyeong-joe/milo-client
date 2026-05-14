@@ -66,7 +66,7 @@ export default function GrowthReportsContent({
             >
                 <Text style={styles.profileActionText}>
                     <Ionicons name="analytics-outline" size={20} />
-                    {" "} Growth Entries
+                    {" "} Growth Measurements
                 </Text>
             </Pressable>
             <GrowthChartCard

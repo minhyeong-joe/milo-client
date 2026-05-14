@@ -43,7 +43,7 @@ export function formatBabyAge(birthdate: string, today = new Date()) {
 	const monthLabel = months === 1 ? "month" : "months";
 	const dayLabel = days === 1 ? "day" : "days";
 
-	return `${months} ${monthLabel} - ${days} ${dayLabel}`;
+	return `${months} ${monthLabel} · ${days} ${dayLabel}`;
 }
 
 export function formatDuration(totalMinutes: number | null) {

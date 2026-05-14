@@ -9,6 +9,7 @@ import {
 	getWhoReference,
 	type GrowthMetric,
 } from "@/utils/growthReports";
+import { formatBabyAge } from "@/utils/routineDisplay";
 
 type ChartPoint = {
     ageDays: number;
@@ -207,7 +208,7 @@ export default function GrowthChartCard({
                     {selectedPoint ? (
                         <View style={styles.pointDetail}>
                             <View>
-                                <Text style={styles.pointDate}>{formatDisplayDate(selectedPoint.date)}</Text>
+                                <Text style={styles.pointDate}>{formatDisplayDate(selectedPoint.date)} - {formatBabyAgeWithString(birthdate, selectedPoint.date)} </Text>
                                 <Text style={styles.pointValue}>
                                     {formatGrowthValue(metric, selectedPoint.measuredValue, units)}
                                 </Text>
@@ -297,6 +298,12 @@ function formatShortDate(date: string) {
 function formatDisplayDate(date: string) {
     const [year, month, day] = date.split("-");
     return `${Number(month)}/${Number(day)}/${year}`;
+}
+
+function formatBabyAgeWithString(birthdate: string, date: string) {
+    const [year, month, day] = date.split("-").map(Number);
+	const entryDate = new Date(year, month - 1, day);
+    return formatBabyAge(birthdate, entryDate);
 }
 
 function shouldShowYear(points: ChartPoint[], index: number) {

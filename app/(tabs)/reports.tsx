@@ -48,11 +48,9 @@ export default function ReportsScreen() {
 	const { preferredLengthUnit, preferredWeightUnit } = useAppPreferences();
 	const {
 		connectionStatus,
-		error: syncError,
 		markAuthRequired,
 		markOffline,
 		markOnline,
-		status: syncStatus,
 	} = useSync();
 	const [activeTab, setActiveTab] = useState<ReportsTab>("patterns");
 	const [patternRangeMode, setPatternRangeMode] = useState<PatternRangeMode>("week");
@@ -69,8 +67,6 @@ export default function ReportsScreen() {
 	const [patternStats, setPatternStats] = useState<RoutineStatsResponse>(() =>
 		createEmptyRoutineStats(initialPatternStartDate, initialPatternEndDate),
 	);
-	const [isGrowthLoading, setIsGrowthLoading] = useState(false);
-	const [isPatternLoading, setIsPatternLoading] = useState(false);
 	const [isRefreshing, setIsRefreshing] = useState(false);
 	const [growthError, setGrowthError] = useState<string | null>(null);
 	const [patternError, setPatternError] = useState<string | null>(null);
@@ -81,7 +77,6 @@ export default function ReportsScreen() {
 			return;
 		}
 
-		setIsGrowthLoading(true);
 		setGrowthError(null);
 
 		try {
@@ -98,8 +93,6 @@ export default function ReportsScreen() {
 				markOffline();
 				setGrowthError(getErrorMessage(caughtError));
 			}
-		} finally {
-			setIsGrowthLoading(false);
 		}
 	}, [loadLocalGrowthRecords, markAuthRequired, markOffline, markOnline, selectedBaby]);
 
@@ -131,7 +124,7 @@ export default function ReportsScreen() {
 		[localPatternDateSet, localPatternStats, patternStats],
 	);
 
-	const loadPatternStats = useCallback(async () => {
+	const refreshPatternStats = useCallback(async () => {
 		const localStats = buildRoutineStatsFromLocalLogs(dailyLogs, patternStartDate, patternEndDateKey);
 
 		if (!selectedBaby) {
@@ -140,7 +133,6 @@ export default function ReportsScreen() {
 			return;
 		}
 
-		setIsPatternLoading(true);
 		setPatternError(null);
 
 		if (
@@ -190,8 +182,6 @@ export default function ReportsScreen() {
 				markOffline();
 				setPatternError(getErrorMessage(caughtError));
 			}
-		} finally {
-			setIsPatternLoading(false);
 		}
 	}, [
 		dailyLogs,
@@ -221,11 +211,11 @@ export default function ReportsScreen() {
 		setIsRefreshing(true);
 
 		try {
-			await loadPatternStats();
+			await refreshPatternStats();
 		} finally {
 			setIsRefreshing(false);
 		}
-	}, [loadPatternStats]);
+	}, [refreshPatternStats]);
 	const changePatternRangeMode = useCallback((mode: PatternRangeMode) => {
 		if (mode === "custom") {
 			setPatternRangeMode("custom");
@@ -270,18 +260,6 @@ export default function ReportsScreen() {
 	}, [patternDayCount, patternEndDateKey, patternRangeMode, selectedBaby]);
 
 	useEffect(() => {
-		if (activeTab === "growth") {
-			void loadGrowthRecords();
-		}
-	}, [activeTab, loadGrowthRecords]);
-
-	useEffect(() => {
-		if (activeTab === "patterns") {
-			void loadPatternStats();
-		}
-	}, [activeTab, loadPatternStats]);
-
-	useEffect(() => {
 		if (!selectedBaby) {
 			setPatternEndDate(null);
 			setCustomPatternStartDate(null);
@@ -295,6 +273,48 @@ export default function ReportsScreen() {
 		setPatternRangeMode("week");
 	}, [selectedBaby]);
 
+	useEffect(() => {
+		let isMounted = true;
+
+		if (!selectedBaby) {
+			setPatternStats(localPatternStats);
+			setPatternError(null);
+			return;
+		}
+
+		setPatternStats((currentStats) =>
+			currentStats.startDate === patternStartDate &&
+			currentStats.endDate === patternEndDateKey
+				? currentStats
+				: localPatternStats,
+		);
+
+		if (!session) {
+			return;
+		}
+
+		void loadCachedRoutineStats({
+			babyId: selectedBaby.id,
+			endDate: patternEndDateKey,
+			startDate: patternStartDate,
+			userId: session.user.id,
+		}).then((cachedStats) => {
+			if (isMounted && cachedStats) {
+				setPatternStats(cachedStats);
+			}
+		});
+
+		return () => {
+			isMounted = false;
+		};
+	}, [
+		localPatternStats,
+		patternEndDateKey,
+		patternStartDate,
+		selectedBaby,
+		session,
+	]);
+
 	const sortedGrowthRecords = useMemo(
 		() =>
 			[...growthRecords].sort((left, right) =>
@@ -302,13 +322,8 @@ export default function ReportsScreen() {
 			),
 		[growthRecords],
 	);
-	const retryActiveTab = activeTab === "growth" ? loadGrowthRecords : loadPatternStats;
+	const retryActiveTab = activeTab === "growth" ? refreshGrowthRecords : refreshLogStats;
 	const activeError = activeTab === "growth" ? growthError : patternError;
-	const activeIsLoading = activeTab === "growth" ? isGrowthLoading : isPatternLoading;
-	const hasActiveData =
-		activeTab === "growth"
-			? growthRecords.length > 0
-			: displayedPatternStats.days.some((day) => day.logs.length > 0);
 
 	return (
 		<SafeAreaView edges={["top", "left", "right"]} style={globalStyles.screen}>
@@ -328,13 +343,9 @@ export default function ReportsScreen() {
 					/>
 				</View>
 
-				{activeIsLoading && hasActiveData ? (
-					<SyncStatusCard status="syncing" />
-				) : null}
-
-				{!activeIsLoading && syncStatus !== "syncing" && connectionStatus !== "online" ? (
+				{activeError ? (
 					<SyncStatusCard
-						message={syncError ?? activeError}
+						message={activeError}
 						onRetry={() => void retryActiveTab()}
 						status={connectionStatus === "authRequired" ? "authRequired" : "offline"}
 					/>
@@ -346,7 +357,7 @@ export default function ReportsScreen() {
 							? getDateKeyInTimeZone(new Date(), selectedBaby.timezone)
 							: getDateKey(new Date()))}
 						endDate={patternEndDateKey}
-						isLoading={isPatternLoading}
+						isLoading={false}
 						isRefreshing={isRefreshing}
 						maxDate={todayDateKey}
 						onCustomRangeApply={applyCustomPatternRange}
@@ -360,7 +371,7 @@ export default function ReportsScreen() {
 					/>
 				) : (
 					<GrowthReportsContent
-						isLoading={isGrowthLoading}
+						isLoading={false}
 						isRefreshing={isRefreshing}
 						lengthUnit={preferredLengthUnit}
 						onRefresh={refreshGrowthRecords}
