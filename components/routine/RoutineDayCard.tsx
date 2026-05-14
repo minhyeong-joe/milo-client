@@ -4,6 +4,7 @@ import { formatDayLabel } from "@/utils/routineDisplay";
 import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { RoutineAIInsight } from "./RoutineAIInsight";
 import { RoutineCard } from "./RoutineCard";
 import { RoutineSummary } from "./RoutineSummary";
 import { Timeline } from "./Timeline";
@@ -24,6 +25,7 @@ export function RoutineDayCard({
 	const [view, setView] = useState<RoutineDayCardView>(defaultView);
 	const isTimeline = view === "timeline";
 	const dayLabel = formatDayLabel(day.date, currentTime);
+	const isToday = dayLabel.label === "Today";
 
 	const toggleView = () => {
 		setView((prev) => (prev === "timeline" ? "summary" : "timeline"));
@@ -50,7 +52,10 @@ export function RoutineDayCard({
 			{isTimeline ? (
 				<Timeline config={config} currentTime={currentTime} events={day.timeline} />
 			) : (
-				<RoutineSummary config={config} summary={day.summary} />
+				<>
+					<RoutineSummary config={config} summary={day.summary} />
+					{!isToday ? <RoutineAIInsight /> : null}
+				</>
 			)}
 		</RoutineCard>
 	);
