@@ -142,6 +142,7 @@ export function DiaryMediaPreview({
 export function DiaryHeroCarousel({ media }: { media: DiaryMediaPreviewItem[] }) {
 	const [activeIndex, setActiveIndex] = useState(0);
 	const [selectedGalleryIndex, setSelectedGalleryIndex] = useState<number | null>(null);
+	const heroScrollViewRef = useRef<ScrollView | null>(null);
 	const { width } = useWindowDimensions();
 	const heroWidth = Math.max(width - spacing.md * 2, 280);
 
@@ -149,12 +150,22 @@ export function DiaryHeroCarousel({ media }: { media: DiaryMediaPreviewItem[] })
 		return null;
 	}
 
+	const setHeroIndex = (index: number, animated: boolean) => {
+		if (index < 0 || index >= media.length) {
+			return;
+		}
+
+		setActiveIndex(index);
+		heroScrollViewRef.current?.scrollTo({
+			animated,
+			x: index * heroWidth,
+		});
+	};
+
 	const handleMomentumScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
 		const nextIndex = Math.round(event.nativeEvent.contentOffset.x / heroWidth);
 
-		if (nextIndex >= 0 && nextIndex < media.length) {
-			setActiveIndex(nextIndex);
-		}
+		setHeroIndex(nextIndex, false);
 	};
 
 	return (
@@ -163,6 +174,7 @@ export function DiaryHeroCarousel({ media }: { media: DiaryMediaPreviewItem[] })
 				horizontal
 				onMomentumScrollEnd={handleMomentumScrollEnd}
 				pagingEnabled
+				ref={heroScrollViewRef}
 				scrollEventThrottle={16}
 				showsHorizontalScrollIndicator={false}
 				style={styles.heroPager}
@@ -202,7 +214,7 @@ export function DiaryHeroCarousel({ media }: { media: DiaryMediaPreviewItem[] })
 					media={media}
 					onClose={() => setSelectedGalleryIndex(null)}
 					onIndexChange={(index) => {
-						setActiveIndex(index);
+						setHeroIndex(index, false);
 						setSelectedGalleryIndex(index);
 					}}
 				/>
@@ -346,8 +358,6 @@ function FullscreenMediaGallery({
 	onIndexChange: (index: number) => void;
 }) {
 	const item = media[index];
-	const canGoPrevious = index > 0;
-	const canGoNext = index < media.length - 1;
 	const scrollViewRef = useRef<ScrollView | null>(null);
 	const { width } = useWindowDimensions();
 
@@ -384,6 +394,7 @@ function FullscreenMediaGallery({
 					showsHorizontalScrollIndicator={false}
 					style={styles.galleryPager}
 				>
+					
 					{media.map((galleryItem, galleryIndex) => (
 						<View
 							key={galleryItem.id ?? galleryItem.objectKey}
@@ -396,6 +407,7 @@ function FullscreenMediaGallery({
 						</View>
 					))}
 				</ScrollView>
+				
 				<Pressable
 					accessibilityLabel="Close media viewer"
 					accessibilityRole="button"
@@ -404,28 +416,11 @@ function FullscreenMediaGallery({
 				>
 					<Ionicons color={colors.light.surface} name="close" size={22} />
 				</Pressable>
-
-				{canGoPrevious ? (
-					<Pressable
-						accessibilityLabel="Previous media"
-						accessibilityRole="button"
-						onPress={() => onIndexChange(index - 1)}
-						style={[styles.galleryNavButton, styles.galleryPreviousButton]}
-					>
-						<Ionicons color={colors.light.surface} name="chevron-back" size={34} />
-					</Pressable>
-				) : null}
-
-				{canGoNext ? (
-					<Pressable
-						accessibilityLabel="Next media"
-						accessibilityRole="button"
-						onPress={() => onIndexChange(index + 1)}
-						style={[styles.galleryNavButton, styles.galleryNextButton]}
-					>
-						<Ionicons color={colors.light.surface} name="chevron-forward" size={34} />
-					</Pressable>
-				) : null}
+				<View style={styles.galleryCountBadge}>
+					<Text style={styles.heroCountText}>
+						{index + 1} / {media.length}
+					</Text>
+				</View>
 			</View>
 		</Modal>
 	);
@@ -844,6 +839,10 @@ const styles = StyleSheet.create({
 		position: "absolute",
 		right: spacing.md,
 		top: spacing.md,
+	},
+	galleryCountBadge: {
+		position: "absolute",
+		top: spacing.xl + 20,
 	},
 	heroCountText: {
 		...typography.caption,
