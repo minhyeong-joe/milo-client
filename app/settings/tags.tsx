@@ -1,0 +1,453 @@
+import { DiaryTagPill } from "@/components/diary/DiaryTagPill";
+import { ConfirmDeleteModal } from "@/components/routine/ConfirmDeleteModal";
+import { SettingsHeader } from "@/components/settings/SettingsRows";
+import { useBabySelection } from "@/context/BabySelectionContext";
+import { useDiaryCache } from "@/context/DiaryCacheContext";
+import type { DiaryTag } from "@/services/api/diary";
+import { deleteTag, listTags, updateTag } from "@/services/api/tags";
+import { colors, globalStyles, spacing, typography } from "@/styles/globalStyles";
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+	Pressable,
+	RefreshControl,
+	ScrollView,
+	StyleSheet,
+	Text,
+	TextInput,
+	View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+
+const TAG_COLORS = [
+	"#7C5CE7",
+	"#D84D8B",
+	"#F97316",
+	"#2FAE62",
+	"#0EA5E9",
+	"#64748B",
+];
+const DEFAULT_TAG_TYPE_ORDER = ["milestone", "emotions", "event"];
+
+export default function MilestoneTagsScreen() {
+	const router = useRouter();
+	const { selectedBaby } = useBabySelection();
+	const { removeTagFromDiaryCache, updateTagInDiaryCache } = useDiaryCache();
+	const [tags, setTags] = useState<DiaryTag[]>([]);
+	const [selectedTag, setSelectedTag] = useState<DiaryTag | null>(null);
+	const [name, setName] = useState("");
+	const [color, setColor] = useState(TAG_COLORS[0]);
+	const [error, setError] = useState<string | null>(null);
+	const [isLoading, setIsLoading] = useState(false);
+	const [isSaving, setIsSaving] = useState(false);
+	const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
+	const [areDefaultTagsExpanded, setAreDefaultTagsExpanded] = useState(false);
+
+	const customTags = useMemo(
+		() => tags.filter((tag) => tag.scope === "custom").sort(sortTags),
+		[tags],
+	);
+	const globalTags = useMemo(
+		() => tags.filter((tag) => tag.scope === "global").sort(sortTags),
+		[tags],
+	);
+	const globalTagsByType = useMemo(() => groupTagsByType(globalTags), [globalTags]);
+	const previewTag = selectedTag
+		? { ...selectedTag, color, name: name.trim() || selectedTag.name }
+		: null;
+
+	const load = useCallback(async () => {
+		if (!selectedBaby) {
+			setTags([]);
+			return;
+		}
+
+		setIsLoading(true);
+		setError(null);
+
+		try {
+			const response = await listTags({ babyId: selectedBaby.id });
+			setTags(response.tags);
+		} catch (caughtError) {
+			setError(getErrorMessage(caughtError));
+		} finally {
+			setIsLoading(false);
+		}
+	}, [selectedBaby]);
+
+	useEffect(() => {
+		void load();
+	}, [load]);
+
+	const selectTag = (tag: DiaryTag) => {
+		if (tag.scope === "global") {
+			setSelectedTag(null);
+			setError("Default tags are shared and read-only.");
+			return;
+		}
+
+		setSelectedTag(tag);
+		setName(tag.name);
+		setColor(tag.color);
+		setError(null);
+	};
+
+	const saveTag = async () => {
+		if (!selectedBaby || !selectedTag) {
+			return;
+		}
+
+		const trimmedName = name.trim();
+
+		if (!trimmedName) {
+			setError("Tag name is required.");
+			return;
+		}
+
+		setIsSaving(true);
+		setError(null);
+
+		try {
+			const response = await updateTag(selectedBaby.id, selectedTag.id, {
+				color,
+				name: trimmedName,
+			});
+			setTags((currentTags) =>
+				currentTags.map((tag) => (tag.id === response.tag.id ? response.tag : tag)),
+			);
+			setSelectedTag(response.tag);
+			setName(response.tag.name);
+			setColor(response.tag.color);
+			updateTagInDiaryCache(selectedBaby.id, response.tag);
+		} catch (caughtError) {
+			setError(getErrorMessage(caughtError));
+		} finally {
+			setIsSaving(false);
+		}
+	};
+
+	const removeTag = async () => {
+		if (!selectedBaby || !selectedTag) {
+			return;
+		}
+
+		setIsSaving(true);
+		setError(null);
+
+		try {
+			await deleteTag(selectedBaby.id, selectedTag.id);
+			setTags((currentTags) => currentTags.filter((tag) => tag.id !== selectedTag.id));
+			removeTagFromDiaryCache(selectedBaby.id, selectedTag.id);
+			setSelectedTag(null);
+			setIsDeleteModalVisible(false);
+		} catch (caughtError) {
+			setError(getErrorMessage(caughtError));
+		} finally {
+			setIsSaving(false);
+		}
+	};
+
+	return (
+		<SafeAreaView style={globalStyles.screen}>
+			<SettingsHeader onBack={() => router.back()} title="Milestone Tags" />
+			<ScrollView
+				contentContainerStyle={styles.content}
+				keyboardShouldPersistTaps="handled"
+				refreshControl={
+					<RefreshControl
+						onRefresh={() => void load()}
+						refreshing={isLoading}
+						tintColor={colors.light.primary}
+					/>
+				}
+			>
+				{!selectedBaby ? (
+					<View style={globalStyles.card}>
+						<Text style={globalStyles.bodyText}>Select a baby to manage tags.</Text>
+					</View>
+				) : null}
+
+				<View style={globalStyles.card}>
+					<Text style={styles.sectionTitle}>Custom Tags</Text>
+					<Text style={styles.helper}>Tap a custom tag to edit its name or color.</Text>
+					<View style={styles.tagWrap}>
+						{customTags.map((tag) => (
+							<Pressable key={tag.id} onPress={() => selectTag(tag)} style={styles.tagButton}>
+								<DiaryTagPill tag={tag} />
+							</Pressable>
+						))}
+						{customTags.length === 0 ? (
+							<Text style={styles.helper}>No custom tags yet. Create tags from a diary entry.</Text>
+						) : null}
+					</View>
+				</View>
+
+				{selectedTag ? (
+					<View style={globalStyles.card}>
+						<View style={globalStyles.rowBetween}>
+							<Text style={styles.sectionTitle}>Edit Custom Tag</Text>
+							<Pressable onPress={() => setSelectedTag(null)} style={styles.iconButton}>
+								<Ionicons color={colors.light.textSecondary} name="close" size={20} />
+							</Pressable>
+						</View>
+						<View style={styles.previewRow}>
+							<Text style={styles.helper}>Preview</Text>
+							{previewTag ? <DiaryTagPill tag={previewTag} /> : null}
+						</View>
+						<Text style={styles.label}>Name</Text>
+						<TextInput
+							autoCapitalize="words"
+							maxLength={40}
+							onChangeText={setName}
+							placeholder="Tag name"
+							placeholderTextColor={colors.light.textSecondary}
+							style={styles.input}
+							value={name}
+						/>
+						<Text style={styles.label}>Color</Text>
+						<View style={styles.swatchRow}>
+							{TAG_COLORS.map((tagColor) => (
+								<Pressable
+									accessibilityRole="button"
+									accessibilityState={{ selected: color === tagColor }}
+									key={tagColor}
+									onPress={() => setColor(tagColor)}
+									style={[
+										styles.swatch,
+										{ backgroundColor: tagColor },
+										color === tagColor && styles.swatchSelected,
+									]}
+								/>
+							))}
+						</View>
+						<View style={styles.actionRow}>
+							<Pressable
+								disabled={isSaving}
+								onPress={() => setIsDeleteModalVisible(true)}
+								style={[styles.actionButton, styles.deleteButton]}
+							>
+								<Text style={styles.deleteText}>Remove</Text>
+							</Pressable>
+							<Pressable
+								disabled={isSaving}
+								onPress={() => void saveTag()}
+								style={[styles.actionButton, styles.saveButton, isSaving && styles.disabled]}
+							>
+								<Text style={styles.saveText}>{isSaving ? "Saving..." : "Save"}</Text>
+							</Pressable>
+						</View>
+					</View>
+				) : null}
+
+				{error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+				<View style={globalStyles.card}>
+					<Pressable
+						accessibilityRole="button"
+						accessibilityState={{ expanded: areDefaultTagsExpanded }}
+						onPress={() => setAreDefaultTagsExpanded((currentValue) => !currentValue)}
+						style={styles.defaultHeader}
+					>
+						<View>
+							<Text style={styles.sectionTitle}>Default Tags</Text>
+							<Text style={styles.helper}>Common tags provided for ease of access.</Text>
+						</View>
+						<Ionicons
+							color={colors.light.textSecondary}
+							name={areDefaultTagsExpanded ? "chevron-up" : "chevron-down"}
+							size={22}
+						/>
+					</Pressable>
+					{areDefaultTagsExpanded ? (
+						<View style={styles.defaultGroups}>
+							{globalTagsByType.map((group) => (
+								<View key={group.type} style={styles.defaultGroup}>
+									<Text style={styles.typeLabel}>{formatTagType(group.type)}</Text>
+									<View style={styles.tagWrap}>
+										{group.tags.map((tag) => (
+											<DiaryTagPill tag={tag} key={tag.id}/>
+										))}
+									</View>
+								</View>
+							))}
+						</View>
+					) : null}
+				</View>
+			</ScrollView>
+			<ConfirmDeleteModal
+				confirmLabel="Remove"
+				message="This removes the custom tag and detaches it from diary entries. Default tags cannot be removed."
+				onCancel={() => setIsDeleteModalVisible(false)}
+				onConfirm={() => void removeTag()}
+				title="Remove tag?"
+				visible={isDeleteModalVisible}
+			/>
+		</SafeAreaView>
+	);
+}
+
+function sortTags(left: DiaryTag, right: DiaryTag) {
+	return left.name.localeCompare(right.name);
+}
+
+function groupTagsByType(tags: DiaryTag[]) {
+	const typeToTags = new Map<string, DiaryTag[]>();
+
+	for (const tag of tags) {
+		const normalizedType = tag.type.trim().toLowerCase() || "other";
+		typeToTags.set(normalizedType, [...(typeToTags.get(normalizedType) ?? []), tag]);
+	}
+
+	const orderedTypes = [
+		...DEFAULT_TAG_TYPE_ORDER.filter((type) => typeToTags.has(type)),
+		...Array.from(typeToTags.keys())
+			.filter((type) => !DEFAULT_TAG_TYPE_ORDER.includes(type))
+			.sort(),
+	];
+
+	return orderedTypes.map((type) => ({
+		tags: (typeToTags.get(type) ?? []).sort(sortTags),
+		type,
+	}));
+}
+
+function formatTagType(type: string) {
+	if (type === "emotions") {
+		return "Emotions";
+	}
+
+	return type
+		.split(/[\s_-]+/)
+		.filter(Boolean)
+		.map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+		.join(" ");
+}
+
+function getErrorMessage(error: unknown) {
+	if (error instanceof Error) {
+		return error.message;
+	}
+
+	return "Could not update tags. Please try again.";
+}
+
+const styles = StyleSheet.create({
+	actionButton: {
+		alignItems: "center",
+		borderRadius: 12,
+		flex: 1,
+		paddingVertical: spacing.md,
+	},
+	actionRow: {
+		flexDirection: "row",
+		gap: spacing.md,
+		marginTop: spacing.md,
+	},
+	content: {
+		gap: spacing.md,
+		padding: spacing.md,
+		paddingBottom: spacing.xl,
+	},
+	defaultGroup: {
+		gap: spacing.sm,
+	},
+	defaultGroups: {
+		gap: spacing.md,
+		marginTop: spacing.md,
+	},
+	defaultHeader: {
+		alignItems: "center",
+		flexDirection: "row",
+		gap: spacing.md,
+		justifyContent: "space-between",
+	},
+	deleteButton: {
+		backgroundColor: colors.light.surface,
+		borderColor: colors.light.error,
+		borderWidth: 1,
+	},
+	deleteText: {
+		...typography.label,
+		color: colors.light.error,
+	},
+	disabled: {
+		opacity: 0.5,
+	},
+	errorText: {
+		...typography.caption,
+		color: colors.light.error,
+	},
+	helper: {
+		...typography.caption,
+		color: colors.light.textSecondary,
+		lineHeight: 18,
+		marginTop: spacing.xs,
+	},
+	iconButton: {
+		padding: spacing.xs,
+	},
+	input: {
+		...typography.body,
+		borderColor: colors.light.border,
+		borderRadius: 12,
+		borderWidth: 1,
+		color: colors.light.textPrimary,
+		marginTop: spacing.xs,
+		padding: spacing.md,
+	},
+	label: {
+		...typography.caption,
+		color: colors.light.textSecondary,
+		marginTop: spacing.md,
+		textTransform: "uppercase",
+	},
+	previewRow: {
+		alignItems: "center",
+		flexDirection: "row",
+		gap: spacing.sm,
+		marginTop: spacing.md,
+	},
+	saveButton: {
+		backgroundColor: colors.light.primary,
+	},
+	saveText: {
+		...typography.label,
+		color: colors.light.surface,
+	},
+	sectionTitle: {
+		...typography.sectionTitle,
+		color: colors.light.textPrimary,
+	},
+	swatch: {
+		borderColor: colors.light.surface,
+		borderRadius: 999,
+		borderWidth: 3,
+		height: 34,
+		width: 34,
+	},
+	swatchRow: {
+		flexDirection: "row",
+		flexWrap: "wrap",
+		gap: spacing.sm,
+		marginTop: spacing.sm,
+	},
+	swatchSelected: {
+		borderColor: colors.light.textPrimary,
+	},
+	tagButton: {
+		alignSelf: "flex-start",
+	},
+	tagWrap: {
+		flexDirection: "row",
+		flexWrap: "wrap",
+		gap: spacing.sm,
+		marginTop: spacing.md,
+	},
+	typeLabel: {
+		...typography.caption,
+		color: colors.light.textSecondary,
+		fontWeight: "800",
+		textTransform: "uppercase",
+	},
+});

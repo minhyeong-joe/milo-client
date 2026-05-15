@@ -33,6 +33,12 @@ export default function RootLayout() {
                     <Stack.Screen name="routine/add-diaper" />
                     <Stack.Screen name="routine/add-meal" />
                     <Stack.Screen name="routine/add-sleep" />
+                    <Stack.Screen name="settings/account" />
+                    <Stack.Screen name="settings/ai-insights" />
+                    <Stack.Screen name="settings/backup-export" />
+                    <Stack.Screen name="settings/caregivers" />
+                    <Stack.Screen name="settings/preferences" />
+                    <Stack.Screen name="settings/tags" />
                   </Stack>
                 </SyncProvider>
               </DiaryCacheProvider>

@@ -1,181 +1,199 @@
-import { useAppPreferences } from "@/context/AppPreferencesContext";
+import { SettingsGroup, SettingsRow } from "@/components/settings/SettingsRows";
 import { useAuthSession } from "@/context/AuthSessionContext";
+import { useBabySelection } from "@/context/BabySelectionContext";
 import { colors, globalStyles, spacing, typography } from "@/styles/globalStyles";
-import { useRouter } from "expo-router";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
+
+const fallbackBabyAvatar = require("@/assets/images/baby.png");
 
 export default function SettingsScreen() {
-  const router = useRouter();
-  const { signOut } = useAuthSession();
-  const {
-    preferredLengthUnit,
-    preferredVolumeUnit,
-    preferredWeightUnit,
-    setPreferredLengthUnit,
-    setPreferredVolumeUnit,
-    setPreferredWeightUnit,
-  } = useAppPreferences();
+	const router = useRouter();
+	const { signOut } = useAuthSession();
+	const { selectedBaby } = useBabySelection();
 
-  const handleSignOut = async () => {
-    await signOut();
-    router.replace("/sign-in");
-  };
+	const handleSignOut = async () => {
+		await signOut();
+		router.replace("/sign-in");
+	};
 
-  return (
-    <SafeAreaView edges={["top", "left", "right"]} style={globalStyles.screen}>
-      <View style={globalStyles.screenContent}>
-        <Text style={globalStyles.titleText}>Settings Screen</Text>
-        <Text style={globalStyles.bodyText}>
-          Baby profile, AI preferences, app settings, and account settings.
-        </Text>
-        <View style={styles.settingsCard}>
-          <Text style={globalStyles.bodyText}>Unit Preference</Text>
-          <View style={styles.settingRow}>
-            <Text style={styles.settingTitle}>Volume unit</Text>
-            <View style={styles.segmentedControl}>
-              <UnitButton
-                isSelected={preferredVolumeUnit === "ml"}
-                label="mL"
-                onPress={() => void setPreferredVolumeUnit("ml")}
-              />
-              <UnitButton
-                isSelected={preferredVolumeUnit === "oz"}
-                label="oz"
-                onPress={() => void setPreferredVolumeUnit("oz")}
-              />
-            </View>
-          </View>
-          <View style={styles.settingRow}>
-            <Text style={styles.settingTitle}>Length unit</Text>
-            <View style={styles.segmentedControl}>
-              <UnitButton
-                isSelected={preferredLengthUnit === "cm"}
-                label="cm"
-                onPress={() => void setPreferredLengthUnit("cm")}
-              />
-              <UnitButton
-                isSelected={preferredLengthUnit === "in"}
-                label="in"
-                onPress={() => void setPreferredLengthUnit("in")}
-              />
-            </View>
-          </View>
-          <View style={styles.settingRow}>
-            <Text style={styles.settingTitle}>Weight unit</Text>
-            <View style={styles.segmentedControl}>
-              <UnitButton
-                isSelected={preferredWeightUnit === "kg"}
-                label="kg"
-                onPress={() => void setPreferredWeightUnit("kg")}
-              />
-              <UnitButton
-                isSelected={preferredWeightUnit === "lb"}
-                label="lb"
-                onPress={() => void setPreferredWeightUnit("lb")}
-              />
-            </View>
-          </View>
-        </View>
-        <Pressable
-          onPress={handleSignOut}
-          style={({ pressed }) => [
-            styles.signOutButton,
-            pressed && styles.pressedButton,
-          ]}
-        >
-          <Text style={styles.signOutText}>Sign Out</Text>
-        </Pressable>
-      </View>
-    </SafeAreaView>
-  );
+	return (
+		<SafeAreaView edges={["top", "left", "right"]} style={globalStyles.screen}>
+			<ScrollView contentContainerStyle={styles.content}>
+				<Text style={globalStyles.sectionTitleText}>Settings</Text>
+
+				<Pressable
+					accessibilityRole="button"
+					onPress={() => router.push("/baby/edit-profile")}
+					style={({ pressed }) => [styles.profileCard, pressed && styles.pressed]}
+				>
+					<Image
+						source={selectedBaby?.avatarUrl ? { uri: selectedBaby.avatarUrl } : fallbackBabyAvatar}
+						style={styles.avatar}
+					/>
+					<View style={styles.profileText}>
+						<Text style={styles.babyName}>{selectedBaby?.name ?? "Baby Profile"}</Text>
+						<Text style={styles.profileSubtitle}>
+							{selectedBaby
+								? `Born ${formatBirthdate(selectedBaby.birthdate)}\n${formatAge(selectedBaby.birthdate)} old`
+								: "Create or choose a baby profile"}
+						</Text>
+					</View>
+					<Ionicons color={colors.light.textSecondary} name="chevron-forward" size={22} />
+				</Pressable>
+
+				<SettingsGroup>
+					<SettingsRow
+						icon="people-outline"
+						iconBackground="#EAF8EF"
+						iconColor="#2FAE62"
+						onPress={() => router.push("/settings/caregivers")}
+						subtitle="Access and invitations"
+						title="Manage Caregivers"
+					/>
+					<SettingsRow
+						icon="analytics-outline"
+						iconBackground="#EAF8EF"
+						iconColor="#2FAE62"
+						onPress={() => router.push("/baby/growth")}
+						subtitle="Height, Weight, Head Size"
+						title="Growth Records"
+					/>
+					<SettingsRow
+						icon="pricetag-outline"
+						iconBackground="#FFEAF4"
+						iconColor="#D84D8B"
+						onPress={() => router.push("/settings/tags")}
+						subtitle="Manage milestone tags"
+						title="Milestone Tags"
+					/>
+				</SettingsGroup>
+
+				<SettingsGroup>
+					<SettingsRow
+						icon="settings-outline"
+						onPress={() => router.push("/settings/preferences")}
+						subtitle="Units, Language, Theme"
+						title="App Preferences"
+					/>
+					<SettingsRow
+						icon="sparkles-outline"
+						onPress={() => router.push("/settings/ai-insights")}
+						subtitle="Insight settings and daily summary"
+						title="AI & Insights"
+					/>
+					<SettingsRow
+						icon="person-outline"
+						onPress={() => router.push("/settings/account")}
+						subtitle="Email, Password, Security"
+						title="Account"
+					/>
+					<SettingsRow
+						icon="cloud-upload-outline"
+						onPress={() => router.push("/settings/backup-export")}
+						subtitle="Export data and backups"
+						title="Backup & Export"
+					/>
+					<SettingsRow
+						icon="information-circle-outline"
+						subtitle="Version 1.0.0"
+						title="About"
+					/>
+				</SettingsGroup>
+
+				<Pressable
+					accessibilityRole="button"
+					onPress={handleSignOut}
+					style={({ pressed }) => [styles.signOutButton, pressed && styles.pressed]}
+				>
+					<Text style={styles.signOutText}>Sign Out</Text>
+				</Pressable>
+			</ScrollView>
+		</SafeAreaView>
+	);
 }
 
-function UnitButton({
-  isSelected,
-  label,
-  onPress,
-}: {
-  isSelected: boolean;
-  label: string;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected: isSelected }}
-      onPress={onPress}
-      style={[styles.unitButton, isSelected && styles.unitButtonSelected]}
-    >
-      <Text style={[styles.unitButtonText, isSelected && styles.unitButtonTextSelected]}>
-        {label}
-      </Text>
-    </Pressable>
-  );
+function formatBirthdate(dateKey: string) {
+	const date = new Date(`${dateKey}T00:00:00`);
+	return new Intl.DateTimeFormat("en-US", {
+		day: "numeric",
+		month: "short",
+		year: "numeric",
+	}).format(date);
+}
+
+function formatAge(dateKey: string) {
+	const birthdate = new Date(`${dateKey}T00:00:00`);
+	const today = new Date();
+	let months = (today.getFullYear() - birthdate.getFullYear()) * 12;
+	months += today.getMonth() - birthdate.getMonth();
+
+	if (today.getDate() < birthdate.getDate()) {
+		months -= 1;
+	}
+
+	const monthAnchor = new Date(birthdate);
+	monthAnchor.setMonth(birthdate.getMonth() + Math.max(months, 0));
+	const days = Math.max(0, Math.floor((today.getTime() - monthAnchor.getTime()) / 86400000));
+
+	if (months <= 0) {
+		return `${days} days`;
+	}
+
+	return `${months} months • ${days} days`;
 }
 
 const styles = StyleSheet.create({
-  segmentedControl: {
-    backgroundColor: colors.light.background,
-    borderColor: colors.light.border,
-    borderRadius: 12,
-    borderWidth: 1,
-    flexDirection: "row",
-    minWidth: 128,
-    padding: 3,
-  },
-  settingsCard: {
-    backgroundColor: colors.light.surface,
-    borderColor: colors.light.border,
-    borderRadius: 14,
-    borderWidth: 1,
-    marginTop: spacing.lg,
-    padding: spacing.md,
-  },
-  settingTitle: {
-    color: colors.light.textPrimary,
-    flex: 1,
-    fontSize: 16,
-    fontWeight: "800",
-  },
-  settingRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: spacing.md,
-    marginTop: spacing.md,
-  },
-  signOutButton: {
-    alignItems: "center",
-    backgroundColor: colors.light.surface,
-    borderColor: colors.light.error,
-    borderRadius: 14,
-    borderWidth: 1,
-    justifyContent: "center",
-    marginTop: spacing.lg,
-    minHeight: 50,
-  },
-  pressedButton: {
-    opacity: 0.7,
-  },
-  signOutText: {
-    ...typography.label,
-    color: colors.light.error,
-  },
-  unitButton: {
-    alignItems: "center",
-    borderRadius: 9,
-    flex: 1,
-    paddingVertical: spacing.sm,
-  },
-  unitButtonSelected: {
-    backgroundColor: colors.light.primary,
-  },
-  unitButtonText: {
-    color: colors.light.textSecondary,
-    fontSize: 14,
-    fontWeight: "800",
-  },
-  unitButtonTextSelected: {
-    color: colors.light.surface,
-  },
+	avatar: {
+		backgroundColor: "#D9BFAE",
+		borderRadius: 28,
+		height: 56,
+		width: 56,
+	},
+	babyName: {
+		...typography.label,
+		color: colors.light.textPrimary,
+	},
+	content: {
+		gap: spacing.md,
+		padding: spacing.md,
+		paddingBottom: spacing.xl,
+	},
+	pressed: {
+		opacity: 0.72,
+	},
+	profileCard: {
+		alignItems: "center",
+		backgroundColor: colors.light.surface,
+		borderColor: colors.light.border,
+		borderRadius: 16,
+		borderWidth: 1,
+		flexDirection: "row",
+		gap: spacing.md,
+		padding: spacing.md,
+	},
+	profileSubtitle: {
+		...typography.caption,
+		color: colors.light.textSecondary,
+		lineHeight: 18,
+		marginTop: 3,
+	},
+	profileText: {
+		flex: 1,
+	},
+	signOutButton: {
+		alignItems: "center",
+		backgroundColor: colors.light.surface,
+		borderColor: colors.light.error,
+		borderRadius: 16,
+		borderWidth: 1,
+		justifyContent: "center",
+		minHeight: 52,
+	},
+	signOutText: {
+		...typography.label,
+		color: colors.light.error,
+	},
 });

@@ -24,10 +24,12 @@ type DiaryCacheContextValue = {
 	appendDiaryPage: (babyId: string, response: ListDiaryEntriesResponse) => void;
 	getDiaryCache: (babyId: string) => DiaryCacheState;
 	markDiaryCacheDirty: (babyId: string) => void;
+	removeTagFromDiaryCache: (babyId: string, tagId: string) => void;
 	removeDiaryEntryFromCache: (babyId: string, diaryId: string) => void;
 	replaceDiaryEntryInCache: (babyId: string, entry: DiaryEntry) => void;
 	setDiaryFirstPage: (babyId: string, response: ListDiaryEntriesResponse) => void;
 	shouldRefreshDiaryCache: (babyId: string) => boolean;
+	updateTagInDiaryCache: (babyId: string, tag: DiaryEntry["tags"][number]) => void;
 };
 
 const emptyCache: DiaryCacheState = {
@@ -113,6 +115,40 @@ export function DiaryCacheProvider({ children }: { children: ReactNode }) {
 		});
 	}, []);
 
+	const updateTagInDiaryCache = useCallback((babyId: string, tag: DiaryEntry["tags"][number]) => {
+		setCacheByBabyId((currentCache) => {
+			const currentBabyCache = currentCache[babyId] ?? emptyCache;
+
+			return {
+				...currentCache,
+				[babyId]: {
+					...currentBabyCache,
+					entries: currentBabyCache.entries.map((entry) => ({
+						...entry,
+						tags: entry.tags.map((entryTag) => (entryTag.id === tag.id ? tag : entryTag)),
+					})),
+				},
+			};
+		});
+	}, []);
+
+	const removeTagFromDiaryCache = useCallback((babyId: string, tagId: string) => {
+		setCacheByBabyId((currentCache) => {
+			const currentBabyCache = currentCache[babyId] ?? emptyCache;
+
+			return {
+				...currentCache,
+				[babyId]: {
+					...currentBabyCache,
+					entries: currentBabyCache.entries.map((entry) => ({
+						...entry,
+						tags: entry.tags.filter((tag) => tag.id !== tagId),
+					})),
+				},
+			};
+		});
+	}, []);
+
 	const markDiaryCacheDirty = useCallback((babyId: string) => {
 		setCacheByBabyId((currentCache) => {
 			const currentBabyCache = currentCache[babyId] ?? emptyCache;
@@ -147,19 +183,23 @@ export function DiaryCacheProvider({ children }: { children: ReactNode }) {
 			appendDiaryPage,
 			getDiaryCache,
 			markDiaryCacheDirty,
+			removeTagFromDiaryCache,
 			removeDiaryEntryFromCache,
 			replaceDiaryEntryInCache,
 			setDiaryFirstPage,
 			shouldRefreshDiaryCache,
+			updateTagInDiaryCache,
 		}),
 		[
 			appendDiaryPage,
 			getDiaryCache,
 			markDiaryCacheDirty,
+			removeTagFromDiaryCache,
 			removeDiaryEntryFromCache,
 			replaceDiaryEntryInCache,
 			setDiaryFirstPage,
 			shouldRefreshDiaryCache,
+			updateTagInDiaryCache,
 		],
 	);
 
