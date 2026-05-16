@@ -852,7 +852,7 @@ function DiaryEmptyState({
 }
 
 function getDateKeyInTimeZone(value: Date, timeZone?: string | null) {
-	const formatter = new Intl.DateTimeFormat("en-CA", {
+	const formatter = new Intl.DateTimeFormat("en-US", {
 		day: "2-digit",
 		month: "2-digit",
 		timeZone: timeZone || undefined,
@@ -1022,7 +1022,7 @@ function formatShortDate(dateKey: string) {
 		return dateKey;
 	}
 
-	return new Intl.DateTimeFormat(undefined, {
+	return new Intl.DateTimeFormat("en-US", {
 		day: "numeric",
 		month: "short",
 	}).format(date);

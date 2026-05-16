@@ -720,7 +720,7 @@ export function DiaryEntryForm({
 }
 
 function formatDisplayDate(date: Date) {
-	return new Intl.DateTimeFormat(undefined, {
+	return new Intl.DateTimeFormat("en-US", {
 		day: "numeric",
 		month: "long",
 		year: "numeric",

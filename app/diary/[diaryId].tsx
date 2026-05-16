@@ -253,7 +253,7 @@ function formatDateTime(value: string) {
 		return value;
 	}
 
-	return new Intl.DateTimeFormat(undefined, {
+	return new Intl.DateTimeFormat("en-US", {
 		dateStyle: "medium",
 		timeStyle: "short",
 	}).format(date);
@@ -262,7 +262,7 @@ function formatDateTime(value: string) {
 function formatHeaderDate(dateKey: string) {
 	const [year, month, day] = dateKey.split("-").map(Number);
 	const date = new Date(year, month - 1, day);
-	return new Intl.DateTimeFormat(undefined, {
+	return new Intl.DateTimeFormat("en-US", {
 		day: "numeric",
 		month: "long",
 		year: "numeric",
@@ -272,7 +272,7 @@ function formatHeaderDate(dateKey: string) {
 function formatHeaderSubtitle(dateKey: string, birthdate?: string) {
 	const [year, month, day] = dateKey.split("-").map(Number);
 	const entryDate = new Date(year, month - 1, day);
-	const weekday = new Intl.DateTimeFormat(undefined, { weekday: "long" }).format(entryDate);
+	const weekday = new Intl.DateTimeFormat("en-US", { weekday: "long" }).format(entryDate);
 	const ageLabel = birthdate ? formatBabyAge(birthdate, entryDate) : null;
 
 	return ageLabel ? `${weekday} · ${ageLabel} old` : weekday;
