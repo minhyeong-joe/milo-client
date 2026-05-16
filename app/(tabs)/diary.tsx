@@ -1,5 +1,6 @@
 import { DiaryEntryCard } from "@/components/diary/DiaryEntryCard";
 import { DiaryActionsModal } from "@/components/diary/DiaryActionsModal";
+import { DiaryTagPill } from "@/components/diary/DiaryTagPill";
 import { ConfirmDeleteModal } from "@/components/routine/ConfirmDeleteModal";
 import { useBabySelection } from "@/context/BabySelectionContext";
 import { useDiaryCache } from "@/context/DiaryCacheContext";
@@ -8,25 +9,57 @@ import {
 	deleteDiaryEntry,
 	listDiaryEntries,
 	type DiaryEntry,
+	type DiaryListFilters,
+	type DiaryTag,
 } from "@/services/api/diary";
+import { listTags } from "@/services/api/tags";
 import { colors, globalStyles, spacing, typography } from "@/styles/globalStyles";
 import { Ionicons } from "@expo/vector-icons";
+import DateTimePicker, { type DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import {
 	ActivityIndicator,
 	Alert,
 	FlatList,
+	Modal,
 	Pressable,
 	RefreshControl,
 	ScrollView,
 	StyleSheet,
 	Text,
+	TextInput,
 	View,
+	Keyboard
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const PAGE_SIZE = 10;
+const SEARCH_DEBOUNCE_MS = 300;
+const TAG_TYPE_FILTERS = [
+	{ color: "#F59E0B", label: "Milestone", value: "milestone" },
+	{ color: "#EC4899", label: "Emotions", value: "emotion" },
+	{ color: "#38BDF8", label: "Events", value: "event" },
+	{ color: "#64748B", label: "Custom", value: "custom" },
+] as const;
+
+type MediaFilter = "all" | "with" | "without";
+type DiaryFilterState = {
+	endDate: string | null;
+	media: MediaFilter;
+	startDate: string | null;
+	tagIds: string[];
+	tagTypes: string[];
+};
+
+const emptyFilters: DiaryFilterState = {
+	endDate: null,
+	media: "all",
+	startDate: null,
+	tagIds: [],
+	tagTypes: [],
+};
 
 export default function DiaryScreen() {
 	const router = useRouter();
@@ -46,15 +79,53 @@ export default function DiaryScreen() {
 	const [actionEntry, setActionEntry] = useState<DiaryEntry | null>(null);
 	const [deleteEntry, setDeleteEntry] = useState<DiaryEntry | null>(null);
 	const [isDeleting, setIsDeleting] = useState(false);
-	const diaryCache = selectedBaby ? getDiaryCache(selectedBaby.id) : null;
+	const [isSearchVisible, setIsSearchVisible] = useState(false);
+	const searchBarRef = useRef<TextInput>(null);
+	const [searchText, setSearchText] = useState("");
+	const [debouncedSearchText, setDebouncedSearchText] = useState("");
+	const [filters, setFilters] = useState<DiaryFilterState>(emptyFilters);
+	const [draftFilters, setDraftFilters] = useState<DiaryFilterState>(emptyFilters);
+	const [datePickerTarget, setDatePickerTarget] = useState<"start" | "end" | null>(null);
+	const [isFilterVisible, setIsFilterVisible] = useState(false);
+	const [availableTags, setAvailableTags] = useState<DiaryTag[]>([]);
+	const [isLoadingTags, setIsLoadingTags] = useState(false);
+	const activeDiaryFilters = useMemo(
+		() => toDiaryListFilters(debouncedSearchText, filters),
+		[debouncedSearchText, filters],
+	);
+	const diaryCacheKey = useMemo(
+		() => serializeDiaryFilters(activeDiaryFilters),
+		[activeDiaryFilters],
+	);
+	const diaryCache = selectedBaby ? getDiaryCache(selectedBaby.id, diaryCacheKey) : null;
 	const entries = diaryCache?.entries ?? [];
 	const nextCursor = diaryCache?.nextCursor ?? null;
 	const isDiaryOffline = connectionStatus !== "online";
+	const hasActiveFilters = diaryCacheKey !== DEFAULT_DIARY_FILTER_KEY;
 
 	const todayDate = useMemo(
 		() => getDateKeyInTimeZone(new Date(), selectedBaby?.timezone),
 		[selectedBaby?.timezone],
 	);
+
+	useEffect(() => {
+		const timeoutId = setTimeout(() => {
+			setDebouncedSearchText(searchText.trim());
+		}, SEARCH_DEBOUNCE_MS);
+
+		return () => clearTimeout(timeoutId);
+	}, [searchText]);
+
+	useEffect(() => {
+		if (isSearchVisible) {
+			requestAnimationFrame(() => {
+				searchBarRef.current?.focus();
+			});
+		} else {
+			searchBarRef.current?.blur();
+			Keyboard.dismiss();
+		}
+	}, [isSearchVisible]);
 
 	const loadFirstPage = useCallback(
 		async ({
@@ -81,10 +152,13 @@ export default function DiaryScreen() {
 			try {
 				const response = await listDiaryEntries({
 					babyId: selectedBaby.id,
-					endDate: getDateKeyInTimeZone(new Date(), selectedBaby.timezone),
+					...activeDiaryFilters,
+					endDate:
+						activeDiaryFilters.endDate ??
+						getDateKeyInTimeZone(new Date(), selectedBaby.timezone),
 					take: PAGE_SIZE,
 				});
-				setDiaryFirstPage(selectedBaby.id, response);
+				setDiaryFirstPage(selectedBaby.id, response, diaryCacheKey);
 				markOnline();
 			} catch {
 				markOffline();
@@ -94,7 +168,15 @@ export default function DiaryScreen() {
 				setIsRefreshing(false);
 			}
 		},
-		[connectionStatus, markOffline, markOnline, selectedBaby, setDiaryFirstPage],
+		[
+			activeDiaryFilters,
+			connectionStatus,
+			diaryCacheKey,
+			markOffline,
+			markOnline,
+			selectedBaby,
+			setDiaryFirstPage,
+		],
 	);
 
 	const loadMore = useCallback(async () => {
@@ -107,9 +189,10 @@ export default function DiaryScreen() {
 			const response = await listDiaryEntries({
 				babyId: selectedBaby.id,
 				cursor: nextCursor,
+				...activeDiaryFilters,
 				take: PAGE_SIZE,
 			});
-			appendDiaryPage(selectedBaby.id, response);
+			appendDiaryPage(selectedBaby.id, response, diaryCacheKey);
 			markOnline();
 		} catch (caughtError) {
 			console.warn(caughtError);
@@ -117,17 +200,83 @@ export default function DiaryScreen() {
 		} finally {
 			setIsLoadingMore(false);
 		}
-	}, [appendDiaryPage, isDiaryOffline, isLoading, isLoadingMore, markOffline, markOnline, nextCursor, selectedBaby]);
+	}, [
+		activeDiaryFilters,
+		appendDiaryPage,
+		diaryCacheKey,
+		isDiaryOffline,
+		isLoading,
+		isLoadingMore,
+		markOffline,
+		markOnline,
+		nextCursor,
+		selectedBaby,
+	]);
 
 	useFocusEffect(
 		useCallback(() => {
-			if (!selectedBaby || !shouldRefreshDiaryCache(selectedBaby.id)) {
+			if (!selectedBaby || !shouldRefreshDiaryCache(selectedBaby.id, diaryCacheKey)) {
 				return;
 			}
 
 			void loadFirstPage();
-		}, [loadFirstPage, selectedBaby, shouldRefreshDiaryCache]),
+		}, [diaryCacheKey, loadFirstPage, selectedBaby, shouldRefreshDiaryCache]),
 	);
+
+	useEffect(() => {
+		if (!selectedBaby || connectionStatus !== "online") {
+			return;
+		}
+
+		void loadFirstPage();
+	}, [connectionStatus, diaryCacheKey, loadFirstPage, selectedBaby]);
+
+	const loadTags = useCallback(async () => {
+		if (!selectedBaby || connectionStatus !== "online") {
+			return;
+		}
+
+		setIsLoadingTags(true);
+
+		try {
+			const response = await listTags({ babyId: selectedBaby.id });
+			setAvailableTags(response.tags);
+			markOnline();
+		} catch (caughtError) {
+			console.warn(caughtError);
+			markOffline();
+		} finally {
+			setIsLoadingTags(false);
+		}
+	}, [connectionStatus, markOffline, markOnline, selectedBaby]);
+
+	const applyFilters = () => {
+		setFilters(normalizeFilters(draftFilters));
+		setIsFilterVisible(false);
+		setDatePickerTarget(null);
+	};
+
+	const clearDraftFilters = () => {
+		setDraftFilters(emptyFilters);
+	};
+
+	const handleFilterDateChange = (_event: DateTimePickerEvent, selectedDate?: Date) => {
+		if (!datePickerTarget) {
+			return;
+		}
+
+		if (selectedDate) {
+			const nextDateKey = toDateKey(selectedDate);
+			setDraftFilters((currentFilters) =>
+				normalizeFilters({
+					...currentFilters,
+					[datePickerTarget === "start" ? "startDate" : "endDate"]: nextDateKey,
+				}),
+			);
+		}
+
+		setDatePickerTarget(null);
+	};
 
 	const openEntry = (entry: DiaryEntry) => {
 		router.push({
@@ -214,12 +363,19 @@ export default function DiaryScreen() {
 						<HeaderIconButton
 							label="Search diary"
 							name="search-outline"
-							onPress={() => undefined}
+							onPress={() => {
+								setIsSearchVisible((currentValue) => !currentValue);
+								setSearchText("");
+							}}
 						/>
 						<HeaderIconButton
 							label="Filter diary"
 							name="filter-outline"
-							onPress={() => undefined}
+							onPress={() => {
+								setDraftFilters(filters);
+								setIsFilterVisible(true);
+								void loadTags();
+							}}
 						/>
 						<Pressable
 							accessibilityLabel="Add diary entry"
@@ -233,6 +389,47 @@ export default function DiaryScreen() {
 							<Ionicons color={colors.light.surface} name="add" size={24} />
 						</Pressable>
 					</View>
+				</View>
+				{isSearchVisible ? (
+					<View style={styles.searchRow}>
+						<Ionicons color={colors.light.textSecondary} name="search-outline" size={18} />
+						<TextInput
+							autoCapitalize="none"
+							autoCorrect={false}
+							onChangeText={setSearchText}
+							placeholder="Search title or note"
+							placeholderTextColor={colors.light.textSecondary}
+							style={styles.searchInput}
+							value={searchText}
+							ref={searchBarRef}
+						/>
+						{searchText.length > 0 ? (
+							<Pressable
+								accessibilityLabel="Clear search"
+								onPress={() => setSearchText("")}
+								style={styles.clearIconButton}
+							>
+								<Ionicons color={colors.light.textSecondary} name="close-circle" size={18} />
+							</Pressable>
+						) : null}
+					</View>
+				) : null}
+				<View>
+					{hasActiveFilters ? (
+						<ActiveFilterChips
+							filters={activeDiaryFilters}
+							onClearAll={() => {
+								setDebouncedSearchText("");
+								setFilters(emptyFilters);
+							}}
+							onRemove={(key, value) => {
+								setFilters((currentFilters) =>
+									removeFilterValue(currentFilters, key, value),
+								);
+							}}
+							tags={availableTags}
+						/>
+					) : null}
 				</View>
 
 				{selectedBaby && isDiaryOffline ? (
@@ -323,6 +520,22 @@ export default function DiaryScreen() {
 				title="Delete diary entry?"
 				visible={Boolean(deleteEntry)}
 			/>
+			<DiaryFilterModal
+				availableTags={availableTags}
+				datePickerTarget={datePickerTarget}
+				draftFilters={draftFilters}
+				isLoadingTags={isLoadingTags}
+				onApply={applyFilters}
+				onChangeDate={handleFilterDateChange}
+				onClear={clearDraftFilters}
+				onClose={() => {
+					setIsFilterVisible(false);
+					setDatePickerTarget(null);
+				}}
+				onDraftChange={setDraftFilters}
+				onOpenDatePicker={setDatePickerTarget}
+				visible={isFilterVisible}
+			/>
 		</SafeAreaView>
 	);
 }
@@ -335,6 +548,246 @@ const DIARY_EDIT_OFFLINE_MESSAGE =
 	"Reconnect to edit diary entries.";
 const DIARY_DELETE_OFFLINE_MESSAGE =
 	"Reconnect to delete diary entries.";
+
+function ActiveFilterChips({
+	filters,
+	onClearAll,
+	onRemove,
+	tags,
+}: {
+	filters: DiaryListFilters;
+	onClearAll: () => void;
+	onRemove: (key: ActiveFilterKey, value?: string) => void;
+	tags: DiaryTag[];
+}) {
+	const chips = getActiveFilterChips(filters, tags);
+
+	if (chips.length === 0) {
+		return null;
+	}
+
+	return (
+		<ScrollView
+			contentContainerStyle={styles.activeFilterRow}
+			horizontal
+			showsHorizontalScrollIndicator={false}
+		>
+			{chips.map((chip) => (
+				<Pressable
+					accessibilityRole="button"
+					key={`${chip.key}:${chip.value ?? chip.label}`}
+					onPress={() => onRemove(chip.key, chip.value)}
+					style={styles.activeFilterChip}
+				>
+					<Text style={styles.activeFilterText}>{chip.label}</Text>
+					<Ionicons color={colors.light.primary} name="close" size={14} />
+				</Pressable>
+			))}
+			<Pressable accessibilityRole="button" onPress={onClearAll} style={styles.clearAllChip}>
+				<Text style={styles.clearAllText}>Clear all</Text>
+			</Pressable>
+		</ScrollView>
+	);
+}
+
+function DiaryFilterModal({
+	availableTags,
+	datePickerTarget,
+	draftFilters,
+	isLoadingTags,
+	onApply,
+	onChangeDate,
+	onClear,
+	onClose,
+	onDraftChange,
+	onOpenDatePicker,
+	visible,
+}: {
+	availableTags: DiaryTag[];
+	datePickerTarget: "start" | "end" | null;
+	draftFilters: DiaryFilterState;
+	isLoadingTags: boolean;
+	onApply: () => void;
+	onChangeDate: (event: DateTimePickerEvent, selectedDate?: Date) => void;
+	onClear: () => void;
+	onClose: () => void;
+	onDraftChange: (filters: DiaryFilterState) => void;
+	onOpenDatePicker: (target: "start" | "end") => void;
+	visible: boolean;
+}) {
+	const sortedTags = useMemo(
+		() => [...availableTags].sort((left, right) => left.name.localeCompare(right.name)),
+		[availableTags],
+	);
+	const insets = useSafeAreaInsets();
+
+	return (
+		<Modal animationType="slide" onRequestClose={onClose} transparent visible={visible}>
+			<View style={{
+					...styles.modalBackdrop, 
+					paddingBottom: Math.max(insets.bottom, 12)
+				}}
+			>
+				<View style={styles.filterSheet}>
+					<View style={globalStyles.rowBetween}>
+						<Text style={styles.filterTitle}>Filter diary</Text>
+						<Pressable accessibilityLabel="Close filters" onPress={onClose} style={styles.clearIconButton}>
+							<Ionicons color={colors.light.textSecondary} name="close" size={22} />
+						</Pressable>
+					</View>
+
+					<ScrollView contentContainerStyle={styles.filterContent}>
+						<Text style={styles.filterSectionTitle}>Date range</Text>
+						<View style={styles.dateFilterRow}>
+							<DateFilterButton
+								label="From"
+								onPress={() => onOpenDatePicker("start")}
+								value={draftFilters.startDate}
+							/>
+							<DateFilterButton
+								label="To"
+								onPress={() => onOpenDatePicker("end")}
+								value={draftFilters.endDate}
+							/>
+						</View>
+						{datePickerTarget ? (
+							<DateTimePicker
+								maximumDate={new Date()}
+								minimumDate={
+									datePickerTarget === "end" && draftFilters.startDate
+										? dateFromKey(draftFilters.startDate) ?? undefined
+										: undefined
+								}
+								mode="date"
+								onChange={onChangeDate}
+								value={
+									datePickerTarget === "start"
+										? dateFromKey(draftFilters.startDate) ?? new Date()
+										: dateFromKey(draftFilters.endDate) ?? new Date()
+								}
+							/>
+						) : null}
+
+						<Text style={styles.filterSectionTitle}>Media</Text>
+						<View style={styles.segmentedRow}>
+							{([
+								["all", "All"],
+								["with", "With media"],
+								["without", "No media"],
+							] as const).map(([value, label]) => (
+								<Pressable
+									accessibilityRole="button"
+									accessibilityState={{ selected: draftFilters.media === value }}
+									key={value}
+									onPress={() => onDraftChange({ ...draftFilters, media: value })}
+									style={[
+										styles.segmentButton,
+										draftFilters.media === value && styles.segmentButtonActive,
+									]}
+								>
+									<Text
+										style={[
+											styles.segmentText,
+											draftFilters.media === value && styles.segmentTextActive,
+										]}
+									>
+										{label}
+									</Text>
+								</Pressable>
+							))}
+						</View>
+
+						<Text style={styles.filterSectionTitle}>Tag type</Text>
+						<View style={styles.filterChipWrap}>
+							{TAG_TYPE_FILTERS.map((filter) => {
+								const isSelected = draftFilters.tagTypes.includes(filter.value);
+
+								return (
+									<Pressable
+										accessibilityRole="button"
+										accessibilityState={{ selected: isSelected }}
+										key={filter.value}
+										onPress={() =>
+											onDraftChange({
+												...draftFilters,
+												tagTypes: toggleArrayValue(draftFilters.tagTypes, filter.value),
+											})
+										}
+										style={[
+											styles.filterChip,
+											{ borderColor: filter.color },
+											isSelected && { backgroundColor: `${filter.color}1F` },
+										]}
+									>
+										<Text style={[styles.filterChipText, { color: filter.color }]}>
+											{filter.label}
+										</Text>
+									</Pressable>
+								);
+							})}
+						</View>
+
+						<View style={globalStyles.rowBetween}>
+							<Text style={styles.filterSectionTitle}>Specific tags</Text>
+							{isLoadingTags ? <Text style={styles.helperText}>Loading...</Text> : null}
+						</View>
+						<View style={styles.filterChipWrap}>
+							{sortedTags.map((tag) => {
+								const isSelected = draftFilters.tagIds.includes(tag.id);
+
+								return (
+									<Pressable
+										accessibilityRole="button"
+										accessibilityState={{ selected: isSelected }}
+										key={tag.id}
+										onPress={() =>
+											onDraftChange({
+												...draftFilters,
+												tagIds: toggleArrayValue(draftFilters.tagIds, tag.id),
+											})
+										}
+										style={[styles.tagFilterPill, isSelected && styles.tagFilterPillActive]}
+									>
+										<DiaryTagPill tag={tag} />
+									</Pressable>
+								);
+							})}
+							{!isLoadingTags && sortedTags.length === 0 ? (
+								<Text style={styles.helperText}>No tags available.</Text>
+							) : null}
+						</View>
+					</ScrollView>
+
+					<View style={styles.filterFooter}>
+						<Pressable onPress={onClear} style={[styles.footerButton, styles.secondaryButton]}>
+							<Text style={styles.secondaryButtonText}>Clear</Text>
+						</Pressable>
+						<Pressable onPress={onApply} style={[styles.footerButton, styles.primaryButton]}>
+							<Text style={styles.primaryButtonText}>Apply</Text>
+						</Pressable>
+					</View>
+				</View>
+			</View>
+		</Modal>
+	);
+}
+
+function DateFilterButton({
+	label,
+	onPress,
+	value,
+}: {
+	label: string;
+	onPress: () => void;
+	value: string | null;
+}) {
+	return (
+		<Pressable accessibilityRole="button" onPress={onPress} style={styles.dateFilterButton}>
+			<Text style={styles.helperText}>{label}</Text>
+			<Text style={styles.dateFilterText}>{value ? formatShortDate(value) : "Any"}</Text>
+		</Pressable>
+	);
+}
 
 function DiaryOfflineState({
 	isRetrying,
@@ -416,6 +869,179 @@ function getDateKeyInTimeZone(value: Date, timeZone?: string | null) {
 	return `${year}-${month}-${day}`;
 }
 
+type ActiveFilterKey =
+	| "endDate"
+	| "includeMedia"
+	| "search"
+	| "startDate"
+	| "tagIds"
+	| "tagTypes";
+
+function toDiaryListFilters(search: string, filters: DiaryFilterState): DiaryListFilters {
+	return {
+		endDate: filters.endDate,
+		includeMedia: filters.media === "all" ? null : filters.media === "with",
+		search,
+		startDate: filters.startDate,
+		tagIds: filters.tagIds,
+		tagTypes: filters.tagTypes,
+	};
+}
+
+const DEFAULT_DIARY_FILTER_KEY = "default";
+
+function serializeDiaryFilters(filters: DiaryListFilters) {
+	const parts = [
+		`search=${filters.search?.trim() ?? ""}`,
+		`start=${filters.startDate ?? ""}`,
+		`end=${filters.endDate ?? ""}`,
+		`media=${filters.includeMedia === null || filters.includeMedia === undefined ? "all" : String(filters.includeMedia)}`,
+		`tagTypes=${[...(filters.tagTypes ?? [])].sort().join(",")}`,
+		`tagIds=${[...(filters.tagIds ?? [])].sort().join(",")}`,
+	];
+	const key = parts.join("|");
+
+	return key === "search=|start=|end=|media=all|tagTypes=|tagIds="
+		? DEFAULT_DIARY_FILTER_KEY
+		: key;
+}
+
+function normalizeFilters(filters: DiaryFilterState): DiaryFilterState {
+	let startDate = filters.startDate;
+	let endDate = filters.endDate;
+
+	if (startDate && endDate && endDate < startDate) {
+		endDate = startDate;
+	}
+
+	return {
+		endDate,
+		media: filters.media,
+		startDate,
+		tagIds: [...new Set(filters.tagIds)].sort(),
+		tagTypes: [...new Set(filters.tagTypes)].sort(),
+	};
+}
+
+function removeFilterValue(
+	filters: DiaryFilterState,
+	key: ActiveFilterKey,
+	value?: string,
+): DiaryFilterState {
+	if (key === "startDate") {
+		return { ...filters, startDate: null };
+	}
+
+	if (key === "endDate") {
+		return { ...filters, endDate: null };
+	}
+
+	if (key === "includeMedia") {
+		return { ...filters, media: "all" };
+	}
+
+	if (key === "tagIds" && value) {
+		return { ...filters, tagIds: filters.tagIds.filter((tagId) => tagId !== value) };
+	}
+
+	if (key === "tagTypes" && value) {
+		return { ...filters, tagTypes: filters.tagTypes.filter((tagType) => tagType !== value) };
+	}
+
+	return filters;
+}
+
+function getActiveFilterChips(filters: DiaryListFilters, tags: DiaryTag[]) {
+	const tagById = new Map(tags.map((tag) => [tag.id, tag]));
+	const chips: { key: ActiveFilterKey; label: string; value?: string }[] = [];
+
+	if (filters.startDate) {
+		chips.push({ key: "startDate", label: `From ${formatShortDate(filters.startDate)}` });
+	}
+
+	if (filters.endDate) {
+		chips.push({ key: "endDate", label: `To ${formatShortDate(filters.endDate)}` });
+	}
+
+	if (filters.includeMedia === true) {
+		chips.push({ key: "includeMedia", label: "With media" });
+	}
+
+	if (filters.includeMedia === false) {
+		chips.push({ key: "includeMedia", label: "No media" });
+	}
+
+	for (const tagType of filters.tagTypes ?? []) {
+		chips.push({
+			key: "tagTypes",
+			label: formatTagType(tagType),
+			value: tagType,
+		});
+	}
+
+	for (const tagId of filters.tagIds ?? []) {
+		chips.push({
+			key: "tagIds",
+			label: tagById.get(tagId)?.name ?? "Tag",
+			value: tagId,
+		});
+	}
+
+	return chips;
+}
+
+function toggleArrayValue(values: string[], value: string) {
+	return values.includes(value)
+		? values.filter((currentValue) => currentValue !== value)
+		: [...values, value].sort();
+}
+
+function dateFromKey(dateKey: string | null) {
+	if (!dateKey) {
+		return null;
+	}
+
+	const [year, month, day] = dateKey.split("-").map(Number);
+	const date = new Date(year, month - 1, day);
+
+	return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function toDateKey(date: Date) {
+	const year = date.getFullYear();
+	const month = `${date.getMonth() + 1}`.padStart(2, "0");
+	const day = `${date.getDate()}`.padStart(2, "0");
+
+	return `${year}-${month}-${day}`;
+}
+
+function formatShortDate(dateKey: string) {
+	const date = dateFromKey(dateKey);
+
+	if (!date) {
+		return dateKey;
+	}
+
+	return new Intl.DateTimeFormat(undefined, {
+		day: "numeric",
+		month: "short",
+	}).format(date);
+}
+
+function formatTagType(type: string) {
+	const match = TAG_TYPE_FILTERS.find((filter) => filter.value === type);
+
+	if (match) {
+		return match.label;
+	}
+
+	return type
+		.split(/[\s_-]+/)
+		.filter(Boolean)
+		.map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+		.join(" ");
+}
+
 const styles = StyleSheet.create({
 	addButton: {
 		alignItems: "center",
@@ -425,10 +1051,63 @@ const styles = StyleSheet.create({
 		justifyContent: "center",
 		width: 42,
 	},
+	activeFilterChip: {
+		alignItems: "center",
+		backgroundColor: "#F1EDFF",
+		borderColor: "#DED4FF",
+		borderRadius: 999,
+		borderWidth: 1,
+		flexDirection: "row",
+		gap: spacing.xs,
+		paddingHorizontal: spacing.md,
+		paddingVertical: spacing.xs,
+	},
+	activeFilterRow: {
+		gap: spacing.sm,
+		paddingBottom: spacing.md,
+	},
+	activeFilterText: {
+		...typography.caption,
+		color: colors.light.primary,
+	},
 	centerState: {
 		alignItems: "center",
 		gap: spacing.sm,
 		padding: spacing.xl,
+	},
+	clearAllChip: {
+		alignItems: "center",
+		borderColor: colors.light.border,
+		borderRadius: 999,
+		borderWidth: 1,
+		justifyContent: "center",
+		paddingHorizontal: spacing.md,
+		paddingVertical: spacing.xs,
+	},
+	clearAllText: {
+		...typography.caption,
+		color: colors.light.textSecondary,
+	},
+	clearIconButton: {
+		alignItems: "center",
+		justifyContent: "center",
+		padding: spacing.xs,
+	},
+	dateFilterButton: {
+		borderColor: colors.light.border,
+		borderRadius: 14,
+		borderWidth: 1,
+		flex: 1,
+		gap: spacing.xs,
+		padding: spacing.md,
+	},
+	dateFilterRow: {
+		flexDirection: "row",
+		gap: spacing.sm,
+	},
+	dateFilterText: {
+		...typography.label,
+		color: colors.light.textPrimary,
 	},
 	disabledAddButton: {
 		backgroundColor: colors.light.textSecondary,
@@ -454,6 +1133,50 @@ const styles = StyleSheet.create({
 	footerLoader: {
 		paddingVertical: spacing.lg,
 	},
+	filterChip: {
+		borderRadius: 999,
+		borderWidth: 1,
+		paddingHorizontal: spacing.md,
+		paddingVertical: spacing.sm,
+	},
+	filterChipText: {
+		...typography.caption,
+	},
+	filterChipWrap: {
+		flexDirection: "row",
+		flexWrap: "wrap",
+		gap: spacing.sm,
+	},
+	filterContent: {
+		gap: spacing.md,
+		paddingVertical: spacing.md,
+	},
+	filterFooter: {
+		flexDirection: "row",
+		gap: spacing.md,
+		paddingTop: spacing.md,
+	},
+	filterSectionTitle: {
+		...typography.label,
+		color: colors.light.textPrimary,
+	},
+	filterSheet: {
+		backgroundColor: colors.light.surface,
+		borderTopLeftRadius: 24,
+		borderTopRightRadius: 24,
+		maxHeight: "88%",
+		padding: spacing.md,
+	},
+	filterTitle: {
+		...typography.sectionTitle,
+		color: colors.light.textPrimary,
+	},
+	footerButton: {
+		alignItems: "center",
+		borderRadius: 14,
+		flex: 1,
+		paddingVertical: spacing.md,
+	},
 	header: {
 		alignItems: "center",
 		flexDirection: "row",
@@ -474,9 +1197,18 @@ const styles = StyleSheet.create({
 		justifyContent: "center",
 		width: 42,
 	},
+	helperText: {
+		...typography.caption,
+		color: colors.light.textSecondary,
+	},
 	listContent: {
 		gap: spacing.md,
 		paddingBottom: spacing.md,
+	},
+	modalBackdrop: {
+		backgroundColor: "rgba(21, 24, 39, 0.35)",
+		flex: 1,
+		justifyContent: "flex-end"
 	},
 	noBabyCard: {
 		gap: spacing.sm,
@@ -484,6 +1216,13 @@ const styles = StyleSheet.create({
 	offlineScrollContent: {
 		flexGrow: 1,
 		justifyContent: "center",
+	},
+	primaryButton: {
+		backgroundColor: colors.light.primary,
+	},
+	primaryButtonText: {
+		...typography.label,
+		color: colors.light.surface,
 	},
 	retryButton: {
 		backgroundColor: colors.light.primary,
@@ -495,5 +1234,64 @@ const styles = StyleSheet.create({
 	retryText: {
 		...typography.caption,
 		color: colors.light.surface,
+	},
+	searchInput: {
+		...typography.body,
+		color: colors.light.textPrimary,
+		flex: 1,
+		paddingVertical: spacing.xs,
+	},
+	searchRow: {
+		alignItems: "center",
+		backgroundColor: colors.light.surface,
+		borderColor: colors.light.border,
+		borderRadius: 16,
+		borderWidth: 1,
+		flexDirection: "row",
+		gap: spacing.sm,
+		marginBottom: spacing.md,
+		paddingHorizontal: spacing.md,
+		paddingVertical: spacing.xs,
+	},
+	secondaryButton: {
+		backgroundColor: colors.light.surface,
+		borderColor: colors.light.border,
+		borderWidth: 1,
+	},
+	secondaryButtonText: {
+		...typography.label,
+		color: colors.light.textPrimary,
+	},
+	segmentButton: {
+		alignItems: "center",
+		borderRadius: 999,
+		flex: 1,
+		paddingVertical: spacing.sm,
+	},
+	segmentButtonActive: {
+		backgroundColor: colors.light.surface,
+	},
+	segmentedRow: {
+		backgroundColor: colors.light.background,
+		borderColor: colors.light.border,
+		borderRadius: 999,
+		borderWidth: 1,
+		flexDirection: "row",
+		padding: 3,
+	},
+	segmentText: {
+		...typography.caption,
+		color: colors.light.textSecondary,
+	},
+	segmentTextActive: {
+		color: colors.light.textPrimary,
+	},
+	tagFilterPill: {
+		borderColor: "transparent",
+		borderRadius: 999,
+		borderWidth: 2,
+	},
+	tagFilterPillActive: {
+		borderColor: colors.light.primary,
 	},
 });

@@ -21,14 +21,14 @@ type DiaryCacheState = {
 type DiaryCacheByBabyId = Record<string, DiaryCacheState>;
 
 type DiaryCacheContextValue = {
-	appendDiaryPage: (babyId: string, response: ListDiaryEntriesResponse) => void;
-	getDiaryCache: (babyId: string) => DiaryCacheState;
+	appendDiaryPage: (babyId: string, response: ListDiaryEntriesResponse, cacheKey?: string) => void;
+	getDiaryCache: (babyId: string, cacheKey?: string) => DiaryCacheState;
 	markDiaryCacheDirty: (babyId: string) => void;
 	removeTagFromDiaryCache: (babyId: string, tagId: string) => void;
 	removeDiaryEntryFromCache: (babyId: string, diaryId: string) => void;
 	replaceDiaryEntryInCache: (babyId: string, entry: DiaryEntry) => void;
-	setDiaryFirstPage: (babyId: string, response: ListDiaryEntriesResponse) => void;
-	shouldRefreshDiaryCache: (babyId: string) => boolean;
+	setDiaryFirstPage: (babyId: string, response: ListDiaryEntriesResponse, cacheKey?: string) => void;
+	shouldRefreshDiaryCache: (babyId: string, cacheKey?: string) => boolean;
 	updateTagInDiaryCache: (babyId: string, tag: DiaryEntry["tags"][number]) => void;
 };
 
@@ -45,15 +45,16 @@ export function DiaryCacheProvider({ children }: { children: ReactNode }) {
 	const [cacheByBabyId, setCacheByBabyId] = useState<DiaryCacheByBabyId>({});
 
 	const getDiaryCache = useCallback(
-		(babyId: string) => cacheByBabyId[babyId] ?? emptyCache,
+		(babyId: string, cacheKey = DEFAULT_CACHE_KEY) =>
+			cacheByBabyId[getScopedCacheKey(babyId, cacheKey)] ?? emptyCache,
 		[cacheByBabyId],
 	);
 
 	const setDiaryFirstPage = useCallback(
-		(babyId: string, response: ListDiaryEntriesResponse) => {
+		(babyId: string, response: ListDiaryEntriesResponse, cacheKey = DEFAULT_CACHE_KEY) => {
 			setCacheByBabyId((currentCache) => ({
 				...currentCache,
-				[babyId]: {
+				[getScopedCacheKey(babyId, cacheKey)]: {
 					entries: response.diaryEntries,
 					isDirty: false,
 					loadedAt: Date.now(),
@@ -65,13 +66,14 @@ export function DiaryCacheProvider({ children }: { children: ReactNode }) {
 	);
 
 	const appendDiaryPage = useCallback(
-		(babyId: string, response: ListDiaryEntriesResponse) => {
+		(babyId: string, response: ListDiaryEntriesResponse, cacheKey = DEFAULT_CACHE_KEY) => {
 			setCacheByBabyId((currentCache) => {
-				const currentBabyCache = currentCache[babyId] ?? emptyCache;
+				const scopedCacheKey = getScopedCacheKey(babyId, cacheKey);
+				const currentBabyCache = currentCache[scopedCacheKey] ?? emptyCache;
 
 				return {
 					...currentCache,
-					[babyId]: {
+					[scopedCacheKey]: {
 						...currentBabyCache,
 						entries: mergeEntries(currentBabyCache.entries, response.diaryEntries),
 						nextCursor: response.nextCursor,
@@ -84,88 +86,117 @@ export function DiaryCacheProvider({ children }: { children: ReactNode }) {
 
 	const replaceDiaryEntryInCache = useCallback((babyId: string, entry: DiaryEntry) => {
 		setCacheByBabyId((currentCache) => {
-			const currentBabyCache = currentCache[babyId] ?? emptyCache;
-			const filteredEntries = currentBabyCache.entries.filter(
-				(currentEntry) => currentEntry.id !== entry.id,
-			);
+			const nextCache = { ...currentCache };
+			const scopedPrefix = getScopedCachePrefix(babyId);
+			const matchingKeys = Object.keys(nextCache).filter((key) => key.startsWith(scopedPrefix));
 
-			return {
-				...currentCache,
-				[babyId]: {
+			if (matchingKeys.length === 0) {
+				nextCache[getScopedCacheKey(babyId, DEFAULT_CACHE_KEY)] = {
+					...emptyCache,
+					entries: [entry],
+					loadedAt: Date.now(),
+				};
+				return nextCache;
+			}
+
+			for (const key of matchingKeys) {
+				const currentBabyCache = nextCache[key] ?? emptyCache;
+				const hasEntry = currentBabyCache.entries.some(
+					(currentEntry) => currentEntry.id === entry.id,
+				);
+
+				nextCache[key] = {
 					...currentBabyCache,
-					entries: [entry, ...filteredEntries].sort(compareDiaryEntries),
-					isDirty: false,
+					entries: hasEntry
+						? currentBabyCache.entries.map((currentEntry) =>
+								currentEntry.id === entry.id ? entry : currentEntry,
+							).sort(compareDiaryEntries)
+						: currentBabyCache.entries,
+					isDirty: !hasEntry || currentBabyCache.isDirty,
 					loadedAt: currentBabyCache.loadedAt ?? Date.now(),
-				},
-			};
+				};
+			}
+
+			return nextCache;
 		});
 	}, []);
 
 	const removeDiaryEntryFromCache = useCallback((babyId: string, diaryId: string) => {
 		setCacheByBabyId((currentCache) => {
-			const currentBabyCache = currentCache[babyId] ?? emptyCache;
+			const nextCache = { ...currentCache };
+			const scopedPrefix = getScopedCachePrefix(babyId);
 
-			return {
-				...currentCache,
-				[babyId]: {
+			for (const key of Object.keys(nextCache).filter((cacheKey) => cacheKey.startsWith(scopedPrefix))) {
+				const currentBabyCache = nextCache[key] ?? emptyCache;
+				nextCache[key] = {
 					...currentBabyCache,
 					entries: currentBabyCache.entries.filter((entry) => entry.id !== diaryId),
-				},
-			};
+				};
+			}
+
+			return nextCache;
 		});
 	}, []);
 
 	const updateTagInDiaryCache = useCallback((babyId: string, tag: DiaryEntry["tags"][number]) => {
 		setCacheByBabyId((currentCache) => {
-			const currentBabyCache = currentCache[babyId] ?? emptyCache;
+			const nextCache = { ...currentCache };
+			const scopedPrefix = getScopedCachePrefix(babyId);
 
-			return {
-				...currentCache,
-				[babyId]: {
+			for (const key of Object.keys(nextCache).filter((cacheKey) => cacheKey.startsWith(scopedPrefix))) {
+				const currentBabyCache = nextCache[key] ?? emptyCache;
+				nextCache[key] = {
 					...currentBabyCache,
 					entries: currentBabyCache.entries.map((entry) => ({
 						...entry,
 						tags: entry.tags.map((entryTag) => (entryTag.id === tag.id ? tag : entryTag)),
 					})),
-				},
-			};
+				};
+			}
+
+			return nextCache;
 		});
 	}, []);
 
 	const removeTagFromDiaryCache = useCallback((babyId: string, tagId: string) => {
 		setCacheByBabyId((currentCache) => {
-			const currentBabyCache = currentCache[babyId] ?? emptyCache;
+			const nextCache = { ...currentCache };
+			const scopedPrefix = getScopedCachePrefix(babyId);
 
-			return {
-				...currentCache,
-				[babyId]: {
+			for (const key of Object.keys(nextCache).filter((cacheKey) => cacheKey.startsWith(scopedPrefix))) {
+				const currentBabyCache = nextCache[key] ?? emptyCache;
+				nextCache[key] = {
 					...currentBabyCache,
 					entries: currentBabyCache.entries.map((entry) => ({
 						...entry,
 						tags: entry.tags.filter((tag) => tag.id !== tagId),
 					})),
-				},
-			};
+				};
+			}
+
+			return nextCache;
 		});
 	}, []);
 
 	const markDiaryCacheDirty = useCallback((babyId: string) => {
 		setCacheByBabyId((currentCache) => {
-			const currentBabyCache = currentCache[babyId] ?? emptyCache;
+			const nextCache = { ...currentCache };
+			const scopedPrefix = getScopedCachePrefix(babyId);
 
-			return {
-				...currentCache,
-				[babyId]: {
-					...currentBabyCache,
+			for (const key of Object.keys(nextCache).filter((cacheKey) => cacheKey.startsWith(scopedPrefix))) {
+				nextCache[key] = {
+					...nextCache[key],
 					isDirty: true,
-				},
-			};
+				};
+			}
+
+			return nextCache;
 		});
 	}, []);
 
 	const shouldRefreshDiaryCache = useCallback(
-		(babyId: string) => {
-			const cache = cacheByBabyId[babyId];
+		(babyId: string, cacheKey = DEFAULT_CACHE_KEY) => {
+			const cache = cacheByBabyId[getScopedCacheKey(babyId, cacheKey)];
 
 			if (!cache?.loadedAt || cache.isDirty || cache.entries.length === 0) {
 				return true;
@@ -258,4 +289,14 @@ function getEarliestMediaUrlExpiry(entries: DiaryEntry[]) {
 	}
 
 	return Math.min(...expiries);
+}
+
+const DEFAULT_CACHE_KEY = "default";
+
+function getScopedCacheKey(babyId: string, cacheKey: string) {
+	return `${babyId}::${cacheKey}`;
+}
+
+function getScopedCachePrefix(babyId: string) {
+	return `${babyId}::`;
 }

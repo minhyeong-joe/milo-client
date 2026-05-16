@@ -55,6 +55,15 @@ export type ListDiaryEntriesResponse = {
 	nextCursor: string | null;
 };
 
+export type DiaryListFilters = {
+	endDate?: string | null;
+	includeMedia?: boolean | null;
+	search?: string | null;
+	startDate?: string | null;
+	tagIds?: string[];
+	tagTypes?: string[];
+};
+
 export type DiaryMediaInput = {
 	description?: string | null;
 	fileType: string;
@@ -100,18 +109,38 @@ export function listDiaryEntries({
 	babyId,
 	cursor,
 	endDate,
+	includeMedia,
+	search,
+	startDate,
+	tagIds = [],
+	tagTypes = [],
 	take = 10,
 }: {
 	babyId: string;
 	cursor?: string | null;
-	endDate?: string;
+	endDate?: string | null;
+	includeMedia?: boolean | null;
+	search?: string | null;
+	startDate?: string | null;
+	tagIds?: string[];
+	tagTypes?: string[];
 	take?: number;
 }) {
+	const trimmedSearch = search?.trim();
+
 	return apiGet<ListDiaryEntriesResponse>(`/babies/${babyId}/diaries`, {
 		auth: true,
 		query: {
 			cursor: cursor ?? undefined,
 			endDate: cursor ? undefined : endDate,
+			includeMedia:
+				includeMedia === undefined || includeMedia === null
+					? undefined
+					: String(includeMedia),
+			search: trimmedSearch || undefined,
+			startDate: cursor ? undefined : startDate ?? undefined,
+			tagIds: tagIds.length > 0 ? tagIds.join(",") : undefined,
+			tagTypes: tagTypes.length > 0 ? tagTypes.join(",") : undefined,
 			take,
 		},
 	});
