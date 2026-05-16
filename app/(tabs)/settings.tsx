@@ -1,5 +1,4 @@
 import { SettingsGroup, SettingsRow } from "@/components/settings/SettingsRows";
-import { useAuthSession } from "@/context/AuthSessionContext";
 import { useBabySelection } from "@/context/BabySelectionContext";
 import { colors, globalStyles, spacing, typography } from "@/styles/globalStyles";
 import { Ionicons } from "@expo/vector-icons";
@@ -11,13 +10,7 @@ const fallbackBabyAvatar = require("@/assets/images/baby.png");
 
 export default function SettingsScreen() {
 	const router = useRouter();
-	const { signOut } = useAuthSession();
 	const { selectedBaby } = useBabySelection();
-
-	const handleSignOut = async () => {
-		await signOut();
-		router.replace("/sign-in");
-	};
 
 	return (
 		<SafeAreaView edges={["top", "left", "right"]} style={globalStyles.screen}>
@@ -102,14 +95,6 @@ export default function SettingsScreen() {
 						title="About"
 					/>
 				</SettingsGroup>
-
-				<Pressable
-					accessibilityRole="button"
-					onPress={handleSignOut}
-					style={({ pressed }) => [styles.signOutButton, pressed && styles.pressed]}
-				>
-					<Text style={styles.signOutText}>Sign Out</Text>
-				</Pressable>
 			</ScrollView>
 		</SafeAreaView>
 	);
@@ -182,18 +167,5 @@ const styles = StyleSheet.create({
 	},
 	profileText: {
 		flex: 1,
-	},
-	signOutButton: {
-		alignItems: "center",
-		backgroundColor: colors.light.surface,
-		borderColor: colors.light.error,
-		borderRadius: 16,
-		borderWidth: 1,
-		justifyContent: "center",
-		minHeight: 52,
-	},
-	signOutText: {
-		...typography.label,
-		color: colors.light.error,
 	},
 });

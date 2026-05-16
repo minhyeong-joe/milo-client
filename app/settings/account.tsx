@@ -2,13 +2,18 @@ import { SettingsGroup, SettingsHeader, SettingsRow } from "@/components/setting
 import { useAuthSession } from "@/context/AuthSessionContext";
 import { colors, globalStyles, spacing, typography } from "@/styles/globalStyles";
 import { useRouter } from "expo-router";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, Text, View, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function AccountScreen() {
 	const router = useRouter();
-	const { session } = useAuthSession();
+	const { session, signOut } = useAuthSession();
 	const user = session?.user;
+
+	const handleSignOut = async () => {
+		await signOut();
+		router.replace("/sign-in");
+	};
 
 	return (
 		<SafeAreaView style={globalStyles.screen}>
@@ -32,6 +37,13 @@ export default function AccountScreen() {
 						title="Change Password"
 					/>
 				</SettingsGroup>
+				<Pressable
+					accessibilityRole="button"
+					onPress={handleSignOut}
+					style={({ pressed }) => [styles.signOutButton, pressed && styles.pressed]}
+				>
+					<Text style={styles.signOutText}>Sign Out</Text>
+				</Pressable>
 			</ScrollView>
 		</SafeAreaView>
 	);
@@ -76,5 +88,21 @@ const styles = StyleSheet.create({
 	sectionTitle: {
 		...typography.sectionTitle,
 		color: colors.light.textPrimary,
+	},
+	signOutButton: {
+		alignItems: "center",
+		backgroundColor: colors.light.surface,
+		borderColor: colors.light.error,
+		borderRadius: 16,
+		borderWidth: 1,
+		justifyContent: "center",
+		minHeight: 52,
+	},
+	signOutText: {
+		...typography.label,
+		color: colors.light.error,
+	},
+	pressed: {
+		opacity: 0.72,
 	},
 });
