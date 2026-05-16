@@ -7,11 +7,8 @@ import { RoutineDataProvider } from "@/context/RoutineDataContext";
 import { SyncProvider } from "@/context/SyncContext";
 import { StatusBar } from "expo-status-bar";
 import { Stack } from "expo-router";
-import { useColorScheme } from "react-native";
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
-
   return (
     <AppPreferencesProvider>
       <AuthSessionProvider>
@@ -20,7 +17,11 @@ export default function RootLayout() {
             <GrowthDataProvider>
               <DiaryCacheProvider>
                 <SyncProvider>
-                  <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
+                  <StatusBar
+                    backgroundColor="#F8F8FB"
+                    style="dark"
+                    translucent={false}
+                  />
                   <Stack screenOptions={{ headerShown: false }}>
                     <Stack.Screen name="(auth)" />
                     <Stack.Screen name="(tabs)" />
