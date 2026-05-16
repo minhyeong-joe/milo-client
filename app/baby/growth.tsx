@@ -3,6 +3,7 @@ import { useBabySelection } from "@/context/BabySelectionContext";
 import { useGrowthData } from "@/context/GrowthDataContext";
 import type { LocalGrowthRecord } from "@/services/growth/growthOfflineStore";
 import { colors, globalStyles, spacing, typography } from "@/styles/globalStyles";
+import { formatBabyAge } from "@/utils/routineDisplay";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -55,6 +56,7 @@ export default function GrowthRecordsScreen() {
 
 				{growthRecords.map((record) => (
 					<GrowthRecordCard
+						birthdate={selectedBaby?.birthdate}
 						key={record.id}
 						lengthUnit={preferredLengthUnit}
 						onPress={() => router.push({
@@ -71,20 +73,31 @@ export default function GrowthRecordsScreen() {
 }
 
 function GrowthRecordCard({
+	birthdate,
 	lengthUnit,
 	onPress,
 	record,
 	weightUnit,
 }: {
+	birthdate?: string;
 	lengthUnit: "cm" | "in";
 	onPress: () => void;
 	record: LocalGrowthRecord;
 	weightUnit: "kg" | "lb";
 }) {
+	const ageAtMeasurement = birthdate
+		? formatBabyAge(birthdate, parseDateKey(record.measuredDate))
+		: null;
+
 	return (
 		<Pressable accessibilityRole="button" onPress={onPress} style={globalStyles.card}>
 			<View style={globalStyles.rowBetween}>
-				<Text style={styles.recordDate}>{record.measuredDate}</Text>
+				<View>
+					<Text style={styles.recordDate}>{record.measuredDate}</Text>
+					{ageAtMeasurement ? (
+						<Text style={styles.recordAge}>{ageAtMeasurement} old</Text>
+					) : null}
+				</View>
 				{record.syncStatus === "pending" || record.syncStatus === "failed" ? (
 					<Text style={[
 						styles.syncBadge,
@@ -140,6 +153,10 @@ function formatWeight(valueGrams: number | null, unit: "kg" | "lb") {
 
 function formatDecimal(value: number) {
 	return value.toFixed(1).replace(/\.0$/, "");
+}
+
+function parseDateKey(value: string) {
+	return new Date(`${value}T00:00:00`);
 }
 
 const styles = StyleSheet.create({
@@ -198,6 +215,11 @@ const styles = StyleSheet.create({
 	recordDate: {
 		...typography.itemTitle,
 		color: colors.light.textPrimary,
+	},
+	recordAge: {
+		...typography.caption,
+		color: colors.light.textSecondary,
+		marginTop: 2,
 	},
 	syncBadge: {
 		...typography.caption,

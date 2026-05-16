@@ -6,7 +6,7 @@ import {
 	formatBabyProfileDateKey,
 } from "@/components/baby/BabyProfileFields";
 import { useBabySelection } from "@/context/BabySelectionContext";
-import type { BabySex } from "@/services/api/babies";
+import type { BabySex, CreateBabyAvatarUploadRequest } from "@/services/api/babies";
 import { colors, globalStyles, spacing } from "@/styles/globalStyles";
 import type { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { useRouter } from "expo-router";
@@ -22,20 +22,46 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+type AvatarDraft =
+	| { status: "unchanged" }
+	| { status: "replace"; contentType: CreateBabyAvatarUploadRequest["contentType"]; localUri: string }
+	| { status: "delete" };
+
+type InitialBabyProfile = {
+	avatarObjectKey: string | null;
+	avatarUrl: string | null;
+	birthdate: string;
+	id: string;
+	name: string;
+	sex: BabySex;
+};
+
 export default function EditBabyProfileScreen() {
 	const router = useRouter();
 	const {
-		removeSelectedBabyAvatar,
+		saveSelectedBabyProfileDraft,
 		selectedBaby,
-		setSelectedBabyAvatar,
-		updateSelectedBabyProfile,
 	} = useBabySelection();
-	const [name, setName] = useState(selectedBaby?.name ?? "");
-	const [birthdate, setBirthdate] = useState(() => new Date(`${selectedBaby?.birthdate ?? formatBabyProfileDateKey(new Date())}T00:00:00`));
-	const [sex, setSex] = useState<BabySex>(selectedBaby?.sex ?? "BOY");
+	const [initialProfile] = useState<InitialBabyProfile | null>(() =>
+		selectedBaby
+			? {
+					avatarObjectKey: selectedBaby.avatarObjectKey,
+					avatarUrl: selectedBaby.avatarUrl,
+					birthdate: selectedBaby.birthdate,
+					id: selectedBaby.id,
+					name: selectedBaby.name,
+					sex: selectedBaby.sex,
+				}
+			: null,
+	);
+	const [name, setName] = useState(initialProfile?.name ?? "");
+	const [birthdate, setBirthdate] = useState(() => new Date(`${initialProfile?.birthdate ?? formatBabyProfileDateKey(new Date())}T00:00:00`));
+	const [sex, setSex] = useState<BabySex>(initialProfile?.sex ?? "BOY");
+	const [avatarDraft, setAvatarDraft] = useState<AvatarDraft>({ status: "unchanged" });
 	const [isPickerOpen, setIsPickerOpen] = useState(false);
 	const [isSaving, setIsSaving] = useState(false);
 	const [formError, setFormError] = useState<string | null>(null);
+	const avatarPreview = getAvatarPreview(initialProfile, avatarDraft);
 
 	const handlePickerChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
 		if (Platform.OS === "android") {
@@ -50,7 +76,7 @@ export default function EditBabyProfileScreen() {
 	};
 
 	const saveProfile = async () => {
-		if (!selectedBaby) {
+		if (!initialProfile) {
 			setFormError("Select a baby before editing profile.");
 			return;
 		}
@@ -66,11 +92,14 @@ export default function EditBabyProfileScreen() {
 		setFormError(null);
 
 		try {
-			const didSave = await updateSelectedBabyProfile({
-				birthdate: formatBabyProfileDateKey(birthdate),
-				name: trimmedName,
-				sex,
-			});
+			const didSave = await saveSelectedBabyProfileDraft(
+				{
+					birthdate: formatBabyProfileDateKey(birthdate),
+					name: trimmedName,
+					sex,
+				},
+				avatarDraft,
+			);
 
 			if (didSave) {
 				router.back();
@@ -84,6 +113,15 @@ export default function EditBabyProfileScreen() {
 		}
 	};
 
+	const cancelEdit = () => {
+		setName(initialProfile?.name ?? "");
+		setBirthdate(new Date(`${initialProfile?.birthdate ?? formatBabyProfileDateKey(new Date())}T00:00:00`));
+		setSex(initialProfile?.sex ?? "BOY");
+		setAvatarDraft({ status: "unchanged" });
+		setFormError(null);
+		router.back();
+	};
+
 	return (
 		<SafeAreaView style={globalStyles.screen}>
 			<KeyboardAvoidingView
@@ -91,7 +129,7 @@ export default function EditBabyProfileScreen() {
 				style={styles.keyboardView}
 			>
 				<View style={styles.header}>
-					<Pressable accessibilityRole="button" onPress={() => router.back()} style={styles.headerButton}>
+					<Pressable accessibilityRole="button" onPress={cancelEdit} style={styles.headerButton}>
 						<Text style={styles.cancelText}>Cancel</Text>
 					</Pressable>
 					<Text style={globalStyles.sectionTitleText}>Edit Profile</Text>
@@ -99,12 +137,16 @@ export default function EditBabyProfileScreen() {
 				</View>
 				<ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
 					<BabyAvatarField
-						avatarObjectKey={selectedBaby?.avatarObjectKey}
-						avatarUrl={selectedBaby?.avatarUrl}
-						babyId={selectedBaby?.id}
+						avatarObjectKey={avatarPreview.avatarObjectKey}
+						avatarUrl={avatarPreview.avatarUrl}
+						babyId={initialProfile?.id}
 						disabled={isSaving}
-						onAvatarRemoved={removeSelectedBabyAvatar}
-						onAvatarSelected={setSelectedBabyAvatar}
+						onAvatarRemoved={() =>
+							setAvatarDraft(initialProfile?.avatarObjectKey ? { status: "delete" } : { status: "unchanged" })
+						}
+						onAvatarSelected={({ contentType, localUri }) =>
+							setAvatarDraft({ contentType, localUri, status: "replace" })
+						}
 					/>
 					<BabyNameField
 						label="Name"
@@ -134,6 +176,30 @@ export default function EditBabyProfileScreen() {
 			</KeyboardAvoidingView>
 		</SafeAreaView>
 	);
+}
+
+function getAvatarPreview(
+	initialProfile: InitialBabyProfile | null,
+	avatarDraft: AvatarDraft,
+) {
+	if (avatarDraft.status === "replace") {
+		return {
+			avatarObjectKey: "local:avatar",
+			avatarUrl: avatarDraft.localUri,
+		};
+	}
+
+	if (avatarDraft.status === "delete") {
+		return {
+			avatarObjectKey: null,
+			avatarUrl: null,
+		};
+	}
+
+	return {
+		avatarObjectKey: initialProfile?.avatarObjectKey,
+		avatarUrl: initialProfile?.avatarUrl,
+	};
 }
 
 function getErrorMessage(error: unknown) {

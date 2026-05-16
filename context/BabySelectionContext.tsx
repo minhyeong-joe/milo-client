@@ -40,6 +40,10 @@ type BabySelectionContextValue = {
 	removeSelectedBabyAvatar: () => Promise<boolean>;
 	refreshBabies: () => Promise<void>;
 	selectBaby: (babyId: string) => void;
+	saveSelectedBabyProfileDraft: (
+		input: UpdateBabyRequest,
+		avatarDraft?: SelectedBabyAvatarDraft,
+	) => Promise<boolean>;
 	selectedBaby: BabyListItem | null;
 	selectedBabyId: string | null;
 	updateSelectedBabyProfile: (input: UpdateBabyRequest) => Promise<boolean>;
@@ -49,6 +53,11 @@ type BabySelectionContextValue = {
 	}) => Promise<boolean>;
 	syncPendingBabyAvatarChanges: () => Promise<void>;
 };
+
+type SelectedBabyAvatarDraft =
+	| { status: "replace"; contentType: CreateBabyAvatarUploadRequest["contentType"]; localUri: string }
+	| { status: "delete" }
+	| { status: "unchanged" };
 
 const BabySelectionContext = createContext<BabySelectionContextValue | null>(null);
 
@@ -200,6 +209,79 @@ export function BabySelectionProvider({ children }: PropsWithChildren) {
 		return true;
 	}, [babies, refreshBabies, selectedBaby, session]);
 
+	const saveSelectedBabyProfileDraft = useCallback(async (
+		input: UpdateBabyRequest,
+		avatarDraft: SelectedBabyAvatarDraft = { status: "unchanged" },
+	) => {
+		if (!session || !selectedBaby) {
+			return false;
+		}
+
+		const now = new Date().toISOString();
+		const nextBabies = babies.map((baby) => {
+			if (baby.id !== selectedBaby.id) {
+				return baby;
+			}
+
+			const nextBaby = {
+				...baby,
+				birthdate: input.birthdate,
+				name: input.name,
+				sex: input.sex,
+				updatedAt: now,
+			};
+
+			if (avatarDraft.status === "replace") {
+				return {
+					...nextBaby,
+					avatarObjectKey: "local:avatar",
+					avatarUrl: avatarDraft.localUri,
+				};
+			}
+
+			if (avatarDraft.status === "delete") {
+				return {
+					...nextBaby,
+					avatarObjectKey: null,
+					avatarUrl: null,
+				};
+			}
+
+			return nextBaby;
+		});
+
+		setBabies(nextBabies);
+		await saveCachedBabySelection(session.user.id, nextBabies, selectedBaby.id);
+		await enqueueBabyProfileMutation({
+			babyId: selectedBaby.id,
+			payload: input,
+			status: "pending",
+			userId: session.user.id,
+		});
+
+		if (avatarDraft.status === "replace") {
+			await enqueueBabyAvatarMutation({
+				babyId: selectedBaby.id,
+				contentType: avatarDraft.contentType,
+				localUri: avatarDraft.localUri,
+				operation: "replace",
+				status: "pending",
+				userId: session.user.id,
+			});
+		} else if (avatarDraft.status === "delete") {
+			await enqueueBabyAvatarMutation({
+				babyId: selectedBaby.id,
+				contentType: null,
+				localUri: null,
+				operation: "delete",
+				status: "pending",
+				userId: session.user.id,
+			});
+		}
+
+		return true;
+	}, [babies, selectedBaby, session]);
+
 	const removeSelectedBabyAvatar = useCallback(async () => {
 		if (!session || !selectedBaby) {
 			return false;
@@ -244,6 +326,7 @@ export function BabySelectionProvider({ children }: PropsWithChildren) {
 			isLoading,
 			removeSelectedBabyAvatar,
 			refreshBabies,
+			saveSelectedBabyProfileDraft,
 			selectBaby: (babyId) => {
 				setSelectedBabyId(babyId);
 
@@ -264,6 +347,7 @@ export function BabySelectionProvider({ children }: PropsWithChildren) {
 			isLoading,
 			refreshBabies,
 			removeSelectedBabyAvatar,
+			saveSelectedBabyProfileDraft,
 			selectedBaby,
 			selectedBabyId,
 			session,

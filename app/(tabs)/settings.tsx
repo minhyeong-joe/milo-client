@@ -1,16 +1,19 @@
+import { BabySelectorModal } from "@/components/baby/BabySelectorModal";
 import { SettingsGroup, SettingsRow } from "@/components/settings/SettingsRows";
 import { useBabySelection } from "@/context/BabySelectionContext";
 import { colors, globalStyles, spacing, typography } from "@/styles/globalStyles";
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import { useState } from "react";
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
 
 const fallbackBabyAvatar = require("@/assets/images/baby.png");
 
 export default function SettingsScreen() {
 	const router = useRouter();
-	const { selectedBaby } = useBabySelection();
+	const { babies, selectBaby, selectedBaby } = useBabySelection();
+	const [isSelectorOpen, setIsSelectorOpen] = useState(false);
 
 	return (
 		<SafeAreaView edges={["top", "left", "right"]} style={globalStyles.screen}>
@@ -19,7 +22,8 @@ export default function SettingsScreen() {
 
 				<Pressable
 					accessibilityRole="button"
-					onPress={() => router.push("/baby/edit-profile")}
+					accessibilityLabel="Select baby"
+					onPress={() => setIsSelectorOpen(true)}
 					style={({ pressed }) => [styles.profileCard, pressed && styles.pressed]}
 				>
 					<Image
@@ -34,10 +38,18 @@ export default function SettingsScreen() {
 								: "Create or choose a baby profile"}
 						</Text>
 					</View>
-					<Ionicons color={colors.light.textSecondary} name="chevron-forward" size={22} />
+					<Ionicons color={colors.light.textSecondary} name="chevron-down" size={22} />
 				</Pressable>
 
 				<SettingsGroup>
+					<SettingsRow
+						icon="create-outline"
+						iconBackground="#F1ECFF"
+						iconColor={colors.light.primary}
+						onPress={() => router.push("/baby/edit-profile")}
+						subtitle="Name, birthday, photo"
+						title="Edit Baby Profile"
+					/>
 					<SettingsRow
 						icon="people-outline"
 						iconBackground="#EAF8EF"
@@ -95,6 +107,13 @@ export default function SettingsScreen() {
 						title="About"
 					/>
 				</SettingsGroup>
+				<BabySelectorModal
+					babies={babies}
+					onClose={() => setIsSelectorOpen(false)}
+					onSelectBaby={selectBaby}
+					selectedBaby={selectedBaby}
+					visible={isSelectorOpen}
+				/>
 			</ScrollView>
 		</SafeAreaView>
 	);
