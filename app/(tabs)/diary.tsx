@@ -3,6 +3,7 @@ import { DiaryActionsModal } from "@/components/diary/DiaryActionsModal";
 import { ConfirmDeleteModal } from "@/components/routine/ConfirmDeleteModal";
 import { useBabySelection } from "@/context/BabySelectionContext";
 import { useDiaryCache } from "@/context/DiaryCacheContext";
+import { useSync } from "@/context/SyncContext";
 import {
 	deleteDiaryEntry,
 	listDiaryEntries,
@@ -14,9 +15,11 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import {
 	ActivityIndicator,
+	Alert,
 	FlatList,
 	Pressable,
 	RefreshControl,
+	ScrollView,
 	StyleSheet,
 	Text,
 	View,
@@ -28,6 +31,7 @@ const PAGE_SIZE = 10;
 export default function DiaryScreen() {
 	const router = useRouter();
 	const { selectedBaby } = useBabySelection();
+	const { connectionStatus, markOffline, markOnline } = useSync();
 	const {
 		appendDiaryPage,
 		getDiaryCache,
@@ -45,6 +49,7 @@ export default function DiaryScreen() {
 	const diaryCache = selectedBaby ? getDiaryCache(selectedBaby.id) : null;
 	const entries = diaryCache?.entries ?? [];
 	const nextCursor = diaryCache?.nextCursor ?? null;
+	const isDiaryOffline = connectionStatus !== "online";
 
 	const todayDate = useMemo(
 		() => getDateKeyInTimeZone(new Date(), selectedBaby?.timezone),
@@ -52,9 +57,17 @@ export default function DiaryScreen() {
 	);
 
 	const loadFirstPage = useCallback(
-		async ({ refreshing = false }: { refreshing?: boolean } = {}) => {
+		async ({
+			forceNetwork = false,
+			refreshing = false,
+		}: { forceNetwork?: boolean; refreshing?: boolean } = {}) => {
 			if (!selectedBaby) {
 				setError(null);
+				return;
+			}
+
+			if (connectionStatus !== "online" && !forceNetwork) {
+				setError(DIARY_OFFLINE_MESSAGE);
 				return;
 			}
 
@@ -72,18 +85,20 @@ export default function DiaryScreen() {
 					take: PAGE_SIZE,
 				});
 				setDiaryFirstPage(selectedBaby.id, response);
+				markOnline();
 			} catch {
-				setError("Could not load diary entries. Pull to refresh or try again.");
+				markOffline();
+				setError(DIARY_OFFLINE_MESSAGE);
 			} finally {
 				setIsLoading(false);
 				setIsRefreshing(false);
 			}
 		},
-		[selectedBaby, setDiaryFirstPage],
+		[connectionStatus, markOffline, markOnline, selectedBaby, setDiaryFirstPage],
 	);
 
 	const loadMore = useCallback(async () => {
-		if (!selectedBaby || !nextCursor || isLoadingMore || isLoading) {
+		if (!selectedBaby || !nextCursor || isLoadingMore || isLoading || isDiaryOffline) {
 			return;
 		}
 
@@ -95,12 +110,14 @@ export default function DiaryScreen() {
 				take: PAGE_SIZE,
 			});
 			appendDiaryPage(selectedBaby.id, response);
+			markOnline();
 		} catch (caughtError) {
 			console.warn(caughtError);
+			markOffline();
 		} finally {
 			setIsLoadingMore(false);
 		}
-	}, [appendDiaryPage, isLoading, isLoadingMore, nextCursor, selectedBaby]);
+	}, [appendDiaryPage, isDiaryOffline, isLoading, isLoadingMore, markOffline, markOnline, nextCursor, selectedBaby]);
 
 	useFocusEffect(
 		useCallback(() => {
@@ -122,8 +139,28 @@ export default function DiaryScreen() {
 		});
 	};
 
+	const showDiaryOfflineAlert = (message: string) => {
+		setError(message);
+		Alert.alert("Diary unavailable offline", message);
+	};
+
+	const openAdd = () => {
+		if (isDiaryOffline) {
+			showDiaryOfflineAlert(DIARY_ADD_OFFLINE_MESSAGE);
+			return;
+		}
+
+		router.push("/diary/add");
+	};
+
 	const openEdit = (entry: DiaryEntry) => {
 		setActionEntry(null);
+
+		if (isDiaryOffline) {
+			showDiaryOfflineAlert(DIARY_EDIT_OFFLINE_MESSAGE);
+			return;
+		}
+
 		router.push({
 			pathname: "/diary/edit",
 			params: {
@@ -134,11 +171,23 @@ export default function DiaryScreen() {
 
 	const requestDelete = (entry: DiaryEntry) => {
 		setActionEntry(null);
+
+		if (isDiaryOffline) {
+			showDiaryOfflineAlert(DIARY_DELETE_OFFLINE_MESSAGE);
+			return;
+		}
+
 		setDeleteEntry(entry);
 	};
 
 	const confirmDelete = async () => {
 		if (!selectedBaby || !deleteEntry) {
+			return;
+		}
+
+		if (isDiaryOffline) {
+			showDiaryOfflineAlert(DIARY_DELETE_OFFLINE_MESSAGE);
+			setDeleteEntry(null);
 			return;
 		}
 
@@ -174,15 +223,39 @@ export default function DiaryScreen() {
 						/>
 						<Pressable
 							accessibilityLabel="Add diary entry"
-							onPress={() => router.push("/diary/add")}
-							style={styles.addButton}
+							accessibilityState={{ disabled: isDiaryOffline }}
+							onPress={openAdd}
+							style={[
+								styles.addButton,
+								isDiaryOffline && styles.disabledAddButton,
+							]}
 						>
 							<Ionicons color={colors.light.surface} name="add" size={24} />
 						</Pressable>
 					</View>
 				</View>
 
-				{selectedBaby ? (
+				{selectedBaby && isDiaryOffline ? (
+					<ScrollView
+						contentContainerStyle={styles.offlineScrollContent}
+						refreshControl={
+							<RefreshControl
+								refreshing={isRefreshing}
+								tintColor={colors.light.primary}
+								onRefresh={() =>
+									loadFirstPage({ forceNetwork: true, refreshing: true })
+								}
+							/>
+						}
+					>
+						<DiaryOfflineState
+							isRetrying={isRefreshing}
+							onRetry={() =>
+								loadFirstPage({ forceNetwork: true, refreshing: true })
+							}
+						/>
+					</ScrollView>
+				) : selectedBaby ? (
 					<FlatList
 						contentContainerStyle={[
 							styles.listContent,
@@ -212,7 +285,9 @@ export default function DiaryScreen() {
 							<RefreshControl
 								refreshing={isRefreshing}
 								tintColor={colors.light.primary}
-								onRefresh={() => loadFirstPage({ refreshing: true })}
+								onRefresh={() =>
+									loadFirstPage({ forceNetwork: true, refreshing: true })
+								}
 							/>
 						}
 						renderItem={({ item }) => (
@@ -249,6 +324,38 @@ export default function DiaryScreen() {
 				visible={Boolean(deleteEntry)}
 			/>
 		</SafeAreaView>
+	);
+}
+
+const DIARY_OFFLINE_MESSAGE =
+	"Diary is unavailable offline.";
+const DIARY_ADD_OFFLINE_MESSAGE =
+	"Diary is unavailable offline.";
+const DIARY_EDIT_OFFLINE_MESSAGE =
+	"Reconnect to edit diary entries.";
+const DIARY_DELETE_OFFLINE_MESSAGE =
+	"Reconnect to delete diary entries.";
+
+function DiaryOfflineState({
+	isRetrying,
+	onRetry,
+}: {
+	isRetrying: boolean;
+	onRetry: () => void;
+}) {
+	return (
+		<View style={styles.centerState}>
+			<Ionicons color={colors.light.textSecondary} name="cloud-offline-outline" size={32} />
+			<Text style={styles.emptyTitle}>{DIARY_OFFLINE_MESSAGE}</Text>
+			<Pressable
+				accessibilityRole="button"
+				disabled={isRetrying}
+				onPress={onRetry}
+				style={[styles.retryButton, isRetrying && styles.disabledRetryButton]}
+			>
+				<Text style={styles.retryText}>{isRetrying ? "Trying..." : "Try Again"}</Text>
+			</Pressable>
+		</View>
 	);
 }
 
@@ -323,6 +430,13 @@ const styles = StyleSheet.create({
 		gap: spacing.sm,
 		padding: spacing.xl,
 	},
+	disabledAddButton: {
+		backgroundColor: colors.light.textSecondary,
+		opacity: 0.65,
+	},
+	disabledRetryButton: {
+		opacity: 0.65,
+	},
 	emptyListContent: {
 		flexGrow: 1,
 		justifyContent: "center",
@@ -366,6 +480,10 @@ const styles = StyleSheet.create({
 	},
 	noBabyCard: {
 		gap: spacing.sm,
+	},
+	offlineScrollContent: {
+		flexGrow: 1,
+		justifyContent: "center",
 	},
 	retryButton: {
 		backgroundColor: colors.light.primary,

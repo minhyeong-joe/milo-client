@@ -2,6 +2,7 @@ import { useAuthSession } from "@/context/AuthSessionContext";
 import { useBabySelection } from "@/context/BabySelectionContext";
 import { useGrowthData } from "@/context/GrowthDataContext";
 import { useRoutineData } from "@/context/RoutineDataContext";
+import { syncPendingTagMutations } from "@/services/tags/tagOfflineStore";
 import {
 	createContext,
 	type PropsWithChildren,
@@ -17,7 +18,7 @@ export type ConnectionStatus = "online" | "offline" | "authRequired";
 
 type SyncNowOptions = {
 	babyId?: string;
-	scope?: "growth" | "routine" | "all";
+	scope?: "growth" | "routine" | "tags" | "all";
 };
 
 type SyncContextValue = {
@@ -37,7 +38,7 @@ const SYNC_TIMEOUT_MS = 10000;
 
 export function SyncProvider({ children }: PropsWithChildren) {
 	const { authStatus, session } = useAuthSession();
-	const { refreshBabies, selectedBaby } = useBabySelection();
+	const { refreshBabies, selectedBaby, syncPendingBabyAvatarChanges } = useBabySelection();
 	const { syncPendingGrowthMutations } = useGrowthData();
 	const { syncPendingMutations } = useRoutineData();
 	const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("online");
@@ -83,6 +84,7 @@ export function SyncProvider({ children }: PropsWithChildren) {
 
 			try {
 				if (scope === "all") {
+					await syncPendingBabyAvatarChanges();
 					await refreshBabies();
 				}
 
@@ -99,6 +101,10 @@ export function SyncProvider({ children }: PropsWithChildren) {
 
 				if (scope === "all" || scope === "growth") {
 					await syncPendingGrowthMutations();
+				}
+
+				if ((scope === "all" || scope === "tags") && selectedBaby) {
+					await syncPendingTagMutations(session.user.id, selectedBaby.id);
 				}
 
 				markOnline();
@@ -136,6 +142,7 @@ export function SyncProvider({ children }: PropsWithChildren) {
 		session,
 		syncPendingGrowthMutations,
 		syncPendingMutations,
+		syncPendingBabyAvatarChanges,
 	]);
 
 	const value = useMemo<SyncContextValue>(

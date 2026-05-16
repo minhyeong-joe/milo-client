@@ -20,6 +20,7 @@ import {
 } from "@/services/api/routine";
 import { ApiError } from "@/services/api/httpClient";
 import {
+	deleteRoutineDayCache,
 	deleteQueuedCreateByLocalId,
 	enqueueRoutineMutation,
 	loadPendingRoutineMutations,
@@ -299,11 +300,44 @@ function mergeDailyLogs(currentLogs: RoutineDay[], incomingLogs: RoutineDay[]) {
 	return Array.from(logsByDate.values()).sort(sortDaysDescending);
 }
 
+function getEventClientMutationId(event: RoutineEvent) {
+	return event.clientMutationId ?? null;
+}
+
 function removeEventById(logs: RoutineDay[], eventId: string) {
 	return logs
 		.map((day) => ({
 			...day,
 			timeline: day.timeline.filter((event) => event.id !== eventId),
+		}))
+		.filter((day) => day.timeline.length > 0)
+		.sort(sortDaysDescending);
+}
+
+function removeEventByIdentity(
+	logs: RoutineDay[],
+	{
+		clientMutationId,
+		eventId,
+	}: {
+		clientMutationId?: string | null;
+		eventId?: string;
+	},
+) {
+	return logs
+		.map((day) => ({
+			...day,
+			timeline: day.timeline.filter((event) => {
+				if (eventId && event.id === eventId) {
+					return false;
+				}
+
+				if (clientMutationId && getEventClientMutationId(event) === clientMutationId) {
+					return false;
+				}
+
+				return true;
+			}),
 		}))
 		.filter((day) => day.timeline.length > 0)
 		.sort(sortDaysDescending);
@@ -327,6 +361,10 @@ function getQueueId() {
 
 function getLocalId(kind: "meal" | "diaper" | "sleep") {
 	return `local:${kind}:${createUuid()}`;
+}
+
+function findEventById(logs: RoutineDay[], eventId: string) {
+	return logs.flatMap((day) => day.timeline).find((event) => event.id === eventId);
 }
 
 function getLastLoggedFromLogs(logs: RoutineDay[]): RoutineLastLogged {
@@ -522,11 +560,25 @@ export function RoutineDataProvider({ children }: PropsWithChildren) {
 				try {
 					const response = await sendQueuedMutation(mutation);
 					await markRoutineMutationSynced(mutation.id);
+					await Promise.all(
+						response.affectedDailyLogs
+							.filter((day) => day.timeline.length === 0)
+							.map((day) => deleteRoutineDayCache(session.user.id, selectedBaby.id, day.date)),
+					);
 
 					setDailyLogs((currentLogs) => {
-						const withoutLocal = mutation.localId
-							? removeEventById(currentLogs, mutation.localId)
-							: currentLogs;
+						const clientMutationId =
+							mutation.clientMutationId ??
+							("clientMutationId" in mutation.payload
+								? mutation.payload.clientMutationId
+								: undefined);
+						const withoutLocal =
+							mutation.localId || clientMutationId
+								? removeEventByIdentity(currentLogs, {
+										clientMutationId,
+										eventId: mutation.localId,
+									})
+								: currentLogs;
 						return mergeDailyLogs(withoutLocal, response.affectedDailyLogs);
 					});
 					setLastLogged(response.lastLogged);
@@ -591,6 +643,7 @@ export function RoutineDataProvider({ children }: PropsWithChildren) {
 				amountServings: input.type === "solid" ? input.amountServings : undefined,
 				amountGrams: input.type === "solid" ? input.amountGrams : undefined,
 				amountMl: input.type === "breastMilk" || input.type === "formula" ? input.amountMl : undefined,
+				clientMutationId,
 				durationMinutes: input.type === "breastfeed" ? input.durationMinutes : undefined,
 				breastSide: input.type === "breastfeed" ? input.breastSide : undefined,
 				id: localId,
@@ -644,6 +697,7 @@ export function RoutineDataProvider({ children }: PropsWithChildren) {
 				kind: "sleep",
 			} as const;
 			const sleep: SleepEvent = {
+				clientMutationId,
 				endTime: input.endTime,
 				id: localId,
 				kind: "sleep",
@@ -696,6 +750,7 @@ export function RoutineDataProvider({ children }: PropsWithChildren) {
 				kind: "diaper",
 			} as const;
 			const diaper: DiaperEvent = {
+				clientMutationId,
 				color: input.type === "dirty" || input.type === "both" ? input.color : undefined,
 				id: localId,
 				kind: "diaper",
@@ -741,6 +796,8 @@ export function RoutineDataProvider({ children }: PropsWithChildren) {
 			if (!selectedBaby || !session) return false;
 
 			const { id, ...payload } = input;
+			const existingMeal = findEventById(dailyLogs, id);
+			const clientMutationId = existingMeal?.clientMutationId ?? createUuid();
 			setDailyLogs((currentLogs) => {
 				const nextLogs = updateMealInLogs(currentLogs, input);
 				setLastLogged(getLastLoggedFromLogs(nextLogs));
@@ -750,7 +807,7 @@ export function RoutineDataProvider({ children }: PropsWithChildren) {
 			if (id.startsWith("local:")) {
 				await updateQueuedCreatePayloadByLocalId(session.user.id, selectedBaby.id, id, {
 					...payload,
-					clientMutationId: createUuid(),
+					clientMutationId,
 					kind: "meal",
 				});
 			} else {
@@ -773,6 +830,8 @@ export function RoutineDataProvider({ children }: PropsWithChildren) {
 			if (!selectedBaby || !session) return false;
 
 			const { id, ...payload } = input;
+			const existingDiaper = findEventById(dailyLogs, id);
+			const clientMutationId = existingDiaper?.clientMutationId ?? createUuid();
 			setDailyLogs((currentLogs) => {
 				const nextLogs = updateDiaperInLogs(currentLogs, input);
 				setLastLogged(getLastLoggedFromLogs(nextLogs));
@@ -782,7 +841,7 @@ export function RoutineDataProvider({ children }: PropsWithChildren) {
 			if (id.startsWith("local:")) {
 				await updateQueuedCreatePayloadByLocalId(session.user.id, selectedBaby.id, id, {
 					...payload,
-					clientMutationId: createUuid(),
+					clientMutationId,
 					kind: "diaper",
 				});
 			} else {
@@ -805,16 +864,34 @@ export function RoutineDataProvider({ children }: PropsWithChildren) {
 			if (!selectedBaby || !session) return false;
 
 			const { id, ...payload } = input;
+			const existingSleep = findEventById(dailyLogs, id);
+			const clientMutationId = existingSleep?.clientMutationId ?? createUuid();
+			const previousDate = existingSleep ? getEventDate(existingSleep) : null;
+			const updatedSleep = existingSleep && existingSleep.kind === "sleep"
+				? { ...existingSleep, ...payload }
+				: null;
+			const nextDate = updatedSleep ? getEventDate(updatedSleep) : null;
+			const predictedNextLogs = updateSleepInLogs(dailyLogs, input);
 			setDailyLogs((currentLogs) => {
 				const nextLogs = updateSleepInLogs(currentLogs, input);
 				setLastLogged(getLastLoggedFromLogs(nextLogs));
 				return nextLogs;
 			});
 
+			if (
+				previousDate &&
+				nextDate &&
+				previousDate !== nextDate &&
+				!predictedNextLogs.some((day) => day.date === previousDate)
+			) {
+				void deleteRoutineDayCache(session.user.id, selectedBaby.id, previousDate)
+					.catch(reportBackgroundError);
+			}
+
 			if (id.startsWith("local:")) {
 				await updateQueuedCreatePayloadByLocalId(session.user.id, selectedBaby.id, id, {
 					...payload,
-					clientMutationId: createUuid(),
+					clientMutationId,
 					kind: "sleep",
 				});
 			} else {

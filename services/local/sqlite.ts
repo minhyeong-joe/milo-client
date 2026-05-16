@@ -145,5 +145,69 @@ async function initLocalDb(db: SQLite.SQLiteDatabase) {
 
     CREATE INDEX IF NOT EXISTS growth_mutation_queue_pending_idx
     ON growth_mutation_queue(user_id, baby_id, status, created_at);
+
+    CREATE TABLE IF NOT EXISTS tag_cache (
+      user_id TEXT NOT NULL,
+      baby_id TEXT NOT NULL,
+      id TEXT NOT NULL,
+      tag_json TEXT NOT NULL,
+      sync_status TEXT NOT NULL CHECK(sync_status IN ('synced', 'pending', 'failed')),
+      deleted_at TEXT,
+      error TEXT,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (user_id, baby_id, id)
+    );
+
+    CREATE INDEX IF NOT EXISTS tag_cache_type_idx
+    ON tag_cache(user_id, baby_id, deleted_at);
+
+    CREATE TABLE IF NOT EXISTS tag_mutation_queue (
+      id TEXT PRIMARY KEY NOT NULL,
+      user_id TEXT NOT NULL,
+      baby_id TEXT NOT NULL,
+      tag_id TEXT NOT NULL,
+      operation TEXT NOT NULL CHECK(operation IN ('update', 'delete')),
+      payload_json TEXT NOT NULL,
+      status TEXT NOT NULL CHECK(status IN ('pending', 'failed')),
+      error TEXT,
+      retry_count INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS tag_mutation_queue_pending_idx
+    ON tag_mutation_queue(user_id, baby_id, status, created_at);
+
+    CREATE TABLE IF NOT EXISTS baby_avatar_mutation_queue (
+      user_id TEXT NOT NULL,
+      baby_id TEXT NOT NULL,
+      operation TEXT NOT NULL CHECK(operation IN ('replace', 'delete')),
+      local_uri TEXT,
+      content_type TEXT,
+      status TEXT NOT NULL CHECK(status IN ('pending', 'failed')),
+      error TEXT,
+      retry_count INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (user_id, baby_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS baby_avatar_mutation_queue_pending_idx
+    ON baby_avatar_mutation_queue(user_id, status, updated_at);
+
+    CREATE TABLE IF NOT EXISTS baby_profile_mutation_queue (
+      user_id TEXT NOT NULL,
+      baby_id TEXT NOT NULL,
+      payload_json TEXT NOT NULL,
+      status TEXT NOT NULL CHECK(status IN ('pending', 'failed')),
+      error TEXT,
+      retry_count INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (user_id, baby_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS baby_profile_mutation_queue_pending_idx
+    ON baby_profile_mutation_queue(user_id, status, updated_at);
   `);
 }

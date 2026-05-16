@@ -51,9 +51,9 @@ const TAG_FILTERS: { color: string; key: TagFilterKey; label: string }[] = [
 ];
 
 const DEFAULT_TAG_FILTERS: Record<TagFilterKey, boolean> = {
-	custom: true,
-	emotion: true,
-	event: true,
+	custom: false,
+	emotion: false,
+	event: false,
 	milestone: true,
 };
 
@@ -97,6 +97,7 @@ type DiaryEntryFormProps = {
 	initialTitle?: string | null;
 	isCreatingTag?: boolean;
 	isLoadingTags?: boolean;
+	isOnline?: boolean;
 	isSaving?: boolean;
 	onCancel: () => void;
 	onCreateTag: (name: string) => Promise<DiaryTag>;
@@ -115,6 +116,7 @@ export function DiaryEntryForm({
 	initialTitle = "",
 	isCreatingTag = false,
 	isLoadingTags = false,
+	isOnline = true,
 	isSaving = false,
 	onCancel,
 	onCreateTag,
@@ -235,6 +237,11 @@ export function DiaryEntryForm({
 	};
 
 	const handleSubmit = async () => {
+		if (!isOnline) {
+			setValidationError(DIARY_OFFLINE_MESSAGE);
+			return;
+		}
+
 		if (!canSubmit) {
 			setValidationError("Write a diary note before saving.");
 			return;
@@ -309,6 +316,11 @@ export function DiaryEntryForm({
 
 	const addMedia = async () => {
 		if (!babyId || isUploadingMedia) {
+			return;
+		}
+
+		if (!isOnline) {
+			setMediaError(DIARY_OFFLINE_MESSAGE);
 			return;
 		}
 
@@ -689,12 +701,12 @@ export function DiaryEntryForm({
 						<Text style={styles.secondaryButtonText}>Cancel</Text>
 					</Pressable>
 					<Pressable
-						disabled={!canSubmit || isSaving || isUploadingMedia}
+						disabled={!isOnline || !canSubmit || isSaving || isUploadingMedia}
 						onPress={handleSubmit}
 						style={[
 							styles.footerButton,
 							styles.primaryButton,
-							(!canSubmit || isSaving || isUploadingMedia) && styles.disabledButton,
+							(!isOnline || !canSubmit || isSaving || isUploadingMedia) && styles.disabledButton,
 						]}
 					>
 						<Text style={styles.primaryButtonText}>
@@ -843,6 +855,9 @@ function getAssetDurationSeconds(duration?: number | null) {
 
 	return duration > 1000 ? duration / 1000 : duration;
 }
+
+const DIARY_OFFLINE_MESSAGE =
+	"Diary is unavailable offline because entries may include media. Reconnect to view or add diary entries.";
 
 function getMediaErrorMessage(error: unknown) {
 	if (error instanceof Error) {

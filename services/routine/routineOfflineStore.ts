@@ -146,6 +146,16 @@ export async function saveRoutineHomeCache({
 	});
 }
 
+export async function deleteRoutineDayCache(userId: string, babyId: string, date: string) {
+	return runLocalDbWrite(async () => {
+		const db = await getLocalDb();
+		await db.runAsync(
+			"DELETE FROM routine_day_cache WHERE user_id = ? AND baby_id = ? AND date = ?",
+			[userId, babyId, date],
+		);
+	});
+}
+
 export async function enqueueRoutineMutation(mutation: QueuedRoutineMutation) {
 	return runLocalDbWrite(async () => {
 		const db = await getLocalDb();
@@ -241,14 +251,21 @@ export async function updateQueuedCreatePayloadByLocalId(
 		await db.runAsync(
 			`
 			UPDATE routine_mutation_queue
-			SET payload_json = ?, updated_at = ?
+			SET payload_json = ?, client_mutation_id = ?, updated_at = ?
 			WHERE user_id = ?
 				AND baby_id = ?
 				AND local_id = ?
 				AND operation = 'create'
 				AND status = 'pending'
 			`,
-			[JSON.stringify(payload), new Date().toISOString(), userId, babyId, localId],
+			[
+				JSON.stringify(payload),
+				payload.clientMutationId ?? null,
+				new Date().toISOString(),
+				userId,
+				babyId,
+				localId,
+			],
 		);
 	});
 }

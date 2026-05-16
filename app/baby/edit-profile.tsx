@@ -7,7 +7,6 @@ import {
 } from "@/components/baby/BabyProfileFields";
 import { useBabySelection } from "@/context/BabySelectionContext";
 import type { BabySex } from "@/services/api/babies";
-import { updateBaby } from "@/services/api/babies";
 import { colors, globalStyles, spacing } from "@/styles/globalStyles";
 import type { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { useRouter } from "expo-router";
@@ -25,7 +24,12 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function EditBabyProfileScreen() {
 	const router = useRouter();
-	const { refreshBabies, selectedBaby } = useBabySelection();
+	const {
+		removeSelectedBabyAvatar,
+		selectedBaby,
+		setSelectedBabyAvatar,
+		updateSelectedBabyProfile,
+	} = useBabySelection();
 	const [name, setName] = useState(selectedBaby?.name ?? "");
 	const [birthdate, setBirthdate] = useState(() => new Date(`${selectedBaby?.birthdate ?? formatBabyProfileDateKey(new Date())}T00:00:00`));
 	const [sex, setSex] = useState<BabySex>(selectedBaby?.sex ?? "BOY");
@@ -62,13 +66,17 @@ export default function EditBabyProfileScreen() {
 		setFormError(null);
 
 		try {
-			await updateBaby(selectedBaby.id, {
+			const didSave = await updateSelectedBabyProfile({
 				birthdate: formatBabyProfileDateKey(birthdate),
 				name: trimmedName,
 				sex,
 			});
-			await refreshBabies();
-			router.back();
+
+			if (didSave) {
+				router.back();
+			} else {
+				setFormError("Select a baby before editing profile.");
+			}
 		} catch (error) {
 			setFormError(getErrorMessage(error));
 		} finally {
@@ -95,7 +103,8 @@ export default function EditBabyProfileScreen() {
 						avatarUrl={selectedBaby?.avatarUrl}
 						babyId={selectedBaby?.id}
 						disabled={isSaving}
-						onAvatarChanged={refreshBabies}
+						onAvatarRemoved={removeSelectedBabyAvatar}
+						onAvatarSelected={setSelectedBabyAvatar}
 					/>
 					<BabyNameField
 						label="Name"

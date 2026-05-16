@@ -232,7 +232,7 @@ function createNetworkError(error: unknown, didTimeout: boolean) {
 			status: 0,
 			code: "REQUEST_TIMEOUT",
 			body: error,
-			message: "Milo API request timed out. Please try again.",
+			message: "Connection timed out. Please try again.",
 		});
 	}
 
@@ -240,7 +240,7 @@ function createNetworkError(error: unknown, didTimeout: boolean) {
 		status: 0,
 		code: "NETWORK_ERROR",
 		body: error,
-		message: "Could not reach Milo API. Please check your connection and try again.",
+		message: "Could not reach server. Please check your connection and try again.",
 	});
 }
 

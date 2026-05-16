@@ -5,17 +5,22 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { DiaryEntryForm } from "@/components/diary/DiaryEntryForm";
+import { useAuthSession } from "@/context/AuthSessionContext";
 import { useBabySelection } from "@/context/BabySelectionContext";
 import { useDiaryCache } from "@/context/DiaryCacheContext";
+import { useSync } from "@/context/SyncContext";
 import { createDiaryEntry, type DiaryTag } from "@/services/api/diary";
 import { ApiError } from "@/services/api/httpClient";
 import { createTag, listTags } from "@/services/api/tags";
+import { loadCachedTags, saveTagsCache } from "@/services/tags/tagOfflineStore";
 import { colors, globalStyles, spacing, typography } from "@/styles/globalStyles";
 
 export default function AddDiaryScreen() {
 	const router = useRouter();
+	const { session } = useAuthSession();
 	const { selectedBaby } = useBabySelection();
 	const { replaceDiaryEntryInCache } = useDiaryCache();
+	const { connectionStatus, markOffline, markOnline } = useSync();
 	const [error, setError] = useState<string | null>(null);
 	const [isCreatingTag, setIsCreatingTag] = useState(false);
 	const [isLoadingTags, setIsLoadingTags] = useState(false);
@@ -31,26 +36,47 @@ export default function AddDiaryScreen() {
 		setIsLoadingTags(true);
 
 		try {
+			if (!session) {
+				return;
+			}
+
+			const cachedTags = await loadCachedTags(session.user.id, selectedBaby.id);
+			if (cachedTags.length > 0) {
+				setAvailableTags(cachedTags);
+			}
+
+			if (connectionStatus !== "online") {
+				return;
+			}
+
 			const response = await listTags({
 				babyId: selectedBaby.id,
 			});
 
 			setAvailableTags(response.tags);
+			await saveTagsCache(session.user.id, selectedBaby.id, response.tags);
+			markOnline();
 		} catch (caughtError) {
 			console.warn(caughtError);
-			setAvailableTags([]);
+			markOffline();
 		} finally {
 			setIsLoadingTags(false);
 		}
-	}, [selectedBaby]);
+	}, [connectionStatus, markOffline, markOnline, selectedBaby, session]);
 
 	useEffect(() => {
-		void loadTags();
-	}, [loadTags]);
+		if (connectionStatus === "online") {
+			void loadTags();
+		}
+	}, [connectionStatus, loadTags]);
 
 	const handleCreateTag = useCallback(async (name: string) => {
 		if (!selectedBaby) {
 			throw new Error("Choose a baby before creating tags.");
+		}
+
+		if (connectionStatus !== "online") {
+			throw new Error(DIARY_OFFLINE_MESSAGE);
 		}
 
 		const trimmedName = name.trim();
@@ -81,7 +107,7 @@ export default function AddDiaryScreen() {
 		} finally {
 			setIsCreatingTag(false);
 		}
-	}, [loadTags, selectedBaby]);
+	}, [connectionStatus, loadTags, selectedBaby]);
 
 	const handleSubmit = async (input: {
 		content: string;
@@ -92,6 +118,11 @@ export default function AddDiaryScreen() {
 	}) => {
 		if (!selectedBaby) {
 			setError("Choose a baby before saving a diary entry.");
+			return;
+		}
+
+		if (connectionStatus !== "online") {
+			setError(DIARY_OFFLINE_MESSAGE);
 			return;
 		}
 
@@ -107,8 +138,10 @@ export default function AddDiaryScreen() {
 				title: input.title,
 			});
 			replaceDiaryEntryInCache(selectedBaby.id, response.diaryEntry);
+			markOnline();
 			router.back();
 		} catch (caughtError) {
+			markOffline();
 			setError(getErrorMessage(caughtError));
 		} finally {
 			setIsSaving(false);
@@ -130,13 +163,19 @@ export default function AddDiaryScreen() {
 				<View style={styles.iconButton} />
 			</View>
 
-			{selectedBaby ? (
+			{connectionStatus !== "online" ? (
+				<DiaryRouteOfflineState
+					message={DIARY_OFFLINE_MESSAGE}
+					onBack={() => router.back()}
+				/>
+			) : selectedBaby ? (
 				<DiaryEntryForm
 					availableTags={availableTags}
 					babyId={selectedBaby.id}
 					error={error}
 					isCreatingTag={isCreatingTag}
 					isLoadingTags={isLoadingTags}
+					isOnline={connectionStatus === "online"}
 					isSaving={isSaving}
 					onCancel={() => router.back()}
 					onCreateTag={handleCreateTag}
@@ -179,6 +218,30 @@ function getErrorMessage(error: unknown) {
 	return "Could not save this diary entry.";
 }
 
+const DIARY_OFFLINE_MESSAGE =
+	"Diary is unavailable offline.";
+
+function DiaryRouteOfflineState({
+	message,
+	onBack,
+}: {
+	message: string;
+	onBack: () => void;
+}) {
+	return (
+		<View style={globalStyles.screenContent}>
+			<View style={[globalStyles.card, styles.offlineCard]}>
+				<Ionicons color={colors.light.textSecondary} name="cloud-offline-outline" size={32} />
+				<Text style={styles.offlineTitle}>Diary unavailable offline</Text>
+				<Text style={styles.offlineText}>{message}</Text>
+				<Pressable accessibilityRole="button" onPress={onBack} style={styles.offlineButton}>
+					<Text style={styles.offlineButtonText}>Back</Text>
+				</Pressable>
+			</View>
+		</View>
+	);
+}
+
 const styles = StyleSheet.create({
 	header: {
 		alignItems: "center",
@@ -196,5 +259,32 @@ const styles = StyleSheet.create({
 		height: 44,
 		justifyContent: "center",
 		width: 44,
+	},
+	offlineButton: {
+		backgroundColor: colors.light.primary,
+		borderRadius: 999,
+		marginTop: spacing.sm,
+		paddingHorizontal: spacing.lg,
+		paddingVertical: spacing.sm,
+	},
+	offlineButtonText: {
+		...typography.caption,
+		color: colors.light.surface,
+		fontWeight: "700",
+	},
+	offlineCard: {
+		alignItems: "center",
+		gap: spacing.sm,
+		marginTop: spacing.lg,
+	},
+	offlineText: {
+		...typography.body,
+		color: colors.light.textSecondary,
+		textAlign: "center",
+	},
+	offlineTitle: {
+		...typography.sectionTitle,
+		color: colors.light.textPrimary,
+		textAlign: "center",
 	},
 });

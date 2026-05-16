@@ -1,10 +1,19 @@
 import { DiaryTagPill } from "@/components/diary/DiaryTagPill";
 import { ConfirmDeleteModal } from "@/components/routine/ConfirmDeleteModal";
 import { SettingsHeader } from "@/components/settings/SettingsRows";
+import { useAuthSession } from "@/context/AuthSessionContext";
 import { useBabySelection } from "@/context/BabySelectionContext";
 import { useDiaryCache } from "@/context/DiaryCacheContext";
+import { useSync } from "@/context/SyncContext";
 import type { DiaryTag } from "@/services/api/diary";
 import { deleteTag, listTags, updateTag } from "@/services/api/tags";
+import {
+	enqueueTagMutation,
+	loadCachedTags,
+	markTagDeleted,
+	saveTagsCache,
+	upsertPendingTag,
+} from "@/services/tags/tagOfflineStore";
 import { colors, globalStyles, spacing, typography } from "@/styles/globalStyles";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -32,13 +41,16 @@ const DEFAULT_TAG_TYPE_ORDER = ["milestone", "emotions", "event"];
 
 export default function MilestoneTagsScreen() {
 	const router = useRouter();
+	const { session } = useAuthSession();
 	const { selectedBaby } = useBabySelection();
 	const { removeTagFromDiaryCache, updateTagInDiaryCache } = useDiaryCache();
+	const { connectionStatus, markOffline, markOnline, syncNow } = useSync();
 	const [tags, setTags] = useState<DiaryTag[]>([]);
 	const [selectedTag, setSelectedTag] = useState<DiaryTag | null>(null);
 	const [name, setName] = useState("");
 	const [color, setColor] = useState(TAG_COLORS[0]);
 	const [error, setError] = useState<string | null>(null);
+	const [infoMessage, setInfoMessage] = useState<string | null>(null);
 	const [isLoading, setIsLoading] = useState(false);
 	const [isSaving, setIsSaving] = useState(false);
 	const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
@@ -57,7 +69,7 @@ export default function MilestoneTagsScreen() {
 		? { ...selectedTag, color, name: name.trim() || selectedTag.name }
 		: null;
 
-	const load = useCallback(async () => {
+	const load = useCallback(async ({ forceNetwork = false }: { forceNetwork?: boolean } = {}) => {
 		if (!selectedBaby) {
 			setTags([]);
 			return;
@@ -65,16 +77,51 @@ export default function MilestoneTagsScreen() {
 
 		setIsLoading(true);
 		setError(null);
+		setInfoMessage(null);
 
 		try {
+			if (!session) {
+				setTags([]);
+				return;
+			}
+
+			const cachedTags = await loadCachedTags(session.user.id, selectedBaby.id);
+			if (cachedTags.length > 0) {
+				setTags(cachedTags);
+			}
+
+			if (connectionStatus !== "online" && !forceNetwork) {
+				return;
+			}
+
+			if (forceNetwork || cachedTags.some((tag) => tag.syncStatus === "pending" || tag.syncStatus === "failed")) {
+				const syncSucceeded = await syncNow({
+					babyId: selectedBaby.id,
+					scope: "tags",
+				});
+
+				if (!syncSucceeded && forceNetwork) {
+					return;
+				}
+			}
+
 			const response = await listTags({ babyId: selectedBaby.id });
-			setTags(response.tags);
+			await saveTagsCache(session.user.id, selectedBaby.id, response.tags);
+			const mergedTags = await loadCachedTags(session.user.id, selectedBaby.id);
+			setTags(mergedTags);
+			setSelectedTag((currentTag) =>
+				currentTag
+					? mergedTags.find((tag) => tag.id === currentTag.id) ?? null
+					: null,
+			);
+			markOnline();
 		} catch (caughtError) {
 			setError(getErrorMessage(caughtError));
+			markOffline();
 		} finally {
 			setIsLoading(false);
 		}
-	}, [selectedBaby]);
+	}, [connectionStatus, markOffline, markOnline, selectedBaby, session, syncNow]);
 
 	useEffect(() => {
 		void load();
@@ -83,6 +130,7 @@ export default function MilestoneTagsScreen() {
 	const selectTag = (tag: DiaryTag) => {
 		if (tag.scope === "global") {
 			setSelectedTag(null);
+			setInfoMessage(null);
 			setError("Default tags are shared and read-only.");
 			return;
 		}
@@ -91,24 +139,57 @@ export default function MilestoneTagsScreen() {
 		setName(tag.name);
 		setColor(tag.color);
 		setError(null);
+		setInfoMessage(null);
 	};
 
 	const saveTag = async () => {
-		if (!selectedBaby || !selectedTag) {
+		if (!selectedBaby || !selectedTag || !session) {
 			return;
 		}
 
 		const trimmedName = name.trim();
 
 		if (!trimmedName) {
+			setInfoMessage(null);
 			setError("Tag name is required.");
 			return;
 		}
 
 		setIsSaving(true);
 		setError(null);
+		setInfoMessage(null);
 
 		try {
+			const nextTag = {
+				...selectedTag,
+				color,
+				name: trimmedName,
+				updatedAt: new Date().toISOString(),
+			};
+
+			setTags((currentTags) =>
+				currentTags.map((tag) => (tag.id === nextTag.id ? nextTag : tag)),
+			);
+			setSelectedTag(nextTag);
+			setName(nextTag.name);
+			setColor(nextTag.color);
+			updateTagInDiaryCache(selectedBaby.id, nextTag);
+			await upsertPendingTag(session.user.id, selectedBaby.id, nextTag);
+
+			if (connectionStatus !== "online") {
+				await enqueueTagMutation({
+					babyId: selectedBaby.id,
+					id: createUuid(),
+					operation: "update",
+					payload: { color, name: trimmedName },
+					status: "pending",
+					tagId: selectedTag.id,
+					userId: session.user.id,
+				});
+				setInfoMessage("Tag saved locally. It will sync when you're online.");
+				return;
+			}
+
 			const response = await updateTag(selectedBaby.id, selectedTag.id, {
 				color,
 				name: trimmedName,
@@ -120,29 +201,58 @@ export default function MilestoneTagsScreen() {
 			setName(response.tag.name);
 			setColor(response.tag.color);
 			updateTagInDiaryCache(selectedBaby.id, response.tag);
+			await saveTagsCache(session.user.id, selectedBaby.id, [
+				...tags.filter((tag) => tag.id !== response.tag.id),
+				response.tag,
+			]);
+			markOnline();
 		} catch (caughtError) {
+			setInfoMessage(null);
 			setError(getErrorMessage(caughtError));
+			markOffline();
 		} finally {
 			setIsSaving(false);
 		}
 	};
 
 	const removeTag = async () => {
-		if (!selectedBaby || !selectedTag) {
+		if (!selectedBaby || !selectedTag || !session) {
 			return;
 		}
 
 		setIsSaving(true);
 		setError(null);
+		setInfoMessage(null);
 
 		try {
-			await deleteTag(selectedBaby.id, selectedTag.id);
 			setTags((currentTags) => currentTags.filter((tag) => tag.id !== selectedTag.id));
 			removeTagFromDiaryCache(selectedBaby.id, selectedTag.id);
+			await markTagDeleted(session.user.id, selectedBaby.id, selectedTag.id);
+
+			if (connectionStatus !== "online") {
+				await enqueueTagMutation({
+					babyId: selectedBaby.id,
+					id: createUuid(),
+					operation: "delete",
+					payload: {},
+					status: "pending",
+					tagId: selectedTag.id,
+					userId: session.user.id,
+				});
+				setSelectedTag(null);
+				setIsDeleteModalVisible(false);
+				setInfoMessage("Tag removed locally. It will sync when you're online.");
+				return;
+			}
+
+			await deleteTag(selectedBaby.id, selectedTag.id);
 			setSelectedTag(null);
 			setIsDeleteModalVisible(false);
+			markOnline();
 		} catch (caughtError) {
+			setInfoMessage(null);
 			setError(getErrorMessage(caughtError));
+			markOffline();
 		} finally {
 			setIsSaving(false);
 		}
@@ -156,7 +266,7 @@ export default function MilestoneTagsScreen() {
 				keyboardShouldPersistTaps="handled"
 				refreshControl={
 					<RefreshControl
-						onRefresh={() => void load()}
+						onRefresh={() => void load({ forceNetwork: true })}
 						refreshing={isLoading}
 						tintColor={colors.light.primary}
 					/>
@@ -240,6 +350,12 @@ export default function MilestoneTagsScreen() {
 					</View>
 				) : null}
 
+				{infoMessage ? (
+					<View style={styles.infoBanner}>
+						<Ionicons color="#2563EB" name="information-circle-outline" size={18} />
+						<Text style={styles.infoText}>{infoMessage}</Text>
+					</View>
+				) : null}
 				{error ? <Text style={styles.errorText}>{error}</Text> : null}
 
 				<View style={globalStyles.card}>
@@ -324,6 +440,18 @@ function formatTagType(type: string) {
 		.join(" ");
 }
 
+function createUuid() {
+	if (globalThis.crypto?.randomUUID) {
+		return globalThis.crypto.randomUUID();
+	}
+
+	return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (value) => {
+		const random = Math.floor(Math.random() * 16);
+		const next = value === "x" ? random : (random & 0x3) | 0x8;
+		return next.toString(16);
+	});
+}
+
 function getErrorMessage(error: unknown) {
 	if (error instanceof Error) {
 		return error.message;
@@ -386,6 +514,22 @@ const styles = StyleSheet.create({
 	},
 	iconButton: {
 		padding: spacing.xs,
+	},
+	infoBanner: {
+		alignItems: "center",
+		backgroundColor: "#EAF4FF",
+		borderColor: "#B9DCF8",
+		borderRadius: 12,
+		borderWidth: 1,
+		flexDirection: "row",
+		gap: spacing.sm,
+		padding: spacing.md,
+	},
+	infoText: {
+		...typography.caption,
+		color: "#2563EB",
+		flex: 1,
+		lineHeight: 18,
 	},
 	input: {
 		...typography.body,

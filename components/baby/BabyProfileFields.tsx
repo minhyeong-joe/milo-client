@@ -3,10 +3,10 @@ import DateTimePicker, {
 	type DateTimePickerEvent,
 } from "@react-native-community/datetimepicker";
 import * as ImagePicker from "expo-image-picker";
+import { Directory, File, Paths } from "expo-file-system";
 import type { ComponentProps } from "react";
 import { Alert, Image, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
-import type { BabySex } from "@/services/api/babies";
-import { confirmBabyAvatar, createBabyAvatarUpload, removeBabyAvatar } from "@/services/api/babies";
+import type { BabySex, CreateBabyAvatarUploadRequest } from "@/services/api/babies";
 import { colors, spacing, typography } from "@/styles/globalStyles";
 
 type IoniconName = ComponentProps<typeof Ionicons>["name"];
@@ -19,13 +19,18 @@ export function BabyAvatarField({
 	avatarUrl,
 	babyId,
 	disabled = false,
-	onAvatarChanged,
+	onAvatarRemoved,
+	onAvatarSelected,
 }: {
 	avatarObjectKey?: string | null;
 	avatarUrl?: string | null;
 	babyId?: string;
 	disabled?: boolean;
-	onAvatarChanged?: () => Promise<void> | void;
+	onAvatarRemoved?: () => Promise<unknown> | unknown;
+	onAvatarSelected?: (input: {
+		contentType: CreateBabyAvatarUploadRequest["contentType"];
+		localUri: string;
+	}) => Promise<unknown> | unknown;
 }) {
 	const canEdit = Boolean(babyId) && !disabled;
 
@@ -58,25 +63,10 @@ export function BabyAvatarField({
 		try {
 			const asset = result.assets[0];
 			const contentType = getAvatarContentType(asset);
-			const upload = await createBabyAvatarUpload(babyId, { contentType });
-			const imageResponse = await fetch(asset.uri);
-			const imageBlob = await imageResponse.blob();
-			const uploadResponse = await fetch(upload.uploadUrl, {
-				body: imageBlob,
-				headers: {
-					"Content-Type": contentType,
-				},
-				method: "PUT",
-			});
-
-			if (!uploadResponse.ok) {
-				throw new Error("Could not upload profile picture. Please try again.");
-			}
-
-			await confirmBabyAvatar(babyId, { objectKey: upload.objectKey });
-			await onAvatarChanged?.();
+			const localUri = await copyAvatarToLocalCache(asset.uri, contentType, babyId);
+			await onAvatarSelected?.({ contentType, localUri });
 		} catch (error) {
-			Alert.alert("Upload failed", getAvatarErrorMessage(error));
+			Alert.alert("Photo failed", getAvatarErrorMessage(error));
 		}
 	};
 
@@ -86,8 +76,7 @@ export function BabyAvatarField({
 		}
 
 		try {
-			await removeBabyAvatar(babyId);
-			await onAvatarChanged?.();
+			await onAvatarRemoved?.();
 		} catch (error) {
 			Alert.alert("Remove failed", getAvatarErrorMessage(error));
 		}
@@ -290,6 +279,26 @@ function getAvatarContentType(asset: ImagePicker.ImagePickerAsset): AvatarConten
 	}
 
 	return "image/jpeg";
+}
+
+async function copyAvatarToLocalCache(
+	uri: string,
+	contentType: AvatarContentType,
+	babyId: string,
+) {
+	const extension = contentType === "image/png"
+		? "png"
+		: contentType === "image/webp"
+			? "webp"
+			: "jpg";
+	const directory = new Directory(Paths.document, "milo", "avatar-cache");
+	const destination = new File(directory, `${babyId}-${Date.now()}.${extension}`);
+	const source = new File(uri);
+
+	directory.create({ idempotent: true, intermediates: true });
+	source.copy(destination);
+
+	return destination.uri;
 }
 
 function getAvatarErrorMessage(error: unknown) {

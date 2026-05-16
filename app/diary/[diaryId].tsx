@@ -4,13 +4,14 @@ import { DiaryTagPill } from "@/components/diary/DiaryTagPill";
 import { ConfirmDeleteModal } from "@/components/routine/ConfirmDeleteModal";
 import { useBabySelection } from "@/context/BabySelectionContext";
 import { useDiaryCache } from "@/context/DiaryCacheContext";
+import { useSync } from "@/context/SyncContext";
 import { deleteDiaryEntry, type DiaryEntry } from "@/services/api/diary";
 import { colors, globalStyles, spacing, typography } from "@/styles/globalStyles";
 import { formatBabyAge } from "@/utils/routineDisplay";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function DiaryDetailScreen() {
@@ -18,6 +19,7 @@ export default function DiaryDetailScreen() {
 	const params = useLocalSearchParams<{ diaryId: string; entry?: string }>();
 	const { selectedBaby } = useBabySelection();
 	const { getDiaryCache, removeDiaryEntryFromCache } = useDiaryCache();
+	const { connectionStatus } = useSync();
 	const parsedEntry = parseEntryParam(params.entry);
 	const cachedEntry = selectedBaby
 		? getDiaryCache(selectedBaby.id).entries.find((item) => item.id === params.diaryId)
@@ -29,6 +31,7 @@ export default function DiaryDetailScreen() {
 	const [isDeleting, setIsDeleting] = useState(false);
 	const insets = useSafeAreaInsets();
 	const footerBottomPadding = Math.max(insets.bottom, 12);
+	const isDiaryOffline = connectionStatus !== "online";
 
 	const openEdit = () => {
 		if (!entry) {
@@ -36,6 +39,12 @@ export default function DiaryDetailScreen() {
 		}
 
 		setIsActionsVisible(false);
+
+		if (isDiaryOffline) {
+			showDiaryOfflineAlert(DIARY_EDIT_OFFLINE_MESSAGE);
+			return;
+		}
+
 		router.push({
 			pathname: "/diary/edit",
 			params: {
@@ -46,11 +55,23 @@ export default function DiaryDetailScreen() {
 
 	const requestDelete = () => {
 		setIsActionsVisible(false);
+
+		if (isDiaryOffline) {
+			showDiaryOfflineAlert(DIARY_DELETE_OFFLINE_MESSAGE);
+			return;
+		}
+
 		setIsDeleteModalVisible(true);
 	};
 
 	const confirmDelete = async () => {
 		if (!selectedBaby || !entry) {
+			return;
+		}
+
+		if (isDiaryOffline) {
+			showDiaryOfflineAlert(DIARY_DELETE_OFFLINE_MESSAGE);
+			setIsDeleteModalVisible(false);
 			return;
 		}
 
@@ -190,6 +211,15 @@ export default function DiaryDetailScreen() {
 			</Modal>
 		</SafeAreaView>
 	);
+}
+
+const DIARY_EDIT_OFFLINE_MESSAGE =
+	"Reconnect to edit diary entries. Diary media requires an internet connection.";
+const DIARY_DELETE_OFFLINE_MESSAGE =
+	"Reconnect to delete diary entries. Diary media requires an internet connection.";
+
+function showDiaryOfflineAlert(message: string) {
+	Alert.alert("Diary unavailable offline", message);
 }
 
 function MetadataRow({ label, value }: { label: string; value: string }) {

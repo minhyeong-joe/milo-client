@@ -1,5 +1,16 @@
 import { useAuthSession } from "@/context/AuthSessionContext";
-import { getBabies, type BabyListItem } from "@/services/api/babies";
+import { getBabies, type BabyListItem, type UpdateBabyRequest } from "@/services/api/babies";
+import type { CreateBabyAvatarUploadRequest } from "@/services/api/babies";
+import {
+	applyPendingBabyAvatarMutations,
+	enqueueBabyAvatarMutation,
+	syncPendingBabyAvatarMutations,
+} from "@/services/babies/babyAvatarOfflineStore";
+import {
+	applyPendingBabyProfileMutations,
+	enqueueBabyProfileMutation,
+	syncPendingBabyProfileMutations,
+} from "@/services/babies/babyProfileOfflineStore";
 import {
 	loadCachedBabySelection,
 	saveCachedBabySelection,
@@ -26,10 +37,17 @@ type BabySelectionContextValue = {
 	babies: BabyListItem[];
 	error: string | null;
 	isLoading: boolean;
+	removeSelectedBabyAvatar: () => Promise<boolean>;
 	refreshBabies: () => Promise<void>;
 	selectBaby: (babyId: string) => void;
 	selectedBaby: BabyListItem | null;
 	selectedBabyId: string | null;
+	updateSelectedBabyProfile: (input: UpdateBabyRequest) => Promise<boolean>;
+	setSelectedBabyAvatar: (input: {
+		contentType: CreateBabyAvatarUploadRequest["contentType"];
+		localUri: string;
+	}) => Promise<boolean>;
+	syncPendingBabyAvatarChanges: () => Promise<void>;
 };
 
 const BabySelectionContext = createContext<BabySelectionContextValue | null>(null);
@@ -61,22 +79,38 @@ export function BabySelectionProvider({ children }: PropsWithChildren) {
 					getAccessibleBabyId(cachedSelection.babies, cachedSelection.selectedBabyId) ??
 					cachedSelection.babies[0]?.id ??
 					null;
+				const cachedBabiesWithPendingProfiles = await applyPendingBabyProfileMutations(
+					session.user.id,
+					cachedSelection.babies,
+				);
+				const cachedBabiesWithPendingAvatars = await applyPendingBabyAvatarMutations(
+					session.user.id,
+					cachedBabiesWithPendingProfiles,
+				);
 
-				setBabies(cachedSelection.babies);
+				setBabies(cachedBabiesWithPendingAvatars);
 				setSelectedBabyId(cachedSelectedBabyId);
 			}
 
 			const response = await getBabies();
+			const babiesWithPendingProfiles = await applyPendingBabyProfileMutations(
+				session.user.id,
+				response.babies,
+			);
+			const babiesWithPendingAvatars = await applyPendingBabyAvatarMutations(
+				session.user.id,
+				babiesWithPendingProfiles,
+			);
 			const storedBabyId = await loadStoredSelectedBabyId(session.user.id);
 			const nextSelectedBabyId =
-				getAccessibleBabyId(response.babies, selectedBabyId) ??
-				getAccessibleBabyId(response.babies, storedBabyId) ??
-				response.babies[0]?.id ??
+				getAccessibleBabyId(babiesWithPendingAvatars, selectedBabyId) ??
+				getAccessibleBabyId(babiesWithPendingAvatars, storedBabyId) ??
+				babiesWithPendingAvatars[0]?.id ??
 				null;
 
-			setBabies(response.babies);
+			setBabies(babiesWithPendingAvatars);
 			setSelectedBabyId(nextSelectedBabyId);
-			await saveCachedBabySelection(session.user.id, response.babies, nextSelectedBabyId);
+			await saveCachedBabySelection(session.user.id, babiesWithPendingAvatars, nextSelectedBabyId);
 
 			if (nextSelectedBabyId) {
 				await saveStoredSelectedBabyId(session.user.id, nextSelectedBabyId);
@@ -101,11 +135,114 @@ export function BabySelectionProvider({ children }: PropsWithChildren) {
 		[babies, selectedBabyId],
 	);
 
+	const setSelectedBabyAvatar = useCallback(async ({
+		contentType,
+		localUri,
+	}: {
+		contentType: CreateBabyAvatarUploadRequest["contentType"];
+		localUri: string;
+	}) => {
+		if (!session || !selectedBaby) {
+			return false;
+		}
+
+		const nextBabies = babies.map((baby) =>
+			baby.id === selectedBaby.id
+				? { ...baby, avatarObjectKey: "local:avatar", avatarUrl: localUri }
+				: baby,
+		);
+
+		setBabies(nextBabies);
+		await saveCachedBabySelection(session.user.id, nextBabies, selectedBaby.id);
+		await enqueueBabyAvatarMutation({
+			babyId: selectedBaby.id,
+			contentType,
+			localUri,
+			operation: "replace",
+			status: "pending",
+			userId: session.user.id,
+		});
+		void syncPendingBabyAvatarMutations(session.user.id)
+			.then(refreshBabies)
+			.catch(reportBackgroundError);
+		return true;
+	}, [babies, refreshBabies, selectedBaby, session]);
+
+	const updateSelectedBabyProfile = useCallback(async (input: UpdateBabyRequest) => {
+		if (!session || !selectedBaby) {
+			return false;
+		}
+
+		const now = new Date().toISOString();
+		const nextBabies = babies.map((baby) =>
+			baby.id === selectedBaby.id
+				? {
+						...baby,
+						birthdate: input.birthdate,
+						name: input.name,
+						sex: input.sex,
+						updatedAt: now,
+					}
+				: baby,
+		);
+
+		setBabies(nextBabies);
+		await saveCachedBabySelection(session.user.id, nextBabies, selectedBaby.id);
+		await enqueueBabyProfileMutation({
+			babyId: selectedBaby.id,
+			payload: input,
+			status: "pending",
+			userId: session.user.id,
+		});
+		void syncPendingBabyProfileMutations(session.user.id)
+			.then(refreshBabies)
+			.catch(reportBackgroundError);
+		return true;
+	}, [babies, refreshBabies, selectedBaby, session]);
+
+	const removeSelectedBabyAvatar = useCallback(async () => {
+		if (!session || !selectedBaby) {
+			return false;
+		}
+
+		const nextBabies = babies.map((baby) =>
+			baby.id === selectedBaby.id
+				? { ...baby, avatarObjectKey: null, avatarUrl: null }
+				: baby,
+		);
+
+		setBabies(nextBabies);
+		await saveCachedBabySelection(session.user.id, nextBabies, selectedBaby.id);
+		await enqueueBabyAvatarMutation({
+			babyId: selectedBaby.id,
+			contentType: null,
+			localUri: null,
+			operation: "delete",
+			status: "pending",
+			userId: session.user.id,
+		});
+		void syncPendingBabyAvatarMutations(session.user.id)
+			.then(refreshBabies)
+			.catch(reportBackgroundError);
+		return true;
+	}, [babies, refreshBabies, selectedBaby, session]);
+
+	const syncPendingBabyAvatarChanges = useCallback(async () => {
+		if (!session) {
+			return;
+		}
+
+		await syncPendingBabyProfileMutations(session.user.id);
+		await syncPendingBabyAvatarMutations(session.user.id);
+		await refreshBabies();
+	}, [refreshBabies, session]);
+
 	const value = useMemo<BabySelectionContextValue>(
 		() => ({
 			babies,
 			error,
 			isLoading,
+			removeSelectedBabyAvatar,
 			refreshBabies,
 			selectBaby: (babyId) => {
 				setSelectedBabyId(babyId);
@@ -117,8 +254,23 @@ export function BabySelectionProvider({ children }: PropsWithChildren) {
 			},
 			selectedBaby,
 			selectedBabyId,
+			setSelectedBabyAvatar,
+			syncPendingBabyAvatarChanges,
+			updateSelectedBabyProfile,
 		}),
-		[babies, error, isLoading, refreshBabies, selectedBaby, selectedBabyId, session],
+		[
+			babies,
+			error,
+			isLoading,
+			refreshBabies,
+			removeSelectedBabyAvatar,
+			selectedBaby,
+			selectedBabyId,
+			session,
+			setSelectedBabyAvatar,
+			syncPendingBabyAvatarChanges,
+			updateSelectedBabyProfile,
+		],
 	);
 
 	return (

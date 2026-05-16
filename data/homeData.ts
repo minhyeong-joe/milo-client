@@ -21,6 +21,7 @@ export type MealEvent = {
   amountServings?: number;          // For solid feedings, representing number of servings.
   amountGrams?: number;         // For solid feedings measured by weight. Separate from serving units.
   breastSide?: "left" | "right"; // For breastfeeding sessions, indicating which side was used
+  clientMutationId?: string | null;
   id: string;
   kind: "meal";
   syncStatus?: "pending" | "failed";
@@ -30,6 +31,7 @@ export type MealEvent = {
 };
 
 export type SleepEvent = {
+  clientMutationId?: string | null;
   endTime?: string;
   id: string;
   kind: "sleep";
@@ -40,6 +42,7 @@ export type SleepEvent = {
 };
 
 export type DiaperEvent = {
+  clientMutationId?: string | null;
   color?: DiaperColor;
   id: string;
   kind: "diaper";
