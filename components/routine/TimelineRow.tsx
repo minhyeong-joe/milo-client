@@ -61,11 +61,13 @@ export function TimelineRow({
 	currentTime,
 	event,
 	isLast,
+	timeZone,
 }: {
 	config: RoutineConfig;
 	currentTime: string;
 	event: RoutineEvent;
 	isLast: boolean;
+	timeZone?: string;
 }) {
 	const display = getEventDisplay(event, config, currentTime);
 	const isSleep = event.kind === "sleep";
@@ -93,10 +95,10 @@ export function TimelineRow({
 		<View style={styles.timelineRow}>
 			{isSleep ? (
 				<Text style={styles.timelineTime}>
-					{`${formatClockTime(event.startTime)}\n ${event.endTime ? `- ${formatClockTime(event.endTime)}` : "- Now"}`}
+					{`${formatClockTime(event.startTime, timeZone)}\n ${event.endTime ? `- ${formatClockTime(event.endTime, timeZone)}` : "- Now"}`}
 				</Text>
 			) : (
-				<Text style={styles.timelineTime}>{formatClockTime(event.time)}</Text>
+				<Text style={styles.timelineTime}>{formatClockTime(event.time, timeZone)}</Text>
 			)}
 
 			<View style={styles.timelineRail}>

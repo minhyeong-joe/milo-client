@@ -2,6 +2,7 @@ import { DiaryEntryCard } from "@/components/diary/DiaryEntryCard";
 import { DiaryActionsModal } from "@/components/diary/DiaryActionsModal";
 import { DiaryTagPill } from "@/components/diary/DiaryTagPill";
 import { ConfirmDeleteModal } from "@/components/routine/ConfirmDeleteModal";
+import { useTimelineTimeZone } from "@/context/AppPreferencesContext";
 import { useBabySelection } from "@/context/BabySelectionContext";
 import { useDiaryCache } from "@/context/DiaryCacheContext";
 import { useSync } from "@/context/SyncContext";
@@ -64,6 +65,7 @@ const emptyFilters: DiaryFilterState = {
 export default function DiaryScreen() {
 	const router = useRouter();
 	const { selectedBaby } = useBabySelection();
+	const timelineTimeZone = useTimelineTimeZone(selectedBaby);
 	const { connectionStatus, markOffline, markOnline } = useSync();
 	const {
 		appendDiaryPage,
@@ -427,6 +429,7 @@ export default function DiaryScreen() {
 									removeFilterValue(currentFilters, key, value),
 								);
 							}}
+							timeZone={timelineTimeZone}
 							tags={availableTags}
 						/>
 					) : null}
@@ -492,6 +495,7 @@ export default function DiaryScreen() {
 								entry={item}
 								onMorePress={setActionEntry}
 								onPress={openEntry}
+								timeZone={timelineTimeZone}
 								todayDate={todayDate}
 							/>
 						)}
@@ -534,6 +538,7 @@ export default function DiaryScreen() {
 				}}
 				onDraftChange={setDraftFilters}
 				onOpenDatePicker={setDatePickerTarget}
+				timeZone={timelineTimeZone}
 				visible={isFilterVisible}
 			/>
 		</SafeAreaView>
@@ -553,14 +558,16 @@ function ActiveFilterChips({
 	filters,
 	onClearAll,
 	onRemove,
+	timeZone,
 	tags,
 }: {
 	filters: DiaryListFilters;
 	onClearAll: () => void;
 	onRemove: (key: ActiveFilterKey, value?: string) => void;
+	timeZone?: string;
 	tags: DiaryTag[];
 }) {
-	const chips = getActiveFilterChips(filters, tags);
+	const chips = getActiveFilterChips(filters, tags, timeZone);
 
 	if (chips.length === 0) {
 		return null;
@@ -601,6 +608,7 @@ function DiaryFilterModal({
 	onClose,
 	onDraftChange,
 	onOpenDatePicker,
+	timeZone,
 	visible,
 }: {
 	availableTags: DiaryTag[];
@@ -613,6 +621,7 @@ function DiaryFilterModal({
 	onClose: () => void;
 	onDraftChange: (filters: DiaryFilterState) => void;
 	onOpenDatePicker: (target: "start" | "end") => void;
+	timeZone?: string;
 	visible: boolean;
 }) {
 	const sortedTags = useMemo(
@@ -642,11 +651,13 @@ function DiaryFilterModal({
 							<DateFilterButton
 								label="From"
 								onPress={() => onOpenDatePicker("start")}
+								timeZone={timeZone}
 								value={draftFilters.startDate}
 							/>
 							<DateFilterButton
 								label="To"
 								onPress={() => onOpenDatePicker("end")}
+								timeZone={timeZone}
 								value={draftFilters.endDate}
 							/>
 						</View>
@@ -775,16 +786,18 @@ function DiaryFilterModal({
 function DateFilterButton({
 	label,
 	onPress,
+	timeZone,
 	value,
 }: {
 	label: string;
 	onPress: () => void;
+	timeZone?: string;
 	value: string | null;
 }) {
 	return (
 		<Pressable accessibilityRole="button" onPress={onPress} style={styles.dateFilterButton}>
 			<Text style={styles.helperText}>{label}</Text>
-			<Text style={styles.dateFilterText}>{value ? formatShortDate(value) : "Any"}</Text>
+			<Text style={styles.dateFilterText}>{value ? formatShortDate(value, timeZone) : "Any"}</Text>
 		</Pressable>
 	);
 }
@@ -951,16 +964,16 @@ function removeFilterValue(
 	return filters;
 }
 
-function getActiveFilterChips(filters: DiaryListFilters, tags: DiaryTag[]) {
+function getActiveFilterChips(filters: DiaryListFilters, tags: DiaryTag[], timeZone?: string) {
 	const tagById = new Map(tags.map((tag) => [tag.id, tag]));
 	const chips: { key: ActiveFilterKey; label: string; value?: string }[] = [];
 
 	if (filters.startDate) {
-		chips.push({ key: "startDate", label: `From ${formatShortDate(filters.startDate)}` });
+		chips.push({ key: "startDate", label: `From ${formatShortDate(filters.startDate, timeZone)}` });
 	}
 
 	if (filters.endDate) {
-		chips.push({ key: "endDate", label: `To ${formatShortDate(filters.endDate)}` });
+		chips.push({ key: "endDate", label: `To ${formatShortDate(filters.endDate, timeZone)}` });
 	}
 
 	if (filters.includeMedia === true) {
@@ -1015,7 +1028,7 @@ function toDateKey(date: Date) {
 	return `${year}-${month}-${day}`;
 }
 
-function formatShortDate(dateKey: string) {
+function formatShortDate(dateKey: string, timeZone?: string) {
 	const date = dateFromKey(dateKey);
 
 	if (!date) {
@@ -1025,6 +1038,7 @@ function formatShortDate(dateKey: string) {
 	return new Intl.DateTimeFormat("en-US", {
 		day: "numeric",
 		month: "short",
+		timeZone,
 	}).format(date);
 }
 

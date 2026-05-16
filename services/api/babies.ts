@@ -42,6 +42,7 @@ export type UpdateBabyRequest = {
 	name: string;
 	birthdate: string;
 	sex: BabySex;
+	timezone?: string;
 };
 
 export type CreateBabyResponse = {

@@ -2,7 +2,7 @@ import { BabyHeader } from "@/components/routine/BabyHeader";
 import { QuickActionGrid } from "@/components/routine/QuickActionGrid";
 import { RoutineDayCard } from "@/components/routine/RoutineDayCard";
 import { SyncStatusCard } from "@/components/sync/SyncStatusCard";
-import { useAppPreferences } from "@/context/AppPreferencesContext";
+import { useAppPreferences, useTimelineTimeZone } from "@/context/AppPreferencesContext";
 import { useAuthSession } from "@/context/AuthSessionContext";
 import { useBabySelection } from "@/context/BabySelectionContext";
 import { useRoutineData } from "@/context/RoutineDataContext";
@@ -74,6 +74,7 @@ export default function HomeScreen() {
 	} = useSync();
 	const currentDate = useCurrentMinute();
 	const currentTime = currentDate.toISOString();
+	const timelineTimeZone = useTimelineTimeZone(selectedBaby);
 	const [isInitialRoutineLoading, setIsInitialRoutineLoading] = useState(false);
 	const [isOlderRoutineLoading, setIsOlderRoutineLoading] = useState(false);
 	const [routineError, setRoutineError] = useState<string | null>(null);
@@ -439,6 +440,7 @@ export default function HomeScreen() {
 								day={log}
 								defaultView={index === 0 ? "timeline" : "summary"}
 								key={log.date}
+								timeZone={timelineTimeZone}
 							/>
 						))}
 					{selectedBaby && isOlderRoutineLoading && (

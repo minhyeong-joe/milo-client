@@ -1,4 +1,4 @@
-import { useAppPreferences } from "@/context/AppPreferencesContext";
+import { useAppPreferences, useTimelineTimeZone } from "@/context/AppPreferencesContext";
 import { useBabySelection } from "@/context/BabySelectionContext";
 import { useGrowthData } from "@/context/GrowthDataContext";
 import { colors, globalStyles, spacing } from "@/styles/globalStyles";
@@ -25,6 +25,7 @@ export default function AddMeasurementScreen() {
 	const router = useRouter();
 	const { growthId } = useLocalSearchParams<{ growthId?: string }>();
 	const { selectedBaby } = useBabySelection();
+	const timelineTimeZone = useTimelineTimeZone(selectedBaby);
 	const {
 		createGrowthRecord,
 		deleteGrowthRecord,
@@ -167,7 +168,7 @@ export default function AddMeasurementScreen() {
 							style={styles.dateField}
 						>
 							<Ionicons color={colors.light.textSecondary} name="calendar-outline" size={20} />
-							<Text style={styles.dateText}>{formatDate(measuredDate)}</Text>
+							<Text style={styles.dateText}>{formatDate(measuredDate, timelineTimeZone)}</Text>
 						</Pressable>
 						{isPickerOpen ? (
 							<DateTimePicker
@@ -277,10 +278,11 @@ function getDateKey(value: Date) {
 	return `${year}-${month}-${day}`;
 }
 
-function formatDate(value: Date) {
+function formatDate(value: Date, timeZone?: string) {
 	return new Intl.DateTimeFormat("en-US", {
 		day: "numeric",
 		month: "short",
+		timeZone,
 		year: "numeric",
 	}).format(value);
 }

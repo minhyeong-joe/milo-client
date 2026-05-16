@@ -8,6 +8,7 @@ import {
 	DiaryEntryForm,
 	type UploadedDiaryMedia,
 } from "@/components/diary/DiaryEntryForm";
+import { useTimelineTimeZone } from "@/context/AppPreferencesContext";
 import { useAuthSession } from "@/context/AuthSessionContext";
 import { useBabySelection } from "@/context/BabySelectionContext";
 import { useDiaryCache } from "@/context/DiaryCacheContext";
@@ -30,6 +31,7 @@ export default function EditDiaryScreen() {
 	const entry = parseEntryParam(params.entry);
 	const { session } = useAuthSession();
 	const { selectedBaby } = useBabySelection();
+	const timelineTimeZone = useTimelineTimeZone(selectedBaby);
 	const { replaceDiaryEntryInCache } = useDiaryCache();
 	const { connectionStatus, markOffline, markOnline } = useSync();
 	const [error, setError] = useState<string | null>(null);
@@ -198,6 +200,7 @@ export default function EditDiaryScreen() {
 					onCreateTag={handleCreateTag}
 					onSubmit={handleSubmit}
 					submitLabel="Save Changes"
+					timeZone={timelineTimeZone}
 				/>
 			) : (
 				<View style={globalStyles.screenContent}>

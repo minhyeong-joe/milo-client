@@ -1,4 +1,6 @@
 import { ConfirmDeleteModal } from "@/components/routine/ConfirmDeleteModal";
+import { useTimelineTimeZone } from "@/context/AppPreferencesContext";
+import { useBabySelection } from "@/context/BabySelectionContext";
 import { RoutineIcon } from "@/components/routine/RoutineIcon";
 import { useRoutineData } from "@/context/RoutineDataContext";
 import type { SleepEvent, SleepType } from "@/data/homeData";
@@ -30,10 +32,11 @@ type PickerTarget = "start" | "end";
 type PickerMode = "date" | "time";
 type ActivePicker = { mode: PickerMode; target: PickerTarget } | null;
 
-function formatDate(value: Date) {
+function formatDate(value: Date, timeZone?: string) {
 	return new Intl.DateTimeFormat("en-US", {
 		day: "numeric",
 		month: "short",
+		timeZone,
 		year: "numeric",
 	}).format(value);
 }
@@ -63,7 +66,9 @@ function DateTimeRow({
 export default function AddSleepScreen() {
 	const router = useRouter();
 	const { sleepId } = useLocalSearchParams<{ sleepId?: string }>();
+	const { selectedBaby } = useBabySelection();
 	const { addSleep, dailyLogs, getLatestSleep, lastLogged, removeSleep, updateSleep } = useRoutineData();
+	const timelineTimeZone = useTimelineTimeZone(selectedBaby);
 	const timelineSleepToEdit = dailyLogs
 		.flatMap((day) => day.timeline)
 		.find(
@@ -259,13 +264,13 @@ export default function AddSleepScreen() {
 							hint="Start date"
 							icon="calendar-outline"
 							onPress={() => setActivePicker({ mode: "date", target: "start" })}
-							value={formatDate(startTime)}
+							value={formatDate(startTime, timelineTimeZone)}
 						/>
 						<DateTimeRow
 							hint="Start time"
 							icon="time-outline"
 							onPress={() => setActivePicker({ mode: "time", target: "start" })}
-							value={formatClockTime(startTime.toISOString())}
+							value={formatClockTime(startTime.toISOString(), timelineTimeZone)}
 						/>
 					</View>
 
@@ -284,13 +289,13 @@ export default function AddSleepScreen() {
 									hint="End date"
 									icon="calendar-outline"
 									onPress={() => setActivePicker({ mode: "date", target: "end" })}
-									value={formatDate(endTime)}
+									value={formatDate(endTime, timelineTimeZone)}
 								/>
 								<DateTimeRow
 									hint="End time"
 									icon="time-outline"
 									onPress={() => setActivePicker({ mode: "time", target: "end" })}
-									value={formatClockTime(endTime.toISOString())}
+									value={formatClockTime(endTime.toISOString(), timelineTimeZone)}
 								/>
 								{durationMinutes !== undefined && !errorMessage ? (
 									<Text style={styles.durationText}>

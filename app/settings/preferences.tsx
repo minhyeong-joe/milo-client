@@ -1,6 +1,8 @@
 import { SettingsHeader } from "@/components/settings/SettingsRows";
+import { TimeZoneSelector } from "@/components/settings/TimeZoneSelector";
 import { useAppPreferences } from "@/context/AppPreferencesContext";
 import { colors, globalStyles, spacing, typography } from "@/styles/globalStyles";
+import { getTimeZoneDisplayLabel } from "@/utils/timeZones";
 import { useRouter } from "expo-router";
 import type { ReactNode } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -10,13 +12,15 @@ export default function AppPreferencesScreen() {
 	const router = useRouter();
 	const {
 		preferredLengthUnit,
-		preferredSolidFoodUnit,
 		preferredVolumeUnit,
 		preferredWeightUnit,
 		setPreferredLengthUnit,
-		setPreferredSolidFoodUnit,
 		setPreferredVolumeUnit,
 		setPreferredWeightUnit,
+		setTimelineTimeZone,
+		setTimelineTimeZoneMode,
+		timelineTimeZone,
+		timelineTimeZoneMode,
 	} = useAppPreferences();
 
 	return (
@@ -71,14 +75,34 @@ export default function AppPreferencesScreen() {
 					</PreferenceRow>
 					<PreferenceRow helper="Coming Soon" label="Language">
 						<DisabledPill label="English" />
-						<DisabledPill label="한국어" />
+						<DisabledPill label="Korean" />
 					</PreferenceRow>
-					<View style={styles.disabledRow}>
-						<Text style={styles.label}>Timeline timezone</Text>
-						<Text style={styles.valueText}>
-							Device default • {Intl.DateTimeFormat().resolvedOptions().timeZone}
-						</Text>
-					</View>
+					<PreferenceRow
+						helper={
+							timelineTimeZoneMode === "baby"
+								? "Show routine and diary times in the selected baby's timezone."
+								: `Show times in ${getTimeZoneDisplayLabel(timelineTimeZone)}.`
+						}
+						label="Timeline timezone"
+					>
+						<SegmentButton
+							active={timelineTimeZoneMode === "baby"}
+							label="Baby"
+							onPress={() => void setTimelineTimeZoneMode("baby")}
+						/>
+						<SegmentButton
+							active={timelineTimeZoneMode === "device"}
+							label="Device"
+							onPress={() => void setTimelineTimeZoneMode("device")}
+						/>
+					</PreferenceRow>
+					{timelineTimeZoneMode === "device" ? (
+						<TimeZoneSelector
+							label="Display timezone"
+							onChange={(timeZone) => void setTimelineTimeZone(timeZone)}
+							timeZone={timelineTimeZone}
+						/>
+					) : null}
 				</View>
 			</ScrollView>
 		</SafeAreaView>
@@ -148,10 +172,6 @@ const styles = StyleSheet.create({
 		color: colors.light.textSecondary,
 		fontWeight: "800",
 	},
-	disabledRow: {
-		gap: spacing.xs,
-		marginTop: spacing.md,
-	},
 	helper: {
 		...typography.caption,
 		color: colors.light.textSecondary,
@@ -201,9 +221,5 @@ const styles = StyleSheet.create({
 	},
 	segmentTextActive: {
 		color: colors.light.surface,
-	},
-	valueText: {
-		...typography.body,
-		color: colors.light.textSecondary,
 	},
 });

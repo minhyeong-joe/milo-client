@@ -1,4 +1,5 @@
 import type { PreferredVolumeUnit } from "@/data/homeData";
+import type { BabyListItem } from "@/services/api/babies";
 import {
 	loadStoredPreferences,
 	saveStoredPreferences,
@@ -7,6 +8,8 @@ import {
 	type PreferredWeightUnit,
 	type StoredPreferences,
 } from "@/services/preferences/preferencesStorage";
+import type { TimelineTimeZoneMode } from "@/utils/timeZones";
+import { getDeviceTimeZone, normalizeTimeZone } from "@/utils/timeZones";
 import {
 	createContext,
 	type ReactNode,
@@ -23,6 +26,8 @@ type AppPreferencesContextValue = StoredPreferences & {
 	setPreferredSolidFoodUnit: (unit: PreferredSolidFoodUnit) => Promise<void>;
 	setPreferredVolumeUnit: (unit: PreferredVolumeUnit) => Promise<void>;
 	setPreferredWeightUnit: (unit: PreferredWeightUnit) => Promise<void>;
+	setTimelineTimeZone: (timeZone: string) => Promise<void>;
+	setTimelineTimeZoneMode: (mode: TimelineTimeZoneMode) => Promise<void>;
 };
 
 const AppPreferencesContext = createContext<AppPreferencesContextValue | undefined>(undefined);
@@ -36,6 +41,10 @@ export function AppPreferencesProvider({ children }: { children: ReactNode }) {
 		useState<PreferredLengthUnit>("cm");
 	const [preferredWeightUnit, setPreferredWeightUnitState] =
 		useState<PreferredWeightUnit>("kg");
+	const [timelineTimeZone, setTimelineTimeZoneState] =
+		useState(() => getDeviceTimeZone());
+	const [timelineTimeZoneMode, setTimelineTimeZoneModeState] =
+		useState<TimelineTimeZoneMode>("baby");
 	const [isReady, setIsReady] = useState(false);
 
 	useEffect(() => {
@@ -52,6 +61,8 @@ export function AppPreferencesProvider({ children }: { children: ReactNode }) {
 			setPreferredSolidFoodUnitState(storedPreferences.preferredSolidFoodUnit);
 			setPreferredLengthUnitState(storedPreferences.preferredLengthUnit);
 			setPreferredWeightUnitState(storedPreferences.preferredWeightUnit);
+			setTimelineTimeZoneState(storedPreferences.timelineTimeZone);
+			setTimelineTimeZoneModeState(storedPreferences.timelineTimeZoneMode);
 			setIsReady(true);
 		}
 
@@ -69,8 +80,10 @@ export function AppPreferencesProvider({ children }: { children: ReactNode }) {
 			preferredSolidFoodUnit,
 			preferredVolumeUnit: unit,
 			preferredWeightUnit,
+			timelineTimeZone,
+			timelineTimeZoneMode,
 		});
-	}, [preferredLengthUnit, preferredSolidFoodUnit, preferredWeightUnit]);
+	}, [preferredLengthUnit, preferredSolidFoodUnit, preferredWeightUnit, timelineTimeZone, timelineTimeZoneMode]);
 
 	const setPreferredSolidFoodUnit = useCallback(async (unit: PreferredSolidFoodUnit) => {
 		setPreferredSolidFoodUnitState(unit);
@@ -79,8 +92,10 @@ export function AppPreferencesProvider({ children }: { children: ReactNode }) {
 			preferredSolidFoodUnit: unit,
 			preferredVolumeUnit,
 			preferredWeightUnit,
+			timelineTimeZone,
+			timelineTimeZoneMode,
 		});
-	}, [preferredLengthUnit, preferredVolumeUnit, preferredWeightUnit]);
+	}, [preferredLengthUnit, preferredVolumeUnit, preferredWeightUnit, timelineTimeZone, timelineTimeZoneMode]);
 
 	const setPreferredLengthUnit = useCallback(async (unit: PreferredLengthUnit) => {
 		setPreferredLengthUnitState(unit);
@@ -89,8 +104,10 @@ export function AppPreferencesProvider({ children }: { children: ReactNode }) {
 			preferredSolidFoodUnit,
 			preferredVolumeUnit,
 			preferredWeightUnit,
+			timelineTimeZone,
+			timelineTimeZoneMode,
 		});
-	}, [preferredSolidFoodUnit, preferredVolumeUnit, preferredWeightUnit]);
+	}, [preferredSolidFoodUnit, preferredVolumeUnit, preferredWeightUnit, timelineTimeZone, timelineTimeZoneMode]);
 
 	const setPreferredWeightUnit = useCallback(async (unit: PreferredWeightUnit) => {
 		setPreferredWeightUnitState(unit);
@@ -99,8 +116,35 @@ export function AppPreferencesProvider({ children }: { children: ReactNode }) {
 			preferredSolidFoodUnit,
 			preferredVolumeUnit,
 			preferredWeightUnit: unit,
+			timelineTimeZone,
+			timelineTimeZoneMode,
 		});
-	}, [preferredLengthUnit, preferredSolidFoodUnit, preferredVolumeUnit]);
+	}, [preferredLengthUnit, preferredSolidFoodUnit, preferredVolumeUnit, timelineTimeZone, timelineTimeZoneMode]);
+
+	const setTimelineTimeZone = useCallback(async (timeZone: string) => {
+		const normalizedTimeZone = normalizeTimeZone(timeZone);
+		setTimelineTimeZoneState(normalizedTimeZone);
+		await saveStoredPreferences({
+			preferredLengthUnit,
+			preferredSolidFoodUnit,
+			preferredVolumeUnit,
+			preferredWeightUnit,
+			timelineTimeZone: normalizedTimeZone,
+			timelineTimeZoneMode,
+		});
+	}, [preferredLengthUnit, preferredSolidFoodUnit, preferredVolumeUnit, preferredWeightUnit, timelineTimeZoneMode]);
+
+	const setTimelineTimeZoneMode = useCallback(async (mode: TimelineTimeZoneMode) => {
+		setTimelineTimeZoneModeState(mode);
+		await saveStoredPreferences({
+			preferredLengthUnit,
+			preferredSolidFoodUnit,
+			preferredVolumeUnit,
+			preferredWeightUnit,
+			timelineTimeZone,
+			timelineTimeZoneMode: mode,
+		});
+	}, [preferredLengthUnit, preferredSolidFoodUnit, preferredVolumeUnit, preferredWeightUnit, timelineTimeZone]);
 
 	const value = useMemo(
 		() => ({
@@ -109,6 +153,10 @@ export function AppPreferencesProvider({ children }: { children: ReactNode }) {
 			preferredSolidFoodUnit,
 			preferredVolumeUnit,
 			preferredWeightUnit,
+			setTimelineTimeZone,
+			setTimelineTimeZoneMode,
+			timelineTimeZone,
+			timelineTimeZoneMode,
 			setPreferredLengthUnit,
 			setPreferredSolidFoodUnit,
 			setPreferredVolumeUnit,
@@ -120,10 +168,14 @@ export function AppPreferencesProvider({ children }: { children: ReactNode }) {
 			preferredSolidFoodUnit,
 			preferredVolumeUnit,
 			preferredWeightUnit,
+			setTimelineTimeZone,
+			setTimelineTimeZoneMode,
 			setPreferredLengthUnit,
 			setPreferredSolidFoodUnit,
 			setPreferredVolumeUnit,
 			setPreferredWeightUnit,
+			timelineTimeZone,
+			timelineTimeZoneMode,
 		],
 	);
 
@@ -142,4 +194,12 @@ export function useAppPreferences() {
 	}
 
 	return context;
+}
+
+export function useTimelineTimeZone(baby?: Pick<BabyListItem, "timezone"> | null) {
+	const { timelineTimeZone, timelineTimeZoneMode } = useAppPreferences();
+
+	return timelineTimeZoneMode === "baby"
+		? normalizeTimeZone(baby?.timezone)
+		: normalizeTimeZone(timelineTimeZone);
 }

@@ -1,5 +1,5 @@
 import { SyncStatusCard } from "@/components/sync/SyncStatusCard";
-import { useAppPreferences } from "@/context/AppPreferencesContext";
+import { useAppPreferences, useTimelineTimeZone } from "@/context/AppPreferencesContext";
 import { useAuthSession } from "@/context/AuthSessionContext";
 import { useBabySelection } from "@/context/BabySelectionContext";
 import { useGrowthData } from "@/context/GrowthDataContext";
@@ -39,6 +39,7 @@ const REPORT_SYNC_TIMEOUT_MS = 10000;
 
 export default function ReportsScreen() {
 	const { selectedBaby } = useBabySelection();
+	const timelineTimeZone = useTimelineTimeZone(selectedBaby);
 	const { session } = useAuthSession();
 	const {
 		growthRecords,
@@ -368,6 +369,7 @@ export default function ReportsScreen() {
 						selectedBaby={selectedBaby}
 						startDate={patternStartDate}
 						stats={displayedPatternStats}
+						timeZone={timelineTimeZone}
 					/>
 				) : (
 					<GrowthReportsContent

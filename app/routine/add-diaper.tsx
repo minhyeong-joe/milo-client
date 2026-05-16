@@ -1,4 +1,6 @@
 import { ConfirmDeleteModal } from "@/components/routine/ConfirmDeleteModal";
+import { useTimelineTimeZone } from "@/context/AppPreferencesContext";
+import { useBabySelection } from "@/context/BabySelectionContext";
 import { RoutineIcon } from "@/components/routine/RoutineIcon";
 import { useRoutineData } from "@/context/RoutineDataContext";
 import type { DiaperColor, DiaperEvent, DiaperType } from "@/data/homeData";
@@ -28,10 +30,11 @@ const NOTES_LIMIT = 100;
 const diaperTypes: DiaperType[] = ["wet", "dirty", "both", "dry"];
 const diaperColors: DiaperColor[] = ["green", "brown", "yellow", "black"];
 
-function formatDate(value: Date) {
+function formatDate(value: Date, timeZone?: string) {
 	return new Intl.DateTimeFormat("en-US", {
 		day: "numeric",
 		month: "short",
+		timeZone,
 		year: "numeric",
 	}).format(value);
 }
@@ -43,7 +46,9 @@ function needsColor(type: DiaperType) {
 export default function AddDiaperScreen() {
 	const router = useRouter();
 	const { diaperId } = useLocalSearchParams<{ diaperId?: string }>();
+	const { selectedBaby } = useBabySelection();
 	const { addDiaper, dailyLogs, getLatestDiaper, removeDiaper, updateDiaper } = useRoutineData();
+	const timelineTimeZone = useTimelineTimeZone(selectedBaby);
 	const diaperToEdit = dailyLogs
 		.flatMap((day) => day.timeline)
 		.find(
@@ -190,7 +195,7 @@ export default function AddDiaperScreen() {
 								size={20}
 							/>
 							<View>
-								<Text style={styles.dateTimeValue}>{formatDate(diaperTime)}</Text>
+							<Text style={styles.dateTimeValue}>{formatDate(diaperTime, timelineTimeZone)}</Text>
 								<Text style={styles.dateTimeHint}>Date</Text>
 							</View>
 						</Pressable>
@@ -206,7 +211,7 @@ export default function AddDiaperScreen() {
 							/>
 							<View>
 								<Text style={styles.dateTimeValue}>
-									{formatClockTime(diaperTime.toISOString())}
+									{formatClockTime(diaperTime.toISOString(), timelineTimeZone)}
 								</Text>
 								<Text style={styles.dateTimeHint}>Time</Text>
 							</View>

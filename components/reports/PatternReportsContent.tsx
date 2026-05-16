@@ -33,6 +33,7 @@ export default function PatternReportsContent({
 	rangeMode,
 	startDate,
 	stats,
+	timeZone,
 }: {
 	canShiftNext: boolean;
 	endDate: string;
@@ -47,6 +48,7 @@ export default function PatternReportsContent({
 	selectedBaby: unknown;
 	startDate: string;
 	stats: RoutineStatsResponse;
+	timeZone?: string;
 }) {
 	const [showMeal, setShowMeal] = useState(true);
 	const [showDiaper, setShowDiaper] = useState(true);
@@ -95,7 +97,7 @@ export default function PatternReportsContent({
 						style={styles.rangeLabelButton}
 						onPress={openCustomRangeModal}
 					>
-						<Text style={styles.rangeLabel}>{formatRangeLabel(startDate, endDate)}</Text>
+						<Text style={styles.rangeLabel}>{formatRangeLabel(startDate, endDate, timeZone)}</Text>
 						<Ionicons
 							color={colors.light.textSecondary}
 							name="calendar-outline"
@@ -166,7 +168,7 @@ export default function PatternReportsContent({
 							{getSnapshotTitle(rangeMode)}
 						</Text>
 						<Text style={styles.summarySubtitle}>
-							{formatRangeLabel(startDate, endDate)} - Based on days with entries
+							{formatRangeLabel(startDate, endDate, timeZone)} - Based on days with entries
 						</Text>
 					</View>
 				</View>
@@ -260,12 +262,14 @@ export default function PatternReportsContent({
 							isActive={activeDatePicker === "start"}
 							label="From"
 							onPress={() => setActiveDatePicker((current) => current === "start" ? null : "start")}
+							timeZone={timeZone}
 							value={draftStartDate}
 						/>
 						<DateField
 							isActive={activeDatePicker === "end"}
 							label="To"
 							onPress={() => setActiveDatePicker((current) => current === "end" ? null : "end")}
+							timeZone={timeZone}
 							value={draftEndDate}
 						/>
 						{activeDatePicker ? (
@@ -325,11 +329,13 @@ function DateField({
 	isActive,
 	label,
 	onPress,
+	timeZone,
 	value,
 }: {
 	isActive: boolean;
 	label: string;
 	onPress: () => void;
+	timeZone?: string;
 	value: Date;
 }) {
 	return (
@@ -340,7 +346,7 @@ function DateField({
 		>
 			<View>
 				<Text style={styles.dateFieldLabel}>{label}</Text>
-				<Text style={styles.dateFieldValue}>{formatFullDate(value)}</Text>
+				<Text style={styles.dateFieldValue}>{formatFullDate(value, timeZone)}</Text>
 			</View>
 			<Ionicons
 				color={colors.light.textSecondary}
@@ -378,26 +384,29 @@ function getSnapshotTitle(rangeMode: PatternRangeMode) {
 	return "Weekly Snapshot";
 }
 
-function formatRangeLabel(startDate: string, endDate: string) {
+function formatRangeLabel(startDate: string, endDate: string, timeZone?: string) {
 	const start = parseDateKey(startDate);
 	const end = parseDateKey(endDate);
 	const startLabel = new Intl.DateTimeFormat("en-US", {
 		month: "short",
 		day: "numeric",
+		timeZone,
 	}).format(start);
 	const endLabel = new Intl.DateTimeFormat("en-US", {
 		month: "short",
 		day: "numeric",
+		timeZone,
 		year: start.getFullYear() === end.getFullYear() ? undefined : "numeric",
 	}).format(end);
 
 	return `${startLabel} - ${endLabel}`;
 }
 
-function formatFullDate(value: Date) {
+function formatFullDate(value: Date, timeZone?: string) {
 	return new Intl.DateTimeFormat("en-US", {
 		day: "numeric",
 		month: "short",
+		timeZone,
 		year: "numeric",
 	}).format(value);
 }

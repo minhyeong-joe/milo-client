@@ -16,15 +16,17 @@ export function RoutineDayCard({
 	currentTime,
 	day,
 	defaultView,
+	timeZone,
 }: {
 	config: RoutineConfig;
 	currentTime: string;
 	day: RoutineDay;
 	defaultView: RoutineDayCardView;
+	timeZone?: string;
 }) {
 	const [view, setView] = useState<RoutineDayCardView>(defaultView);
 	const isTimeline = view === "timeline";
-	const dayLabel = formatDayLabel(day.date, currentTime);
+	const dayLabel = formatDayLabel(day.date, currentTime, timeZone);
 	const isToday = dayLabel.label === "Today";
 
 	const toggleView = () => {
@@ -50,7 +52,7 @@ export function RoutineDayCard({
 			</Pressable>
 
 			{isTimeline ? (
-				<Timeline config={config} currentTime={currentTime} events={day.timeline} />
+				<Timeline config={config} currentTime={currentTime} events={day.timeline} timeZone={timeZone} />
 			) : (
 				<>
 					<RoutineSummary config={config} summary={day.summary} />

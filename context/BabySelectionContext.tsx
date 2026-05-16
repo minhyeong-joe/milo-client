@@ -190,6 +190,7 @@ export function BabySelectionProvider({ children }: PropsWithChildren) {
 						birthdate: input.birthdate,
 						name: input.name,
 						sex: input.sex,
+						timezone: input.timezone ?? baby.timezone,
 						updatedAt: now,
 					}
 				: baby,
@@ -228,6 +229,7 @@ export function BabySelectionProvider({ children }: PropsWithChildren) {
 				birthdate: input.birthdate,
 				name: input.name,
 				sex: input.sex,
+				timezone: input.timezone ?? baby.timezone,
 				updatedAt: now,
 			};
 

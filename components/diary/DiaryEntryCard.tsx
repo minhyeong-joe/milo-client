@@ -11,12 +11,14 @@ type DiaryEntryCardProps = {
 	onPress: (entry: DiaryEntry) => void;
 	onMorePress?: (entry: DiaryEntry) => void;
 	todayDate: string;
+	timeZone?: string;
 };
 
 export function DiaryEntryCard({
 	entry,
 	onMorePress,
 	onPress,
+	timeZone,
 	todayDate,
 }: DiaryEntryCardProps) {
 	const hasSingleMedia = entry.media.length === 1;
@@ -34,7 +36,7 @@ export function DiaryEntryCard({
 		>
 			<View style={styles.headerRow}>
 				<Text style={styles.dateText}>
-					{formatDateLabel(entry.diaryDate)}
+					{formatDateLabel(entry.diaryDate, timeZone)}
 					{entry.diaryDate === todayDate ? " · Today" : ""}
 				</Text>
 				<Pressable
@@ -101,12 +103,13 @@ function CardTextContent({ entry }: { entry: DiaryEntry }) {
 	);
 }
 
-function formatDateLabel(dateKey: string) {
+function formatDateLabel(dateKey: string, timeZone?: string) {
 	const [year, month, day] = dateKey.split("-").map(Number);
 	const date = new Date(year, month - 1, day);
 	return new Intl.DateTimeFormat("en-US", {
 		day: "numeric",
 		month: "short",
+		timeZone,
 		year: "numeric",
 	}).format(date);
 }

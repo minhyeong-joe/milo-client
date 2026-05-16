@@ -6,10 +6,12 @@ export function Timeline({
 	config,
 	currentTime,
 	events,
+	timeZone,
 }: {
 	config: RoutineConfig;
 	currentTime: string;
 	events: RoutineEvent[];
+	timeZone?: string;
 }) {
 	return (
 		<View>
@@ -21,6 +23,7 @@ export function Timeline({
 						event={event}
 						isLast={index === events.length - 1}
 						key={event.id}
+						timeZone={timeZone}
 					/>
 				))}
 			</View>

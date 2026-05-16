@@ -1,5 +1,6 @@
 import { ConfirmDeleteModal } from "@/components/routine/ConfirmDeleteModal";
-import { useAppPreferences } from "@/context/AppPreferencesContext";
+import { useAppPreferences, useTimelineTimeZone } from "@/context/AppPreferencesContext";
+import { useBabySelection } from "@/context/BabySelectionContext";
 import type { MealEvent, MealType } from "@/data/homeData";
 import { routineConfig } from "@/data/homeData";
 import { useRoutineData } from "@/context/RoutineDataContext";
@@ -38,10 +39,11 @@ function isBottleMeal(type: MealType) {
 	return type === "breastMilk" || type === "formula";
 }
 
-function formatDate(value: Date) {
+function formatDate(value: Date, timeZone?: string) {
 	return new Intl.DateTimeFormat("en-US", {
 		day: "numeric",
 		month: "short",
+		timeZone,
 		year: "numeric",
 	}).format(value);
 }
@@ -49,12 +51,14 @@ function formatDate(value: Date) {
 export default function AddMealScreen() {
 	const router = useRouter();
 	const { mealId } = useLocalSearchParams<{ mealId?: string }>();
+	const { selectedBaby } = useBabySelection();
 	const { addMeal, dailyLogs, getLatestMeal, updateMeal, removeMeal } = useRoutineData();
 	const {
 		preferredSolidFoodUnit,
 		preferredVolumeUnit,
 		setPreferredSolidFoodUnit,
 	} = useAppPreferences();
+	const timelineTimeZone = useTimelineTimeZone(selectedBaby);
 	const mealToEdit = dailyLogs
 	.flatMap((day) => day.timeline)
 	.find(
@@ -266,7 +270,7 @@ export default function AddMealScreen() {
 						>
 							<Ionicons color={colors.light.textSecondary} name="calendar-outline" size={20} />
 							<View>
-								<Text style={styles.dateTimeValue}>{formatDate(mealTime)}</Text>
+								<Text style={styles.dateTimeValue}>{formatDate(mealTime, timelineTimeZone)}</Text>
 								<Text style={styles.dateTimeHint}>Date</Text>
 							</View>
 						</Pressable>
@@ -277,7 +281,7 @@ export default function AddMealScreen() {
 						>
 							<Ionicons color={colors.light.textSecondary} name="time-outline" size={20} />
 							<View>
-								<Text style={styles.dateTimeValue}>{formatClockTime(mealTime.toISOString())}</Text>
+								<Text style={styles.dateTimeValue}>{formatClockTime(mealTime.toISOString(), timelineTimeZone)}</Text>
 								<Text style={styles.dateTimeHint}>Time</Text>
 							</View>
 						</Pressable>

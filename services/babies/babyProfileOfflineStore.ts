@@ -115,6 +115,7 @@ export async function applyPendingBabyProfileMutations(
 			birthdate: mutation.payload.birthdate,
 			name: mutation.payload.name,
 			sex: mutation.payload.sex,
+			timezone: mutation.payload.timezone ?? baby.timezone,
 			updatedAt: new Date().toISOString(),
 		};
 	});

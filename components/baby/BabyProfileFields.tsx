@@ -146,6 +146,7 @@ export function BabyBirthdateField({
 	maximumDate = new Date(),
 	onChange,
 	onOpenPicker,
+	timeZone,
 	value,
 }: {
 	isPickerVisible: boolean;
@@ -153,6 +154,7 @@ export function BabyBirthdateField({
 	maximumDate?: Date;
 	onChange: (event: DateTimePickerEvent, selectedDate?: Date) => void;
 	onOpenPicker: () => void;
+	timeZone?: string;
 	value: Date;
 }) {
 	return (
@@ -163,7 +165,7 @@ export function BabyBirthdateField({
 				onPress={onOpenPicker}
 				style={({ pressed }) => [styles.dateButton, pressed && styles.pressedButton]}
 			>
-				<Text style={styles.dateButtonText}>{formatBirthdate(value)}</Text>
+				<Text style={styles.dateButtonText}>{formatBirthdate(value, timeZone)}</Text>
 				<Ionicons
 					color={colors.light.textSecondary}
 					name="calendar-outline"
@@ -251,10 +253,11 @@ export function formatBabyProfileDateKey(date: Date) {
 	return `${year}-${month}-${day}`;
 }
 
-export function formatBirthdate(date: Date) {
+export function formatBirthdate(date: Date, timeZone?: string) {
 	return new Intl.DateTimeFormat("en-US", {
 		day: "numeric",
 		month: "short",
+		timeZone,
 		year: "numeric",
 	}).format(date);
 }

@@ -8,8 +8,20 @@ function padDatePart(value: number) {
 	return value.toString().padStart(2, "0");
 }
 
-export function getLocalDateKey(value: string | Date) {
+export function getLocalDateKey(value: string | Date, timeZone?: string) {
 	const date = value instanceof Date ? value : new Date(value);
+
+	if (timeZone) {
+		const parts = new Intl.DateTimeFormat("en-US", {
+			day: "2-digit",
+			month: "2-digit",
+			timeZone,
+			year: "numeric",
+		}).formatToParts(date);
+		const byType = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+
+		return `${byType.year}-${byType.month}-${byType.day}`;
+	}
 
 	return `${date.getFullYear()}-${padDatePart(date.getMonth() + 1)}-${padDatePart(date.getDate())}`;
 }
@@ -81,22 +93,24 @@ export function formatOzInput(amountOz: number) {
 	return amountOz.toFixed(1);
 }
 
-export function formatClockTime(value: string) {
+export function formatClockTime(value: string, timeZone?: string) {
 	return new Intl.DateTimeFormat("en-US", {
 		hour: "numeric",
 		minute: "2-digit",
+		timeZone,
 	}).format(new Date(value));
 }
 
-export function formatDayLabel(value: string, currentTime?: string) {
+export function formatDayLabel(value: string, currentTime?: string, timeZone?: string) {
 	const date = parseDateKey(value);
 	const current = currentTime ? new Date(currentTime) : new Date();
-	const today = new Date(current.getFullYear(), current.getMonth(), current.getDate());
+	const todayDateKey = getLocalDateKey(current, timeZone);
 	const target = parseDateKey(value);
-	const diffDays = Math.round((today.getTime() - target.getTime()) / MS_PER_DAY);
+	const diffDays = Math.round((parseDateKey(todayDateKey).getTime() - target.getTime()) / MS_PER_DAY);
 	const formatted = new Intl.DateTimeFormat("en-US", {
 		day: "numeric",
 		month: "short",
+		timeZone: "UTC",
 	}).format(date);
 
 	if (diffDays === 0) {
@@ -109,7 +123,7 @@ export function formatDayLabel(value: string, currentTime?: string) {
 
 	return {
 		date: formatted,
-		label: new Intl.DateTimeFormat("en-US", { weekday: "long" }).format(date),
+		label: new Intl.DateTimeFormat("en-US", { timeZone: "UTC", weekday: "long" }).format(date),
 	};
 }
 

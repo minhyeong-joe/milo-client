@@ -34,7 +34,7 @@ export default function SettingsScreen() {
 						<Text style={styles.babyName}>{selectedBaby?.name ?? "Baby Profile"}</Text>
 						<Text style={styles.profileSubtitle}>
 							{selectedBaby
-								? `Born ${formatBirthdate(selectedBaby.birthdate)}\n${formatAge(selectedBaby.birthdate)} old`
+								? `Born ${formatBirthdate(selectedBaby.birthdate, selectedBaby.timezone)}\n${formatAge(selectedBaby.birthdate)} old`
 								: "Create or choose a baby profile"}
 						</Text>
 					</View>
@@ -119,11 +119,12 @@ export default function SettingsScreen() {
 	);
 }
 
-function formatBirthdate(dateKey: string) {
+function formatBirthdate(dateKey: string, timeZone?: string) {
 	const date = new Date(`${dateKey}T00:00:00`);
 	return new Intl.DateTimeFormat("en-US", {
 		day: "numeric",
 		month: "short",
+		timeZone,
 		year: "numeric",
 	}).format(date);
 }

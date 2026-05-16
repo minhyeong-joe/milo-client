@@ -5,9 +5,11 @@ import {
 	BabySexSelector,
 	formatBabyProfileDateKey,
 } from "@/components/baby/BabyProfileFields";
+import { TimeZoneSelector } from "@/components/settings/TimeZoneSelector";
 import { useBabySelection } from "@/context/BabySelectionContext";
 import type { BabySex, CreateBabyAvatarUploadRequest } from "@/services/api/babies";
 import { colors, globalStyles, spacing } from "@/styles/globalStyles";
+import { getDeviceTimeZone } from "@/utils/timeZones";
 import type { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { useRouter } from "expo-router";
 import { useState } from "react";
@@ -34,6 +36,7 @@ type InitialBabyProfile = {
 	id: string;
 	name: string;
 	sex: BabySex;
+	timezone: string;
 };
 
 export default function EditBabyProfileScreen() {
@@ -51,12 +54,14 @@ export default function EditBabyProfileScreen() {
 					id: selectedBaby.id,
 					name: selectedBaby.name,
 					sex: selectedBaby.sex,
+					timezone: selectedBaby.timezone || getDeviceTimeZone(),
 				}
 			: null,
 	);
 	const [name, setName] = useState(initialProfile?.name ?? "");
 	const [birthdate, setBirthdate] = useState(() => new Date(`${initialProfile?.birthdate ?? formatBabyProfileDateKey(new Date())}T00:00:00`));
 	const [sex, setSex] = useState<BabySex>(initialProfile?.sex ?? "BOY");
+	const [timeZone, setTimeZone] = useState(initialProfile?.timezone ?? getDeviceTimeZone());
 	const [avatarDraft, setAvatarDraft] = useState<AvatarDraft>({ status: "unchanged" });
 	const [isPickerOpen, setIsPickerOpen] = useState(false);
 	const [isSaving, setIsSaving] = useState(false);
@@ -97,6 +102,7 @@ export default function EditBabyProfileScreen() {
 					birthdate: formatBabyProfileDateKey(birthdate),
 					name: trimmedName,
 					sex,
+					timezone: timeZone,
 				},
 				avatarDraft,
 			);
@@ -117,6 +123,7 @@ export default function EditBabyProfileScreen() {
 		setName(initialProfile?.name ?? "");
 		setBirthdate(new Date(`${initialProfile?.birthdate ?? formatBabyProfileDateKey(new Date())}T00:00:00`));
 		setSex(initialProfile?.sex ?? "BOY");
+		setTimeZone(initialProfile?.timezone ?? getDeviceTimeZone());
 		setAvatarDraft({ status: "unchanged" });
 		setFormError(null);
 		router.back();
@@ -158,9 +165,16 @@ export default function EditBabyProfileScreen() {
 						isPickerVisible={isPickerOpen}
 						onChange={handlePickerChange}
 						onOpenPicker={() => setIsPickerOpen(true)}
+						timeZone={timeZone}
 						value={birthdate}
 					/>
 					<BabySexSelector onChange={setSex} value={sex} />
+					<TimeZoneSelector
+						disabled={isSaving}
+						label="Baby timezone"
+						onChange={setTimeZone}
+						timeZone={timeZone}
+					/>
 				</ScrollView>
 				<View style={styles.footer}>
 					{formError ? <Text style={styles.errorText}>{formError}</Text> : null}

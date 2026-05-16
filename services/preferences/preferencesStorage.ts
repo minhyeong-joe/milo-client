@@ -1,4 +1,6 @@
 import type { PreferredVolumeUnit } from "@/data/homeData";
+import type { TimelineTimeZoneMode } from "@/utils/timeZones";
+import { getDeviceTimeZone, normalizeTimeZone } from "@/utils/timeZones";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 
@@ -7,6 +9,7 @@ const DEFAULT_VOLUME_UNIT: PreferredVolumeUnit = "ml";
 const DEFAULT_SOLID_FOOD_UNIT: PreferredSolidFoodUnit = "servings";
 const DEFAULT_LENGTH_UNIT: PreferredLengthUnit = "cm";
 const DEFAULT_WEIGHT_UNIT: PreferredWeightUnit = "kg";
+const DEFAULT_TIMELINE_TIME_ZONE_MODE: TimelineTimeZoneMode = "baby";
 
 export type PreferredSolidFoodUnit = "servings" | "grams";
 export type PreferredLengthUnit = "cm" | "in";
@@ -17,6 +20,8 @@ export type StoredPreferences = {
 	preferredSolidFoodUnit: PreferredSolidFoodUnit;
 	preferredLengthUnit: PreferredLengthUnit;
 	preferredWeightUnit: PreferredWeightUnit;
+	timelineTimeZone: string;
+	timelineTimeZoneMode: TimelineTimeZoneMode;
 };
 
 export async function loadStoredPreferences(): Promise<StoredPreferences> {
@@ -42,6 +47,10 @@ export async function loadStoredPreferences(): Promise<StoredPreferences> {
 			preferredWeightUnit: isPreferredWeightUnit(parsed.preferredWeightUnit)
 				? parsed.preferredWeightUnit
 				: DEFAULT_WEIGHT_UNIT,
+			timelineTimeZone: normalizeTimeZone(parsed.timelineTimeZone),
+			timelineTimeZoneMode: isTimelineTimeZoneMode(parsed.timelineTimeZoneMode)
+				? parsed.timelineTimeZoneMode
+				: DEFAULT_TIMELINE_TIME_ZONE_MODE,
 		};
 	} catch {
 		await saveStoredPreferences(getDefaultPreferences());
@@ -59,6 +68,8 @@ function getDefaultPreferences(): StoredPreferences {
 		preferredSolidFoodUnit: DEFAULT_SOLID_FOOD_UNIT,
 		preferredLengthUnit: DEFAULT_LENGTH_UNIT,
 		preferredWeightUnit: DEFAULT_WEIGHT_UNIT,
+		timelineTimeZone: getDeviceTimeZone(),
+		timelineTimeZoneMode: DEFAULT_TIMELINE_TIME_ZONE_MODE,
 	};
 }
 
@@ -76,6 +87,10 @@ function isPreferredLengthUnit(value: unknown): value is PreferredLengthUnit {
 
 function isPreferredWeightUnit(value: unknown): value is PreferredWeightUnit {
 	return value === "kg" || value === "lb";
+}
+
+function isTimelineTimeZoneMode(value: unknown): value is TimelineTimeZoneMode {
+	return value === "baby" || value === "device";
 }
 
 async function readPreferencesValue() {

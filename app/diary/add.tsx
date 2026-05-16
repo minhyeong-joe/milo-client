@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { DiaryEntryForm } from "@/components/diary/DiaryEntryForm";
+import { useTimelineTimeZone } from "@/context/AppPreferencesContext";
 import { useAuthSession } from "@/context/AuthSessionContext";
 import { useBabySelection } from "@/context/BabySelectionContext";
 import { useDiaryCache } from "@/context/DiaryCacheContext";
@@ -19,6 +20,7 @@ export default function AddDiaryScreen() {
 	const router = useRouter();
 	const { session } = useAuthSession();
 	const { selectedBaby } = useBabySelection();
+	const timelineTimeZone = useTimelineTimeZone(selectedBaby);
 	const { replaceDiaryEntryInCache } = useDiaryCache();
 	const { connectionStatus, markOffline, markOnline } = useSync();
 	const [error, setError] = useState<string | null>(null);
@@ -181,6 +183,7 @@ export default function AddDiaryScreen() {
 					onCreateTag={handleCreateTag}
 					onSubmit={handleSubmit}
 					submitLabel="Save"
+					timeZone={timelineTimeZone}
 				/>
 			) : (
 				<View style={globalStyles.screenContent}>

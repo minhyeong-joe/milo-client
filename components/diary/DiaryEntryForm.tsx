@@ -103,6 +103,7 @@ type DiaryEntryFormProps = {
 	onCreateTag: (name: string) => Promise<DiaryTag>;
 	onSubmit: (input: DiaryEntryFormSubmitInput) => Promise<void> | void;
 	submitLabel?: string;
+	timeZone?: string;
 	availableTags: DiaryTag[];
 };
 
@@ -122,6 +123,7 @@ export function DiaryEntryForm({
 	onCreateTag,
 	onSubmit,
 	submitLabel = "Save",
+	timeZone,
 	availableTags,
 }: DiaryEntryFormProps) {
 	const insets = useSafeAreaInsets();
@@ -482,7 +484,7 @@ export function DiaryEntryForm({
 						style={styles.dateButton}
 					>
 						<Ionicons color={colors.light.primary} name="calendar-outline" size={20} />
-						<Text style={styles.dateText}>{formatDisplayDate(date)}</Text>
+						<Text style={styles.dateText}>{formatDisplayDate(date, timeZone)}</Text>
 					</Pressable>
 					{showDatePicker ? (
 						<DateTimePicker
@@ -719,10 +721,11 @@ export function DiaryEntryForm({
 	);
 }
 
-function formatDisplayDate(date: Date) {
+function formatDisplayDate(date: Date, timeZone?: string) {
 	return new Intl.DateTimeFormat("en-US", {
 		day: "numeric",
 		month: "long",
+		timeZone,
 		year: "numeric",
 	}).format(date);
 }
