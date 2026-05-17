@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { LayoutChangeEvent, StyleSheet, Text, View } from "react-native";
 import { BarChart, type stackDataItem } from "react-native-gifted-charts";
 import type {
@@ -44,11 +44,13 @@ export default function RoutineTimetableChart({
 	showDiaper,
 	showMeal,
 	showSleep,
+	timeZone,
 }: {
 	days: RoutineStatsDay[];
 	showDiaper: boolean;
 	showMeal: boolean;
 	showSleep: boolean;
+	timeZone?: string;
 }) {
 	const { globalStyles, styles } = useThemeStyles();
 	const [chartWidth, setChartWidth] = useState(DEFAULT_CHART_WIDTH);
@@ -60,15 +62,34 @@ export default function RoutineTimetableChart({
 		}),
 		[showDiaper, showMeal, showSleep],
 	);
+	const hasActiveSleep = useMemo(
+		() => days.some((day) =>
+			day.logs.some((log) => log.kind === "sleep" && !log.endTime),
+		),
+		[days],
+	);
+	const [now, setNow] = useState(() => new Date());
+
+	useEffect(() => {
+		if (!hasActiveSleep) {
+			return;
+		}
+
+		setNow(new Date());
+		const intervalId = setInterval(() => setNow(new Date()), 60000);
+
+		return () => clearInterval(intervalId);
+	}, [hasActiveSleep]);
+
 	const chartDays = useMemo(
 		() =>
 			days.map((day, index) => ({
 				...day,
-				blocks: buildBlocksForDay(day, days),
+				blocks: buildBlocksForDay(day, timeZone, now),
 				shouldShowLabel: shouldShowDateLabel(index, days.length),
 				showYear: index === 0 || day.date.slice(0, 4) !== days[index - 1]?.date.slice(0, 4),
 			})),
-		[days],
+		[days, now, timeZone],
 	);
 	const isScrollable = days.length > WEEK_DAY_COUNT;
 	const initialSpacing = 4;
@@ -157,15 +178,14 @@ export default function RoutineTimetableChart({
 	);
 }
 
-function buildBlocksForDay(day: RoutineStatsDay, days: RoutineStatsDay[]) {
-	return [
-		...day.logs
+function buildBlocksForDay(day: RoutineStatsDay, timeZone: string | undefined, now: Date) {
+	return day.logs
 		.flatMap((log): TimetableBlock[] => {
 			if (log.kind === "sleep") {
-				return buildSleepBlocks(log, day.date);
+				return buildSleepBlocks(log, day.date, timeZone, now);
 			}
 
-			const startMinute = getMinuteOfDay(log.time, day.date);
+			const startMinute = getMinuteOfDay(log.time, day.date, timeZone);
 			const endMinute = Math.min(DAY_MINUTES, startMinute + POINT_EVENT_MINUTES);
 
 			return [{
@@ -177,83 +197,31 @@ function buildBlocksForDay(day: RoutineStatsDay, days: RoutineStatsDay[]) {
 				startMinute,
 				type: log.type,
 			}];
-		}),
-		...buildPreviousEveningSleepBlocks(day.date, days),
-	]
+		})
 		.sort((left, right) => left.startMinute - right.startMinute);
-}
-
-function buildPreviousEveningSleepBlocks(dayDate: string, days: RoutineStatsDay[]) {
-	return days.flatMap((sourceDay) =>
-		sourceDay.logs.flatMap((log): TimetableBlock[] => {
-			if (sourceDay.date === dayDate || log.kind !== "sleep") {
-				return [];
-			}
-
-			const start = getLocalTimeParts(log.startTime);
-			const end = log.endTime ? getLocalTimeParts(log.endTime) : null;
-
-			if (!start || start.dateKey !== dayDate || end?.dateKey === dayDate) {
-				return [];
-			}
-
-			return [createSleepBlock(log, start.minuteOfDay, DAY_MINUTES, "previous-evening")];
-		}),
-	);
 }
 
 function buildSleepBlocks(
 	log: Extract<RoutinePatternLog, { kind: "sleep" }>,
 	dayDate: string,
+	timeZone?: string,
+	now = new Date(),
 ) {
-	const start = getLocalTimeParts(log.startTime);
-	const end = log.endTime ? getLocalTimeParts(log.endTime) : null;
+	const start = getLocalTimeParts(log.startTime, timeZone);
+	const end = getLocalTimeParts(log.endTime ?? now.toISOString(), timeZone);
 
-	if (!start) {
+	if (!start || !end || end.dateKey < dayDate || start.dateKey > dayDate) {
 		return [];
 	}
 
-	const blocks: TimetableBlock[] = [];
-	const createBlock = (startMinute: number, endMinute: number, suffix: string) => {
-		if (endMinute <= startMinute) {
-			return;
-		}
+	const startMinute = start.dateKey === dayDate ? start.minuteOfDay : 0;
+	const endMinute = end.dateKey === dayDate ? end.minuteOfDay : DAY_MINUTES;
 
-		blocks.push(createSleepBlock(log, startMinute, endMinute, suffix));
-	};
-
-	if (!end) {
-		if (start.dateKey < dayDate) {
-			createBlock(0, DAY_MINUTES, "active-day");
-		} else if (start.dateKey === dayDate) {
-			createBlock(start.minuteOfDay, DAY_MINUTES, "active-start");
-		}
-
-		return blocks;
+	if (endMinute <= startMinute) {
+		return [];
 	}
 
-	if (start.dateKey === end.dateKey) {
-		if (start.dateKey === dayDate) {
-			createBlock(start.minuteOfDay, end.minuteOfDay, "same-day");
-		}
-
-		return blocks;
-	}
-
-	if (start.dateKey < dayDate && end.dateKey === dayDate) {
-		createBlock(0, end.minuteOfDay, "wake-morning");
-		return blocks;
-	}
-
-	if (start.dateKey === dayDate) {
-		createBlock(start.minuteOfDay, DAY_MINUTES, "start-day");
-	} else if (start.dateKey < dayDate && end.dateKey > dayDate) {
-		createBlock(0, DAY_MINUTES, "full-day");
-	} else if (end.dateKey === dayDate) {
-		createBlock(0, end.minuteOfDay, "end-day");
-	}
-
-	return blocks;
+	return [createSleepBlock(log, startMinute, endMinute, getSleepBlockSuffix(log, dayDate, start, end))];
 }
 
 function createSleepBlock(
@@ -337,8 +305,8 @@ function handleChartLayout(setChartWidth: (width: number) => void) {
 	};
 }
 
-function getMinuteOfDay(value: string, dayDate: string) {
-	const parts = getLocalTimeParts(value);
+function getMinuteOfDay(value: string, dayDate: string, timeZone?: string) {
+	const parts = getLocalTimeParts(value, timeZone);
 
 	if (!parts) {
 		return 0;
@@ -354,11 +322,32 @@ function getMinuteOfDay(value: string, dayDate: string) {
 	return parts.minuteOfDay;
 }
 
-function getLocalTimeParts(value: string) {
+function getLocalTimeParts(value: string, timeZone?: string) {
 	const date = new Date(value);
 
 	if (Number.isNaN(date.getTime())) {
 		return null;
+	}
+
+	if (timeZone) {
+		const parts = new Intl.DateTimeFormat("en-US", {
+			day: "2-digit",
+			hour: "2-digit",
+			hourCycle: "h23",
+			minute: "2-digit",
+			month: "2-digit",
+			timeZone,
+			year: "numeric",
+		}).formatToParts(date);
+		const byType = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+
+		return {
+			dateKey: `${byType.year}-${byType.month}-${byType.day}`,
+			minuteOfDay: Math.min(
+				DAY_MINUTES,
+				Math.max(0, Number(byType.hour) * 60 + Number(byType.minute)),
+			),
+		};
 	}
 
 	return {
@@ -368,6 +357,31 @@ function getLocalTimeParts(value: string) {
 			Math.max(0, date.getHours() * 60 + date.getMinutes()),
 		),
 	};
+}
+
+function getSleepBlockSuffix(
+	log: Extract<RoutinePatternLog, { kind: "sleep" }>,
+	dayDate: string,
+	start: { dateKey: string },
+	end: { dateKey: string },
+) {
+	if (!log.endTime) {
+		return start.dateKey === dayDate ? "active-start" : "active-day";
+	}
+
+	if (start.dateKey === dayDate && end.dateKey === dayDate) {
+		return "same-day";
+	}
+
+	if (start.dateKey === dayDate) {
+		return "start-day";
+	}
+
+	if (end.dateKey === dayDate) {
+		return "end-day";
+	}
+
+	return "full-day";
 }
 
 function getLocalDateKey(date: Date) {

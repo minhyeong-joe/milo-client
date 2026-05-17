@@ -121,8 +121,13 @@ export default function ReportsScreen() {
 			? customPatternStartDate ?? patternEndDateKey
 			: addDays(patternEndDateKey, -(patternDayCount - 1));
 	const localPatternStats = useMemo(
-		() => buildRoutineStatsFromLocalLogs(dailyLogs, patternStartDate, patternEndDateKey),
-		[dailyLogs, patternEndDateKey, patternStartDate],
+		() => buildRoutineStatsFromLocalLogs(
+			dailyLogs,
+			patternStartDate,
+			patternEndDateKey,
+			timelineTimeZone,
+		),
+		[dailyLogs, patternEndDateKey, patternStartDate, timelineTimeZone],
 	);
 	const localPatternDateSet = useMemo(
 		() => new Set(dailyLogs.map((day) => day.date)),
@@ -134,7 +139,12 @@ export default function ReportsScreen() {
 	);
 
 	const refreshPatternStats = useCallback(async () => {
-		const localStats = buildRoutineStatsFromLocalLogs(dailyLogs, patternStartDate, patternEndDateKey);
+		const localStats = buildRoutineStatsFromLocalLogs(
+			dailyLogs,
+			patternStartDate,
+			patternEndDateKey,
+			timelineTimeZone,
+		);
 
 		if (!selectedBaby) {
 			setPatternStats(localStats);
@@ -204,6 +214,7 @@ export default function ReportsScreen() {
 		selectedBaby,
 		session,
 		syncPendingMutations,
+		timelineTimeZone,
 	]);
 
 	const refreshGrowthRecords = useCallback(async () => {
@@ -399,6 +410,7 @@ function buildRoutineStatsFromLocalLogs(
 	dailyLogs: { date: string; timeline: RoutineEvent[] }[],
 	startDate: string,
 	endDate: string,
+	timeZone?: string,
 ): RoutineStatsResponse {
 	const stats = createEmptyRoutineStats(startDate, endDate);
 	const daysByDate = new Map(stats.days.map((day) => [day.date, day]));
@@ -406,13 +418,13 @@ function buildRoutineStatsFromLocalLogs(
 	for (const day of dailyLogs) {
 		const statsDay = daysByDate.get(day.date);
 
-		if (!statsDay) {
-			continue;
-		}
-
-		statsDay.logs = day.timeline.map((event) => {
+		for (const event of day.timeline) {
 			if (event.kind === "meal") {
-				return {
+				if (!statsDay) {
+					continue;
+				}
+
+				statsDay.logs.push({
 					amountServings: event.amountServings ?? null,
 					amountGrams: event.amountGrams ?? null,
 					amountMl: event.amountMl ?? null,
@@ -421,26 +433,36 @@ function buildRoutineStatsFromLocalLogs(
 					kind: "meal",
 					time: event.time,
 					type: event.type,
-				};
+				});
+				continue;
 			}
 
 			if (event.kind === "diaper") {
-				return {
+				if (!statsDay) {
+					continue;
+				}
+
+				statsDay.logs.push({
 					id: event.id,
 					kind: "diaper",
 					time: event.time,
 					type: event.type,
-				};
+				});
+				continue;
 			}
 
-			return {
+			const sleepLog = {
 				endTime: event.endTime ?? null,
 				id: event.id,
 				kind: "sleep",
 				startTime: event.startTime,
 				type: event.type,
-			};
-		});
+			} as const;
+
+			for (const date of getSleepOverlapDates(event.startTime, event.endTime ?? null, timeZone)) {
+				daysByDate.get(date)?.logs.push(sleepLog);
+			}
+		}
 	}
 
 	return stats;
@@ -487,6 +509,35 @@ function mergeRoutineStatsForDisplay(
 	};
 }
 
+function getSleepOverlapDates(startTime: string, endTime: string | null, timeZone?: string) {
+	const start = new Date(startTime);
+	const end = endTime ? new Date(endTime) : new Date();
+
+	if (Number.isNaN(start.getTime())) {
+		return [];
+	}
+
+	if (Number.isNaN(end.getTime()) || end.getTime() <= start.getTime()) {
+		return [getDateKeyForInstant(start, timeZone)];
+	}
+
+	const startDate = getDateKeyForInstant(start, timeZone);
+	const endDate = getDateKeyForInstant(end, timeZone);
+	const dates: string[] = [];
+	let current = startDate;
+
+	while (current <= endDate) {
+		dates.push(current);
+		current = addDays(current, 1);
+	}
+
+	return dates;
+}
+
+function getDateKeyForInstant(value: Date, timeZone?: string) {
+	return timeZone ? getDateKeyInTimeZone(value, timeZone) : getDateKey(value);
+}
+
 function buildRoutineStatsSummary(days: RoutineStatsResponse["days"]): RoutineStatsResponse["summary"] {
 	const safeDivide = (value: number, divisor: number) => divisor > 0 ? value / divisor : 0;
 	const mealActiveDays = new Set<string>();
@@ -507,6 +558,7 @@ function buildRoutineStatsSummary(days: RoutineStatsResponse["days"]): RoutineSt
 	let diaperCount = 0;
 	let sleepCount = 0;
 	let sleepDurationMinutes = 0;
+	const countedSleepIds = new Set<string>();
 
 	for (const day of days) {
 		for (const log of day.logs) {
@@ -543,6 +595,11 @@ function buildRoutineStatsSummary(days: RoutineStatsResponse["days"]): RoutineSt
 				diaperCount += 1;
 				diaperTypeCounts[log.type] += 1;
 			} else {
+				if (countedSleepIds.has(log.id)) {
+					continue;
+				}
+
+				countedSleepIds.add(log.id);
 				const durationMinutes = getSleepDurationMinutes(log.startTime, log.endTime);
 
 				sleepActiveDays.add(day.date);

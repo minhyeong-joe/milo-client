@@ -170,6 +170,7 @@ export default function PatternReportsContent({
 					showDiaper={showDiaper}
 					showMeal={showMeal}
 					showSleep={showSleep}
+					timeZone={timeZone}
 				/>
 			</View>
 
