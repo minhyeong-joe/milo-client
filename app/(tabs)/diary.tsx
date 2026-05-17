@@ -89,7 +89,6 @@ export default function DiaryScreen() {
 	const [actionEntry, setActionEntry] = useState<DiaryEntry | null>(null);
 	const [deleteEntry, setDeleteEntry] = useState<DiaryEntry | null>(null);
 	const [isDeleting, setIsDeleting] = useState(false);
-	const [isSearchVisible, setIsSearchVisible] = useState(false);
 	const searchBarRef = useRef<TextInput>(null);
 	const [searchText, setSearchText] = useState("");
 	const [debouncedSearchText, setDebouncedSearchText] = useState("");
@@ -125,17 +124,6 @@ export default function DiaryScreen() {
 
 		return () => clearTimeout(timeoutId);
 	}, [searchText]);
-
-	useEffect(() => {
-		if (isSearchVisible) {
-			requestAnimationFrame(() => {
-				searchBarRef.current?.focus();
-			});
-		} else {
-			searchBarRef.current?.blur();
-			Keyboard.dismiss();
-		}
-	}, [isSearchVisible]);
 
 	const loadFirstPage = useCallback(
 		async ({
@@ -371,14 +359,6 @@ export default function DiaryScreen() {
 					<Text style={globalStyles.titleText}>Diary</Text>
 					<View style={styles.headerActions}>
 						<HeaderIconButton
-							label="Search diary"
-							name="search-outline"
-							onPress={() => {
-								setIsSearchVisible((currentValue) => !currentValue);
-								setSearchText("");
-							}}
-						/>
-						<HeaderIconButton
 							label="Filter diary"
 							name="filter-outline"
 							onPress={() => {
@@ -400,30 +380,28 @@ export default function DiaryScreen() {
 						</Pressable>
 					</View>
 				</View>
-				{isSearchVisible ? (
-					<View style={styles.searchRow}>
-						<Ionicons color={themeColors.textSecondary} name="search-outline" size={18} />
-						<TextInput
-							autoCapitalize="none"
-							autoCorrect={false}
-							onChangeText={setSearchText}
-							placeholder="Search title or note"
-							placeholderTextColor={themeColors.textSecondary}
-							style={styles.searchInput}
-							value={searchText}
-							ref={searchBarRef}
-						/>
-						{searchText.length > 0 ? (
-							<Pressable
-								accessibilityLabel="Clear search"
-								onPress={() => setSearchText("")}
-								style={styles.clearIconButton}
-							>
-								<Ionicons color={themeColors.textSecondary} name="close-circle" size={18} />
-							</Pressable>
-						) : null}
-					</View>
-				) : null}
+				<View style={styles.searchRow}>
+					<Ionicons color={themeColors.textSecondary} name="search-outline" size={18} />
+					<TextInput
+						autoCapitalize="none"
+						autoCorrect={false}
+						onChangeText={setSearchText}
+						placeholder="Search title or note"
+						placeholderTextColor={themeColors.textSecondary}
+						style={styles.searchInput}
+						value={searchText}
+						ref={searchBarRef}
+					/>
+					{searchText.length > 0 ? (
+						<Pressable
+							accessibilityLabel="Clear search"
+							onPress={() => setSearchText("")}
+							style={styles.clearIconButton}
+						>
+							<Ionicons color={themeColors.textSecondary} name="close-circle" size={18} />
+						</Pressable>
+					) : null}
+				</View>
 				<View>
 					{hasActiveFilters ? (
 						<ActiveFilterChips
