@@ -135,7 +135,7 @@ function createStyles(themeColors: ThemeColors) {
 			paddingVertical: spacing.md,
 		},
 		optionRowSelected: {
-			backgroundColor: "#F1EEFF",
+			backgroundColor: themeColors.secondary,
 		},
 		optionSubtext: {
 			...typography.caption,

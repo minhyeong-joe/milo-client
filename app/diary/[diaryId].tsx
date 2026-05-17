@@ -169,7 +169,7 @@ export default function DiaryDetailScreen() {
 								<Text style={styles.aiTitle}>AI Reflection</Text>
 							</View>
 							<Text style={styles.aiText}>
-								A gentle reflection will appear here after AI diary insights are added.
+								A gentle reflection to diary entry will display here.
 							</Text>
 						</View>
 					</>

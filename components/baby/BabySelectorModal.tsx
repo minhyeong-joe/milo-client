@@ -145,7 +145,7 @@ function createStyles(themeColors: ThemeColors) {
 		paddingVertical: spacing.md,
 	},
 	selectorItemSelected: {
-		backgroundColor: "#F1EEFF",
+		backgroundColor: themeColors.secondary,
 	},
 	selectorName: {
 		color: themeColors.textPrimary,

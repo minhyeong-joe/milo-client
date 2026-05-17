@@ -243,14 +243,14 @@ function HeroMedia({ item }: { item: DiaryMediaPreviewItem }) {
 				<Image source={{ uri: imageUri }} style={styles.heroImage} />
 			) : (
 				<Ionicons
-					color={themeColors.textSecondary}
+					color={themeColors.surface}
 					name={isVideo(item.fileType) ? "play-circle-outline" : "image-outline"}
 					size={42}
 				/>
 			)}
 			{isVideo(item.fileType) ? (
 				<View style={styles.heroPlayBadge}>
-					<Ionicons color={themeColors.surface} name="play" size={24} />
+					<Ionicons color={themeColors.mediaText} name="play" size={24} />
 				</View>
 			) : null}
 		</View>
@@ -327,7 +327,7 @@ function MediaTile({
 				/>
 			) : (
 				<Ionicons
-					color={themeColors.textSecondary}
+					color={themeColors.mediaText}
 					name={isVideo(item.fileType) ? "play-circle-outline" : "image-outline"}
 					size={28}
 				/>
@@ -340,7 +340,7 @@ function MediaTile({
 					]}
 				>
 					<View style={styles.videoBadge}>
-						<Ionicons color={themeColors.surface} name="play" size={12} />
+						<Ionicons color={themeColors.mediaText} name="play" size={12} />
 						<Text style={styles.videoBadgeText}>Video</Text>
 					</View>
 				</View>
@@ -351,7 +351,7 @@ function MediaTile({
 					onPress={() => onRemove(item.objectKey)}
 					style={styles.removeButton}
 				>
-					<Ionicons color={themeColors.surface} name="close" size={14} />
+					<Ionicons color={themeColors.mediaText} name="close" size={14} />
 				</Pressable>
 			) : null}
 		</Pressable>
@@ -427,7 +427,7 @@ function FullscreenMediaGallery({
 					onPress={onClose}
 					style={styles.videoCloseButton}
 				>
-					<Ionicons color={themeColors.surface} name="close" size={22} />
+					<Ionicons color={themeColors.mediaText} name="close" size={22} />
 				</Pressable>
 				<View style={styles.galleryCountBadge}>
 					<Text style={styles.heroCountText}>
@@ -512,7 +512,7 @@ function VideoModal({ onClose, uri }: { onClose: () => void; uri: string }) {
 					onPress={onClose}
 					style={styles.videoCloseButton}
 				>
-					<Ionicons color={themeColors.surface} name="close" size={22} />
+					<Ionicons color={themeColors.mediaText} name="close" size={22} />
 				</Pressable>
 				<VideoView
 					contentFit="contain"
@@ -828,19 +828,6 @@ function createStyles(themeColors: ThemeColors) {
 		justifyContent: "center",
 		padding: spacing.lg,
 	},
-	galleryNavButton: {
-		alignItems: "center",
-		backgroundColor: "rgba(255, 255, 255, 0.14)",
-		borderRadius: 999,
-		height: 64,
-		justifyContent: "center",
-		position: "absolute",
-		top: "48%",
-		width: 48,
-	},
-	galleryNextButton: {
-		right: spacing.md,
-	},
 	galleryPage: {
 		alignItems: "center",
 		justifyContent: "center",
@@ -849,11 +836,8 @@ function createStyles(themeColors: ThemeColors) {
 	galleryPager: {
 		...StyleSheet.absoluteFillObject,
 	},
-	galleryPreviousButton: {
-		left: spacing.md,
-	},
 	heroCountBadge: {
-		backgroundColor: "rgba(21, 24, 39, 0.72)",
+		backgroundColor: themeColors.mediaBackground,
 		borderRadius: 999,
 		paddingHorizontal: spacing.sm,
 		paddingVertical: spacing.xs,
@@ -867,7 +851,7 @@ function createStyles(themeColors: ThemeColors) {
 	},
 	heroCountText: {
 		...typography.caption,
-		color: themeColors.surface,
+		color: themeColors.mediaText,
 		fontWeight: "700",
 	},
 	heroDot: {
@@ -894,7 +878,7 @@ function createStyles(themeColors: ThemeColors) {
 	},
 	heroMedia: {
 		alignItems: "center",
-		backgroundColor: "#F7F8FC",
+		backgroundColor: themeColors.mediaBackground,
 		borderColor: themeColors.border,
 		borderRadius: 24,
 		borderWidth: 1,
@@ -912,7 +896,7 @@ function createStyles(themeColors: ThemeColors) {
 	},
 	heroPlayBadge: {
 		alignItems: "center",
-		backgroundColor: "rgba(21, 24, 39, 0.72)",
+		backgroundColor: themeColors.mediaBackground,
 		borderRadius: 999,
 		bottom: spacing.lg,
 		height: 58,
@@ -948,7 +932,7 @@ function createStyles(themeColors: ThemeColors) {
 	},
 	removeButton: {
 		alignItems: "center",
-		backgroundColor: "rgba(21, 24, 39, 0.72)",
+		backgroundColor: themeColors.mediaBackground,
 		borderRadius: 999,
 		height: 24,
 		justifyContent: "center",
@@ -959,7 +943,7 @@ function createStyles(themeColors: ThemeColors) {
 	},
 	videoCloseButton: {
 		alignItems: "center",
-		backgroundColor: "rgba(255, 255, 255, 0.18)",
+		backgroundColor: themeColors.mediaBackground,
 		borderRadius: 999,
 		height: 44,
 		justifyContent: "center",
@@ -1001,7 +985,7 @@ function createStyles(themeColors: ThemeColors) {
 	},
 	videoBadgeText: {
 		...typography.caption,
-		color: themeColors.surface,
+		color: themeColors.mediaText,
 		fontSize: 10,
 	},
 });
