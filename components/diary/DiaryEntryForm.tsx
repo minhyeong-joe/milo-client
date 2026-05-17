@@ -50,12 +50,7 @@ const TAG_FILTERS: { color: string; key: TagFilterKey; label: string }[] = [
 	{ color: "#64748B", key: "custom", label: "Custom" },
 ];
 
-const DEFAULT_TAG_FILTERS: Record<TagFilterKey, boolean> = {
-	custom: false,
-	emotion: false,
-	event: false,
-	milestone: true,
-};
+const DEFAULT_TAG_FILTER: TagFilterKey = "milestone";
 
 type DiaryEntryFormSubmitInput = {
 	content: string;
@@ -135,8 +130,8 @@ export function DiaryEntryForm({
 	const [showDatePicker, setShowDatePicker] = useState(false);
 	const [selectedTags, setSelectedTags] = useState<DiaryTag[]>(initialSelectedTags);
 	const [tagInput, setTagInput] = useState("");
-	const [tagFilters, setTagFilters] =
-		useState<Record<TagFilterKey, boolean>>(DEFAULT_TAG_FILTERS);
+	const [selectedTagFilter, setSelectedTagFilter] =
+		useState<TagFilterKey>(DEFAULT_TAG_FILTER);
 	const [isTagPoolExpanded, setIsTagPoolExpanded] = useState(false);
 	const [validationError, setValidationError] = useState<string | null>(null);
 	const [tagError, setTagError] = useState<string | null>(null);
@@ -198,14 +193,14 @@ export function DiaryEntryForm({
 
 		return availableTags
 			.filter((tag) => !selectedTagIds.has(tag.id))
-			.filter((tag) => isTagFilterEnabled(tag, tagFilters))
+			.filter((tag) => isTagFilterMatch(tag, selectedTagFilter))
 			.filter((tag) =>
 				normalizedSearch.length > 0
 					? normalizeTagName(tag.name).includes(normalizedSearch)
 					: true,
 			)
 			.sort((left, right) => left.name.localeCompare(right.name));
-	}, [availableTags, selectedTags, tagFilters, trimmedTagInput]);
+	}, [availableTags, selectedTagFilter, selectedTags, trimmedTagInput]);
 
 	const hasExactMatch = useMemo(() => {
 		const normalizedInput = normalizeTagName(trimmedTagInput);
@@ -309,11 +304,8 @@ export function DiaryEntryForm({
 		}
 	};
 
-	const toggleTagFilter = (filter: TagFilterKey) => {
-		setTagFilters((currentFilters) => ({
-			...currentFilters,
-			[filter]: !currentFilters[filter],
-		}));
+	const selectTagFilter = (filter: TagFilterKey) => {
+		setSelectedTagFilter(filter);
 	};
 
 	const addMedia = async () => {
@@ -606,11 +598,11 @@ export function DiaryEntryForm({
 							<Pressable
 								accessibilityRole="button"
 								key={filter.key}
-								onPress={() => toggleTagFilter(filter.key)}
+								onPress={() => selectTagFilter(filter.key)}
 								style={[
 									styles.tagFilterButton,
 									{ borderColor: filter.color },
-									tagFilters[filter.key] && {
+									selectedTagFilter === filter.key && {
 										backgroundColor: getTagFilterBackground(filter.color),
 									},
 								]}
@@ -969,27 +961,12 @@ function getTagFilterBackground(color: string) {
 	return `${color}1F`;
 }
 
-function isTagFilterEnabled(
-	tag: DiaryTag,
-	filters: Record<TagFilterKey, boolean>,
-) {
-	if (tag.scope === "custom") {
-		return filters.custom;
+function isTagFilterMatch(tag: DiaryTag, filter: TagFilterKey) {
+	if (filter === "custom") {
+		return tag.scope === "custom";
 	}
 
-	if (tag.type === "milestone") {
-		return filters.milestone;
-	}
-
-	if (tag.type === "emotion") {
-		return filters.emotion;
-	}
-
-	if (tag.type === "event") {
-		return filters.event;
-	}
-
-	return false;
+	return tag.scope !== "custom" && tag.type === filter;
 }
 
 function toDateKey(date: Date) {
