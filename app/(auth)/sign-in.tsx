@@ -1,5 +1,6 @@
 import { useAuthSession } from "@/context/AuthSessionContext";
-import { colors, globalStyles, spacing, typography } from "@/styles/globalStyles";
+import { spacing, typography, type ThemeColors } from "@/styles/globalStyles";
+import { useAppTheme } from "@/context/AppPreferencesContext";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import type { ComponentProps } from "react";
@@ -18,8 +19,16 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 type AuthMode = "signIn" | "createAccount";
 
+function useThemeStyles() {
+	const { globalStyles, themeColors } = useAppTheme();
+	const styles = useMemo(() => createStyles(themeColors), [themeColors]);
+
+	return { globalStyles, styles, themeColors };
+}
+
 export default function SignInScreen() {
 	const router = useRouter();
+	const { globalStyles, themeColors, styles } = useThemeStyles();
 	const { clearError, error, isLoading, signIn, startSignupDraft } = useAuthSession();
 	const [mode, setMode] = useState<AuthMode>("signIn");
 	const [email, setEmail] = useState("");
@@ -81,7 +90,7 @@ export default function SignInScreen() {
 				>
 					<View style={styles.brandRow}>
 						<View style={styles.logo}>
-							<Ionicons color={colors.light.primary} name="sparkles" size={26} />
+							<Ionicons color={themeColors.primary} name="sparkles" size={26} />
 						</View>
 						<View>
 							<Text style={styles.brandName}>Milo</Text>
@@ -167,11 +176,12 @@ function FormField({
 }: {
 	label: string;
 } & ComponentProps<typeof TextInput>) {
+	const { themeColors, styles } = useThemeStyles();
 	return (
 		<View style={styles.field}>
 			<Text style={styles.fieldLabel}>{label}</Text>
 			<TextInput
-				placeholderTextColor={colors.light.textSecondary}
+				placeholderTextColor={themeColors.textSecondary}
 				style={styles.input}
 				{...inputProps}
 			/>
@@ -179,7 +189,8 @@ function FormField({
 	);
 }
 
-const styles = StyleSheet.create({
+function createStyles(themeColors: ThemeColors) {
+	return StyleSheet.create({
 	keyboardView: {
 		flex: 1,
 	},
@@ -204,23 +215,23 @@ const styles = StyleSheet.create({
 	},
 	brandName: {
 		...typography.screenTitle,
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 	},
 	brandCaption: {
 		...typography.body,
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 	},
 	hero: {
 		marginBottom: spacing.lg,
 	},
 	title: {
 		...typography.title,
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 		marginBottom: spacing.sm,
 	},
 	body: {
 		...typography.body,
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 	},
 	formCard: {
 		gap: spacing.md,
@@ -230,22 +241,22 @@ const styles = StyleSheet.create({
 	},
 	fieldLabel: {
 		...typography.caption,
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 		textTransform: "uppercase",
 	},
 	input: {
 		...typography.body,
-		backgroundColor: colors.light.background,
-		borderColor: colors.light.border,
+		backgroundColor: themeColors.background,
+		borderColor: themeColors.border,
 		borderRadius: 14,
 		borderWidth: 1,
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 		minHeight: 50,
 		paddingHorizontal: spacing.md,
 	},
 	primaryButton: {
 		alignItems: "center",
-		backgroundColor: colors.light.primary,
+		backgroundColor: themeColors.primary,
 		borderRadius: 16,
 		justifyContent: "center",
 		marginTop: spacing.xs,
@@ -259,7 +270,7 @@ const styles = StyleSheet.create({
 	},
 	primaryButtonText: {
 		...typography.label,
-		color: colors.light.surface,
+		color: themeColors.surface,
 	},
 	modeLink: {
 		alignItems: "center",
@@ -268,11 +279,12 @@ const styles = StyleSheet.create({
 	},
 	modeLinkText: {
 		...typography.label,
-		color: colors.light.primary,
+		color: themeColors.primary,
 	},
 	errorText: {
 		...typography.body,
-		color: colors.light.error,
+		color: themeColors.error,
 		textAlign: "center",
 	},
 });
+}

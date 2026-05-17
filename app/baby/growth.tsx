@@ -1,16 +1,25 @@
-import { useAppPreferences } from "@/context/AppPreferencesContext";
+import { useMemo } from "react";
+import { useAppPreferences , useAppTheme } from "@/context/AppPreferencesContext";
 import { useBabySelection } from "@/context/BabySelectionContext";
 import { useGrowthData } from "@/context/GrowthDataContext";
 import type { LocalGrowthRecord } from "@/services/growth/growthOfflineStore";
-import { colors, globalStyles, spacing, typography } from "@/styles/globalStyles";
+import { spacing, typography, type ThemeColors } from "@/styles/globalStyles";
 import { formatBabyAge } from "@/utils/routineDisplay";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+function useThemeStyles() {
+	const { globalStyles, themeColors } = useAppTheme();
+	const styles = useMemo(() => createStyles(themeColors), [themeColors]);
+
+	return { globalStyles, styles, themeColors };
+}
+
 export default function GrowthRecordsScreen() {
 	const router = useRouter();
+	const { globalStyles, themeColors, styles } = useThemeStyles();
 	const { selectedBaby } = useBabySelection();
 	const { growthRecords, isLoading, loadGrowthRecords } = useGrowthData();
 	const { preferredLengthUnit, preferredWeightUnit } = useAppPreferences();
@@ -19,7 +28,7 @@ export default function GrowthRecordsScreen() {
 		<SafeAreaView style={globalStyles.screen}>
 			<View style={styles.header}>
 				<Pressable accessibilityRole="button" onPress={() => router.back()} style={styles.headerButton}>
-					<Ionicons color={colors.light.textPrimary} name="chevron-back" size={24} />
+					<Ionicons color={themeColors.textPrimary} name="chevron-back" size={24} />
 				</Pressable>
 				<Text style={globalStyles.sectionTitleText}>Edit Growth</Text>
 				<Pressable
@@ -27,7 +36,7 @@ export default function GrowthRecordsScreen() {
 					onPress={() => router.push("/baby/add-measurement")}
 					style={[styles.headerButton, styles.addButton]}
 				>
-					<Ionicons color={colors.light.surface} name="add" size={22} />
+					<Ionicons color={themeColors.surface} name="add" size={22} />
 				</Pressable>
 			</View>
 
@@ -36,7 +45,7 @@ export default function GrowthRecordsScreen() {
 				refreshControl={
 					<RefreshControl
 						refreshing={isLoading}
-						tintColor={colors.light.primary}
+						tintColor={themeColors.primary}
 						onRefresh={() => void loadGrowthRecords({ sync: true })}
 					/>
 				}
@@ -85,6 +94,7 @@ function GrowthRecordCard({
 	record: LocalGrowthRecord;
 	weightUnit: "kg" | "lb";
 }) {
+	const { globalStyles, styles } = useThemeStyles();
 	const ageAtMeasurement = birthdate
 		? formatBabyAge(birthdate, parseDateKey(record.measuredDate))
 		: null;
@@ -129,6 +139,7 @@ function GrowthRecordCard({
 }
 
 function MeasurementValue({ label, value }: { label: string; value: string }) {
+	const { styles } = useThemeStyles();
 	return (
 		<View style={styles.measurementItem}>
 			<Text style={styles.measurementLabel}>{label}</Text>
@@ -159,9 +170,10 @@ function parseDateKey(value: string) {
 	return new Date(`${value}T00:00:00`);
 }
 
-const styles = StyleSheet.create({
+function createStyles(themeColors: ThemeColors) {
+	return StyleSheet.create({
 	addButton: {
-		backgroundColor: colors.light.primary,
+		backgroundColor: themeColors.primary,
 		borderRadius: 999,
 	},
 	content: {
@@ -173,10 +185,10 @@ const styles = StyleSheet.create({
 	},
 	emptyTitle: {
 		...typography.sectionTitle,
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 	},
 	errorText: {
-		color: colors.light.error,
+		color: themeColors.error,
 		fontSize: 12,
 		fontWeight: "700",
 		marginTop: spacing.sm,
@@ -205,33 +217,34 @@ const styles = StyleSheet.create({
 	},
 	measurementLabel: {
 		...typography.caption,
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 	},
 	measurementText: {
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 		fontSize: 14,
 		fontWeight: "800",
 	},
 	recordDate: {
 		...typography.itemTitle,
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 	},
 	recordAge: {
 		...typography.caption,
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 		marginTop: 2,
 	},
 	syncBadge: {
 		...typography.caption,
 		backgroundColor: "#F1EFFD",
 		borderRadius: 999,
-		color: colors.light.primary,
+		color: themeColors.primary,
 		overflow: "hidden",
 		paddingHorizontal: spacing.sm,
 		paddingVertical: spacing.xs,
 	},
 	syncBadgeFailed: {
 		backgroundColor: "#FEE2E2",
-		color: colors.light.error,
+		color: themeColors.error,
 	},
 });
+}

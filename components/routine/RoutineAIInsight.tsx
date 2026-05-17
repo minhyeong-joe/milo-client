@@ -1,10 +1,19 @@
+import { useAppTheme } from "@/context/AppPreferencesContext";
 import { Ionicons } from "@expo/vector-icons";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 
-import { colors, spacing, typography } from "@/styles/globalStyles";
+import { spacing, typography, type ThemeColors } from "@/styles/globalStyles";
+
+function useThemeStyles() {
+	const { globalStyles, themeColors } = useAppTheme();
+	const styles = useMemo(() => createStyles(themeColors), [themeColors]);
+
+	return { globalStyles, styles, themeColors };
+}
 
 export function RoutineAIInsight() {
+	const { themeColors, styles } = useThemeStyles();
 	const [isModalVisible, setIsModalVisible] = useState(false);
 
 	return (
@@ -15,7 +24,7 @@ export function RoutineAIInsight() {
 				style={styles.card}
 			>
 				<View style={styles.header}>
-					<Ionicons color={colors.light.primary} name="sparkles" size={22} />
+					<Ionicons color={themeColors.primary} name="sparkles" size={22} />
 					<Text style={styles.title}>AI Daily Insight</Text>
 				</View>
 				<Text style={styles.body}>
@@ -35,7 +44,7 @@ export function RoutineAIInsight() {
 				>
 					<Pressable style={styles.modalCard}>
 						<View style={styles.modalIcon}>
-							<Ionicons color={colors.light.primary} name="sparkles" size={24} />
+							<Ionicons color={themeColors.primary} name="sparkles" size={24} />
 						</View>
 						<Text style={styles.modalTitle}>AI Daily Insight</Text>
 						<Text style={styles.modalText}>
@@ -55,7 +64,8 @@ export function RoutineAIInsight() {
 	);
 }
 
-const styles = StyleSheet.create({
+function createStyles(themeColors: ThemeColors) {
+	return StyleSheet.create({
 	backdrop: {
 		alignItems: "center",
 		backgroundColor: "rgba(21, 24, 39, 0.35)",
@@ -65,12 +75,12 @@ const styles = StyleSheet.create({
 	},
 	body: {
 		...typography.body,
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 		lineHeight: 22,
 	},
 	card: {
-		backgroundColor: "#F8F3FF",
-		borderColor: "#ECE0FF",
+		backgroundColor: themeColors.secondary,
+		borderColor: themeColors.border,
 		borderRadius: 14,
 		borderWidth: 1,
 		gap: spacing.sm,
@@ -80,14 +90,14 @@ const styles = StyleSheet.create({
 	closeButton: {
 		alignItems: "center",
 		alignSelf: "stretch",
-		backgroundColor: colors.light.primary,
+		backgroundColor: themeColors.primary,
 		borderRadius: 12,
 		marginTop: spacing.sm,
 		paddingVertical: spacing.md,
 	},
 	closeButtonText: {
 		...typography.label,
-		color: colors.light.surface,
+		color: themeColors.surface,
 	},
 	header: {
 		alignItems: "center",
@@ -96,7 +106,7 @@ const styles = StyleSheet.create({
 	},
 	modalCard: {
 		alignItems: "center",
-		backgroundColor: colors.light.surface,
+		backgroundColor: themeColors.surface,
 		borderRadius: 18,
 		gap: spacing.md,
 		padding: spacing.lg,
@@ -112,17 +122,18 @@ const styles = StyleSheet.create({
 	},
 	modalText: {
 		...typography.body,
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 		lineHeight: 22,
 		textAlign: "center",
 	},
 	modalTitle: {
 		...typography.sectionTitle,
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 	},
 	title: {
 		...typography.label,
-		color: colors.light.primary,
+		color: themeColors.primary,
 		fontWeight: "800",
 	},
 });
+}

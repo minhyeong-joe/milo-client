@@ -2,7 +2,7 @@ import { DiaryEntryCard } from "@/components/diary/DiaryEntryCard";
 import { DiaryActionsModal } from "@/components/diary/DiaryActionsModal";
 import { DiaryTagPill } from "@/components/diary/DiaryTagPill";
 import { ConfirmDeleteModal } from "@/components/routine/ConfirmDeleteModal";
-import { useTimelineTimeZone } from "@/context/AppPreferencesContext";
+import { useTimelineTimeZone , useAppTheme } from "@/context/AppPreferencesContext";
 import { useBabySelection } from "@/context/BabySelectionContext";
 import { useDiaryCache } from "@/context/DiaryCacheContext";
 import { useSync } from "@/context/SyncContext";
@@ -14,7 +14,7 @@ import {
 	type DiaryTag,
 } from "@/services/api/diary";
 import { listTags } from "@/services/api/tags";
-import { colors, globalStyles, spacing, typography } from "@/styles/globalStyles";
+import { spacing, typography, type ThemeColors } from "@/styles/globalStyles";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker, { type DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -33,8 +33,7 @@ import {
 	View,
 	Keyboard
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView , useSafeAreaInsets } from "react-native-safe-area-context";
 
 const PAGE_SIZE = 10;
 const SEARCH_DEBOUNCE_MS = 300;
@@ -62,8 +61,16 @@ const emptyFilters: DiaryFilterState = {
 	tagTypes: [],
 };
 
+function useThemeStyles() {
+	const { globalStyles, themeColors } = useAppTheme();
+	const styles = useMemo(() => createStyles(themeColors), [themeColors]);
+
+	return { globalStyles, styles, themeColors };
+}
+
 export default function DiaryScreen() {
 	const router = useRouter();
+	const { globalStyles, themeColors, styles } = useThemeStyles();
 	const { selectedBaby } = useBabySelection();
 	const timelineTimeZone = useTimelineTimeZone(selectedBaby);
 	const { connectionStatus, markOffline, markOnline } = useSync();
@@ -388,19 +395,19 @@ export default function DiaryScreen() {
 								isDiaryOffline && styles.disabledAddButton,
 							]}
 						>
-							<Ionicons color={colors.light.surface} name="add" size={24} />
+							<Ionicons color={themeColors.surface} name="add" size={24} />
 						</Pressable>
 					</View>
 				</View>
 				{isSearchVisible ? (
 					<View style={styles.searchRow}>
-						<Ionicons color={colors.light.textSecondary} name="search-outline" size={18} />
+						<Ionicons color={themeColors.textSecondary} name="search-outline" size={18} />
 						<TextInput
 							autoCapitalize="none"
 							autoCorrect={false}
 							onChangeText={setSearchText}
 							placeholder="Search title or note"
-							placeholderTextColor={colors.light.textSecondary}
+							placeholderTextColor={themeColors.textSecondary}
 							style={styles.searchInput}
 							value={searchText}
 							ref={searchBarRef}
@@ -411,7 +418,7 @@ export default function DiaryScreen() {
 								onPress={() => setSearchText("")}
 								style={styles.clearIconButton}
 							>
-								<Ionicons color={colors.light.textSecondary} name="close-circle" size={18} />
+								<Ionicons color={themeColors.textSecondary} name="close-circle" size={18} />
 							</Pressable>
 						) : null}
 					</View>
@@ -441,7 +448,7 @@ export default function DiaryScreen() {
 						refreshControl={
 							<RefreshControl
 								refreshing={isRefreshing}
-								tintColor={colors.light.primary}
+								tintColor={themeColors.primary}
 								onRefresh={() =>
 									loadFirstPage({ forceNetwork: true, refreshing: true })
 								}
@@ -466,7 +473,7 @@ export default function DiaryScreen() {
 						ListEmptyComponent={
 							isLoading ? (
 								<View style={styles.centerState}>
-									<ActivityIndicator color={colors.light.primary} />
+									<ActivityIndicator color={themeColors.primary} />
 								</View>
 							) : (
 								<DiaryEmptyState error={error} onRetry={() => loadFirstPage()} />
@@ -475,7 +482,7 @@ export default function DiaryScreen() {
 						ListFooterComponent={
 							isLoadingMore ? (
 								<View style={styles.footerLoader}>
-									<ActivityIndicator color={colors.light.primary} />
+									<ActivityIndicator color={themeColors.primary} />
 								</View>
 							) : null
 						}
@@ -484,7 +491,7 @@ export default function DiaryScreen() {
 						refreshControl={
 							<RefreshControl
 								refreshing={isRefreshing}
-								tintColor={colors.light.primary}
+								tintColor={themeColors.primary}
 								onRefresh={() =>
 									loadFirstPage({ forceNetwork: true, refreshing: true })
 								}
@@ -567,6 +574,7 @@ function ActiveFilterChips({
 	timeZone?: string;
 	tags: DiaryTag[];
 }) {
+	const { themeColors, styles } = useThemeStyles();
 	const chips = getActiveFilterChips(filters, tags, timeZone);
 
 	if (chips.length === 0) {
@@ -587,7 +595,7 @@ function ActiveFilterChips({
 					style={styles.activeFilterChip}
 				>
 					<Text style={styles.activeFilterText}>{chip.label}</Text>
-					<Ionicons color={colors.light.primary} name="close" size={14} />
+					<Ionicons color={themeColors.primary} name="close" size={14} />
 				</Pressable>
 			))}
 			<Pressable accessibilityRole="button" onPress={onClearAll} style={styles.clearAllChip}>
@@ -624,6 +632,7 @@ function DiaryFilterModal({
 	timeZone?: string;
 	visible: boolean;
 }) {
+	const { globalStyles, themeColors, styles } = useThemeStyles();
 	const sortedTags = useMemo(
 		() => [...availableTags].sort((left, right) => left.name.localeCompare(right.name)),
 		[availableTags],
@@ -641,7 +650,7 @@ function DiaryFilterModal({
 					<View style={globalStyles.rowBetween}>
 						<Text style={styles.filterTitle}>Filter diary</Text>
 						<Pressable accessibilityLabel="Close filters" onPress={onClose} style={styles.clearIconButton}>
-							<Ionicons color={colors.light.textSecondary} name="close" size={22} />
+							<Ionicons color={themeColors.textSecondary} name="close" size={22} />
 						</Pressable>
 					</View>
 
@@ -794,6 +803,7 @@ function DateFilterButton({
 	timeZone?: string;
 	value: string | null;
 }) {
+	const { styles } = useThemeStyles();
 	return (
 		<Pressable accessibilityRole="button" onPress={onPress} style={styles.dateFilterButton}>
 			<Text style={styles.helperText}>{label}</Text>
@@ -809,9 +819,10 @@ function DiaryOfflineState({
 	isRetrying: boolean;
 	onRetry: () => void;
 }) {
+	const { themeColors, styles } = useThemeStyles();
 	return (
 		<View style={styles.centerState}>
-			<Ionicons color={colors.light.textSecondary} name="cloud-offline-outline" size={32} />
+			<Ionicons color={themeColors.textSecondary} name="cloud-offline-outline" size={32} />
 			<Text style={styles.emptyTitle}>{DIARY_OFFLINE_MESSAGE}</Text>
 			<Pressable
 				accessibilityRole="button"
@@ -834,9 +845,10 @@ function HeaderIconButton({
 	name: keyof typeof Ionicons.glyphMap;
 	onPress: () => void;
 }) {
+	const { themeColors, styles } = useThemeStyles();
 	return (
 		<Pressable accessibilityLabel={label} onPress={onPress} style={styles.headerIconButton}>
-			<Ionicons color={colors.light.textPrimary} name={name} size={22} />
+			<Ionicons color={themeColors.textPrimary} name={name} size={22} />
 		</Pressable>
 	);
 }
@@ -848,9 +860,10 @@ function DiaryEmptyState({
 	error: string | null;
 	onRetry: () => void;
 }) {
+	const { themeColors, styles } = useThemeStyles();
 	return (
 		<View style={styles.centerState}>
-			<Ionicons color={colors.light.textSecondary} name="journal-outline" size={32} />
+			<Ionicons color={themeColors.textSecondary} name="journal-outline" size={32} />
 			<Text style={styles.emptyTitle}>{error ? "Diary unavailable" : "No diary entries yet"}</Text>
 			<Text style={styles.emptyText}>
 				{error ?? "Capture a small moment, milestone, or memory when you are ready."}
@@ -1056,10 +1069,11 @@ function formatTagType(type: string) {
 		.join(" ");
 }
 
-const styles = StyleSheet.create({
+function createStyles(themeColors: ThemeColors) {
+	return StyleSheet.create({
 	addButton: {
 		alignItems: "center",
-		backgroundColor: colors.light.primary,
+		backgroundColor: themeColors.primary,
 		borderRadius: 999,
 		height: 42,
 		justifyContent: "center",
@@ -1082,7 +1096,7 @@ const styles = StyleSheet.create({
 	},
 	activeFilterText: {
 		...typography.caption,
-		color: colors.light.primary,
+		color: themeColors.primary,
 	},
 	centerState: {
 		alignItems: "center",
@@ -1091,7 +1105,7 @@ const styles = StyleSheet.create({
 	},
 	clearAllChip: {
 		alignItems: "center",
-		borderColor: colors.light.border,
+		borderColor: themeColors.border,
 		borderRadius: 999,
 		borderWidth: 1,
 		justifyContent: "center",
@@ -1100,7 +1114,7 @@ const styles = StyleSheet.create({
 	},
 	clearAllText: {
 		...typography.caption,
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 	},
 	clearIconButton: {
 		alignItems: "center",
@@ -1108,7 +1122,7 @@ const styles = StyleSheet.create({
 		padding: spacing.xs,
 	},
 	dateFilterButton: {
-		borderColor: colors.light.border,
+		borderColor: themeColors.border,
 		borderRadius: 14,
 		borderWidth: 1,
 		flex: 1,
@@ -1121,10 +1135,10 @@ const styles = StyleSheet.create({
 	},
 	dateFilterText: {
 		...typography.label,
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 	},
 	disabledAddButton: {
-		backgroundColor: colors.light.textSecondary,
+		backgroundColor: themeColors.textSecondary,
 		opacity: 0.65,
 	},
 	disabledRetryButton: {
@@ -1136,12 +1150,12 @@ const styles = StyleSheet.create({
 	},
 	emptyText: {
 		...typography.body,
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 		textAlign: "center",
 	},
 	emptyTitle: {
 		...typography.sectionTitle,
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 		textAlign: "center",
 	},
 	footerLoader: {
@@ -1172,10 +1186,10 @@ const styles = StyleSheet.create({
 	},
 	filterSectionTitle: {
 		...typography.label,
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 	},
 	filterSheet: {
-		backgroundColor: colors.light.surface,
+		backgroundColor: themeColors.surface,
 		borderTopLeftRadius: 24,
 		borderTopRightRadius: 24,
 		maxHeight: "88%",
@@ -1183,7 +1197,7 @@ const styles = StyleSheet.create({
 	},
 	filterTitle: {
 		...typography.sectionTitle,
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 	},
 	footerButton: {
 		alignItems: "center",
@@ -1204,7 +1218,7 @@ const styles = StyleSheet.create({
 	},
 	headerIconButton: {
 		alignItems: "center",
-		borderColor: colors.light.border,
+		borderColor: themeColors.border,
 		borderRadius: 999,
 		borderWidth: 1,
 		height: 42,
@@ -1213,7 +1227,7 @@ const styles = StyleSheet.create({
 	},
 	helperText: {
 		...typography.caption,
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 	},
 	listContent: {
 		gap: spacing.md,
@@ -1232,14 +1246,14 @@ const styles = StyleSheet.create({
 		justifyContent: "center",
 	},
 	primaryButton: {
-		backgroundColor: colors.light.primary,
+		backgroundColor: themeColors.primary,
 	},
 	primaryButtonText: {
 		...typography.label,
-		color: colors.light.surface,
+		color: themeColors.surface,
 	},
 	retryButton: {
-		backgroundColor: colors.light.primary,
+		backgroundColor: themeColors.primary,
 		borderRadius: 999,
 		marginTop: spacing.sm,
 		paddingHorizontal: spacing.lg,
@@ -1247,18 +1261,18 @@ const styles = StyleSheet.create({
 	},
 	retryText: {
 		...typography.caption,
-		color: colors.light.surface,
+		color: themeColors.surface,
 	},
 	searchInput: {
 		...typography.body,
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 		flex: 1,
 		paddingVertical: spacing.xs,
 	},
 	searchRow: {
 		alignItems: "center",
-		backgroundColor: colors.light.surface,
-		borderColor: colors.light.border,
+		backgroundColor: themeColors.surface,
+		borderColor: themeColors.border,
 		borderRadius: 16,
 		borderWidth: 1,
 		flexDirection: "row",
@@ -1268,13 +1282,13 @@ const styles = StyleSheet.create({
 		paddingVertical: spacing.xs,
 	},
 	secondaryButton: {
-		backgroundColor: colors.light.surface,
-		borderColor: colors.light.border,
+		backgroundColor: themeColors.surface,
+		borderColor: themeColors.border,
 		borderWidth: 1,
 	},
 	secondaryButtonText: {
 		...typography.label,
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 	},
 	segmentButton: {
 		alignItems: "center",
@@ -1283,11 +1297,11 @@ const styles = StyleSheet.create({
 		paddingVertical: spacing.sm,
 	},
 	segmentButtonActive: {
-		backgroundColor: colors.light.surface,
+		backgroundColor: themeColors.surface,
 	},
 	segmentedRow: {
-		backgroundColor: colors.light.background,
-		borderColor: colors.light.border,
+		backgroundColor: themeColors.background,
+		borderColor: themeColors.border,
 		borderRadius: 999,
 		borderWidth: 1,
 		flexDirection: "row",
@@ -1295,10 +1309,10 @@ const styles = StyleSheet.create({
 	},
 	segmentText: {
 		...typography.caption,
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 	},
 	segmentTextActive: {
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 	},
 	tagFilterPill: {
 		borderColor: "transparent",
@@ -1306,6 +1320,7 @@ const styles = StyleSheet.create({
 		borderWidth: 2,
 	},
 	tagFilterPillActive: {
-		borderColor: colors.light.primary,
+		borderColor: themeColors.primary,
 	},
 });
+}

@@ -1,4 +1,5 @@
-import { colors, typography } from "@/styles/globalStyles";
+import { useAppTheme } from "@/context/AppPreferencesContext";
+import { typography } from "@/styles/globalStyles";
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 import type { ComponentProps } from "react";
@@ -28,17 +29,18 @@ function TabBarIcon({
 
 export default function TabsLayout() {
 	const insets = useSafeAreaInsets();
+	const { themeColors } = useAppTheme();
 
 	return (
 		<Tabs
 			screenOptions={{
 				headerShown: false,
-				tabBarActiveTintColor: colors.light.primary,
-				tabBarInactiveTintColor: colors.light.textSecondary,
+				tabBarActiveTintColor: themeColors.primary,
+				tabBarInactiveTintColor: themeColors.textSecondary,
 				tabBarLabelStyle: typography.tabLabel,
 				tabBarStyle: {
-					backgroundColor: colors.light.surface,
-					borderTopColor: colors.light.border,
+					backgroundColor: themeColors.surface,
+					borderTopColor: themeColors.border,
 					height: 62 + insets.bottom,
 					paddingBottom: Math.max(insets.bottom, 12),
 					paddingTop: 8,

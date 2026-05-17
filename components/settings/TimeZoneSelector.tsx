@@ -1,4 +1,5 @@
-import { colors, globalStyles, spacing, typography } from "@/styles/globalStyles";
+import { spacing, typography, type ThemeColors } from "@/styles/globalStyles";
+import { useAppTheme } from "@/context/AppPreferencesContext";
 import {
 	getTimeZoneDisplayLabel,
 	getTimeZoneOptions,
@@ -15,6 +16,13 @@ import {
 	View,
 } from "react-native";
 
+function useThemeStyles() {
+	const { globalStyles, themeColors } = useAppTheme();
+	const styles = useMemo(() => createStyles(themeColors), [themeColors]);
+
+	return { globalStyles, styles, themeColors };
+}
+
 export function TimeZoneSelector({
 	disabled = false,
 	label,
@@ -26,6 +34,7 @@ export function TimeZoneSelector({
 	onChange: (timeZone: string) => void;
 	timeZone: string;
 }) {
+	const { globalStyles, themeColors, styles } = useThemeStyles();
 	const [isOpen, setIsOpen] = useState(false);
 	const normalizedTimeZone = normalizeTimeZone(timeZone);
 	const options = useMemo(
@@ -50,7 +59,7 @@ export function TimeZoneSelector({
 					{getTimeZoneDisplayLabel(normalizedTimeZone)}
 				</Text>
 				<Ionicons
-					color={colors.light.textSecondary}
+					color={themeColors.textSecondary}
 					name="chevron-down"
 					size={20}
 				/>
@@ -70,7 +79,7 @@ export function TimeZoneSelector({
 								onPress={() => setIsOpen(false)}
 							>
 								<Ionicons
-									color={colors.light.textSecondary}
+									color={themeColors.textSecondary}
 									name="close"
 									size={22}
 								/>
@@ -100,7 +109,7 @@ export function TimeZoneSelector({
 										</View>
 										{isSelected ? (
 											<Ionicons
-												color={colors.light.primary}
+												color={themeColors.primary}
 												name="checkmark"
 												size={22}
 											/>
@@ -116,13 +125,14 @@ export function TimeZoneSelector({
 	);
 }
 
-const styles = StyleSheet.create({
+function createStyles(themeColors: ThemeColors) {
+	return StyleSheet.create({
 	field: {
 		gap: spacing.xs,
 	},
 	fieldLabel: {
 		...typography.caption,
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 		textTransform: "uppercase",
 	},
 	modalBackdrop: {
@@ -133,8 +143,8 @@ const styles = StyleSheet.create({
 		padding: spacing.lg,
 	},
 	modalCard: {
-		backgroundColor: colors.light.surface,
-		borderColor: colors.light.border,
+		backgroundColor: themeColors.surface,
+		borderColor: themeColors.border,
 		borderRadius: 8,
 		borderWidth: 1,
 		maxHeight: "78%",
@@ -143,7 +153,7 @@ const styles = StyleSheet.create({
 	},
 	optionLabel: {
 		...typography.label,
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 	},
 	optionRow: {
 		alignItems: "center",
@@ -159,7 +169,7 @@ const styles = StyleSheet.create({
 	},
 	optionSubtext: {
 		...typography.caption,
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 		marginTop: 2,
 	},
 	optionText: {
@@ -170,8 +180,8 @@ const styles = StyleSheet.create({
 	},
 	selectorButton: {
 		alignItems: "center",
-		backgroundColor: colors.light.background,
-		borderColor: colors.light.border,
+		backgroundColor: themeColors.background,
+		borderColor: themeColors.border,
 		borderRadius: 14,
 		borderWidth: 1,
 		flexDirection: "row",
@@ -185,7 +195,8 @@ const styles = StyleSheet.create({
 	},
 	selectorValue: {
 		...typography.body,
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 		flex: 1,
 	},
 });
+}

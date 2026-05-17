@@ -2,7 +2,8 @@ import { useEffect, useState, useMemo, type ReactNode } from "react";
 import { View, Text, useWindowDimensions, StyleSheet } from "react-native";
 import { type GrowthRecord } from "@/services/api/growth";
 import { LineChart } from "react-native-gifted-charts";
-import { colors, globalStyles, spacing, typography } from "@/styles/globalStyles";
+import { spacing, typography, type ThemeColors } from "@/styles/globalStyles";
+import { useAppTheme } from "@/context/AppPreferencesContext";
 import {
 	formatGrowthValue,
 	getAgeInDays,
@@ -52,6 +53,13 @@ const METRIC_CONFIG: Record<
     },
 };
 
+function useThemeStyles() {
+	const { globalStyles, themeColors } = useAppTheme();
+	const styles = useMemo(() => createStyles(themeColors), [themeColors]);
+
+	return { globalStyles, styles, themeColors };
+}
+
 export default function GrowthChartCard({
     birthdate,
     lengthUnit,
@@ -67,6 +75,7 @@ export default function GrowthChartCard({
     sex: "BOY" | "GIRL";
     weightUnit: "kg" | "lb";
 }) {
+    const { globalStyles, themeColors, styles } = useThemeStyles(); 
     const { width } = useWindowDimensions();
     const [selectedPointId, setSelectedPointId] = useState<string | null>(null);
     const metricConfig = METRIC_CONFIG[metric];
@@ -89,7 +98,7 @@ export default function GrowthChartCard({
 
     const lineData = chartPoints.map<LineDataItem>((point, index) => ({
         dataPointColor:
-            point.id === selectedPoint?.id ? colors.light.primary : "#35A1A4",
+            point.id === selectedPoint?.id ? themeColors.primary : "#35A1A4",
         dataPointRadius: point.id === selectedPoint?.id ? 6 : 4,
         labelComponent: () => (
             <AxisDateLabel
@@ -321,6 +330,7 @@ function AxisDateLabel({
     date: string;
     showYear: boolean;
 }) {
+	const { styles } = useThemeStyles();
     return (
         <View style={styles.axisDateLabel}>
             <Text style={styles.axisDateText}>{formatShortDate(date)}</Text>
@@ -330,9 +340,10 @@ function AxisDateLabel({
 }
 
 
-const styles = StyleSheet.create({
+function createStyles(themeColors: ThemeColors) {
+	return StyleSheet.create({
 	axisLabel: {
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 		fontSize: 10,
 	},
 	axisDateLabel: {
@@ -341,14 +352,14 @@ const styles = StyleSheet.create({
 	},
 	axisDateText: {
 		...typography.caption,
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 		fontSize: 10,
 		lineHeight: 12,
 		textAlign: "center",
 	},
 	axisYearText: {
 		...typography.caption,
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 		fontSize: 9,
 		lineHeight: 11,
 		textAlign: "center",
@@ -360,11 +371,11 @@ const styles = StyleSheet.create({
 	},
 	chartSubtitle: {
 		...typography.caption,
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 	},
 	chartTitle: {
 		...typography.sectionTitle,
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 	},
 	chartWrapper: {
 		marginLeft: -spacing.sm,
@@ -394,12 +405,12 @@ const styles = StyleSheet.create({
 	},
 	pointDate: {
 		...typography.caption,
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 	},
 	pointDetail: {
 		alignItems: "flex-start",
-		backgroundColor: "#F7F8FC",
-		borderColor: colors.light.border,
+		backgroundColor: themeColors.secondary,
+		borderColor: themeColors.border,
 		borderRadius: 12,
 		borderWidth: 1,
 		flexDirection: "row",
@@ -414,21 +425,22 @@ const styles = StyleSheet.create({
 	},
 	pointValue: {
 		...typography.itemTitle,
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 		marginTop: 2,
 	},
 	referenceText: {
 		...typography.caption,
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 		textAlign: "right",
 	},
 	unitLabel: {
 		...typography.caption,
-		backgroundColor: "#F1EFFD",
+		backgroundColor: themeColors.secondary,
 		borderRadius: 999,
-		color: colors.light.primary,
+		color: themeColors.primary,
 		overflow: "hidden",
 		paddingHorizontal: spacing.sm,
 		paddingVertical: spacing.xs,
 	},
 });
+}

@@ -1,4 +1,6 @@
-import { colors, globalStyles, spacing } from "@/styles/globalStyles";
+import { useMemo } from "react";
+import { spacing, type ThemeColors } from "@/styles/globalStyles";
+import { useAppTheme } from "@/context/AppPreferencesContext";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 
 type ConfirmDeleteModalProps = {
@@ -10,6 +12,13 @@ type ConfirmDeleteModalProps = {
 	visible: boolean;
 };
 
+function useThemeStyles() {
+	const { globalStyles, themeColors } = useAppTheme();
+	const styles = useMemo(() => createStyles(themeColors), [themeColors]);
+
+	return { globalStyles, styles, themeColors };
+}
+
 export function ConfirmDeleteModal({
 	confirmLabel,
 	message,
@@ -18,12 +27,14 @@ export function ConfirmDeleteModal({
 	title,
 	visible,
 }: ConfirmDeleteModalProps) {
+	const { globalStyles, styles } = useThemeStyles();
+
 	return (
 		<Modal animationType="fade" transparent visible={visible}>
 			<View style={styles.backdrop}>
 				<View style={styles.modalCard}>
 					<Text style={globalStyles.sectionTitleText}>{title}</Text>
-					<Text style={styles.message}>{message}</Text>
+					<Text style={globalStyles.bodyText}>{message}</Text>
 					<View style={styles.actions}>
 						<Pressable
 							accessibilityRole="button"
@@ -46,7 +57,8 @@ export function ConfirmDeleteModal({
 	);
 }
 
-const styles = StyleSheet.create({
+function createStyles(themeColors: ThemeColors) {
+	return StyleSheet.create({
 	actions: {
 		flexDirection: "row",
 		gap: spacing.sm,
@@ -66,31 +78,29 @@ const styles = StyleSheet.create({
 		paddingVertical: 14,
 	},
 	cancelButton: {
-		backgroundColor: colors.light.surface,
-		borderColor: colors.light.border,
+		backgroundColor: themeColors.surface,
+		borderColor: themeColors.border,
 		borderWidth: 1,
 	},
 	cancelText: {
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 		fontSize: 15,
 		fontWeight: "800",
 	},
 	deleteButton: {
-		backgroundColor: colors.light.error,
+		backgroundColor: themeColors.error,
 	},
 	deleteText: {
-		color: colors.light.surface,
+		color: themeColors.surface,
 		fontSize: 15,
 		fontWeight: "800",
 	},
-	message: {
-		...globalStyles.bodyText,
-	},
 	modalCard: {
-		backgroundColor: colors.light.surface,
+		backgroundColor: themeColors.surface,
 		borderRadius: 18,
 		gap: spacing.md,
 		padding: spacing.lg,
 		width: "100%",
 	},
 });
+}

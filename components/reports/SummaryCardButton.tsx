@@ -1,5 +1,7 @@
+import { useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { colors, globalStyles, spacing } from "@/styles/globalStyles";
+import { spacing, type ThemeColors } from "@/styles/globalStyles";
+import { useAppTheme } from "@/context/AppPreferencesContext";
 import { RoutineIcon } from "../routine/RoutineIcon";
 import { type RoutineKind, routineConfig } from "@/data/homeData";
 import {
@@ -9,6 +11,13 @@ import {
 	type SleepAverage,
 } from "@/services/api/routine";
 import { formatDuration, getAveragePerActiveDay } from "@/utils/routineDisplay";
+
+function useThemeStyles() {
+	const { globalStyles, themeColors } = useAppTheme();
+	const styles = useMemo(() => createStyles(themeColors), [themeColors]);
+
+	return { globalStyles, styles, themeColors };
+}
 
 export default function SummaryCardButton({
     kind = "meal",
@@ -21,6 +30,7 @@ export default function SummaryCardButton({
     setSelected?: (selected: boolean) => void;
     summary: RoutineStatsSummary[RoutineKind];
 }) {
+    const { globalStyles, styles } = useThemeStyles();
     const avgPerActiveDay = getAveragePerActiveDay(kind, summary);
     const metric = getSnapshotMetric(kind, summary);
     
@@ -80,10 +90,11 @@ function getSnapshotMetric(
     };
 }
 
-const styles = StyleSheet.create({
+function createStyles(themeColors: ThemeColors) {
+	return StyleSheet.create({
     container: {
         alignItems: "center",
-        backgroundColor: colors.light.surface,
+        backgroundColor: themeColors.surface,
         borderRadius: 14,
         justifyContent: "center",
         gap: spacing.sm,
@@ -92,9 +103,9 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     containerSelected: {
-        borderColor: colors.light.primary,
+        borderColor: themeColors.primary,
         borderWidth: 1.5,
-        backgroundColor: "#F7F3FF",
+        backgroundColor: themeColors.secondary,
     },
     averageText: {
         fontSize: 12,
@@ -122,3 +133,4 @@ const styles = StyleSheet.create({
         textAlign: "center",
     }
 });
+}

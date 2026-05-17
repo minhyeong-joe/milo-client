@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -8,7 +8,7 @@ import {
 	DiaryEntryForm,
 	type UploadedDiaryMedia,
 } from "@/components/diary/DiaryEntryForm";
-import { useTimelineTimeZone } from "@/context/AppPreferencesContext";
+import { useTimelineTimeZone , useAppTheme } from "@/context/AppPreferencesContext";
 import { useAuthSession } from "@/context/AuthSessionContext";
 import { useBabySelection } from "@/context/BabySelectionContext";
 import { useDiaryCache } from "@/context/DiaryCacheContext";
@@ -23,10 +23,18 @@ import {
 import { ApiError } from "@/services/api/httpClient";
 import { createTag, listTags } from "@/services/api/tags";
 import { loadCachedTags, saveTagsCache } from "@/services/tags/tagOfflineStore";
-import { colors, globalStyles, spacing, typography } from "@/styles/globalStyles";
+import { spacing, typography, type ThemeColors } from "@/styles/globalStyles";
+
+function useThemeStyles() {
+	const { globalStyles, themeColors } = useAppTheme();
+	const styles = useMemo(() => createStyles(themeColors), [themeColors]);
+
+	return { globalStyles, styles, themeColors };
+}
 
 export default function EditDiaryScreen() {
 	const router = useRouter();
+	const { globalStyles, themeColors, styles } = useThemeStyles(); 
 	const params = useLocalSearchParams<{ entry?: string }>();
 	const entry = parseEntryParam(params.entry);
 	const { session } = useAuthSession();
@@ -171,7 +179,7 @@ export default function EditDiaryScreen() {
 					onPress={() => router.back()}
 					style={styles.iconButton}
 				>
-					<Ionicons color={colors.light.textPrimary} name="chevron-back" size={24} />
+					<Ionicons color={themeColors.textPrimary} name="chevron-back" size={24} />
 				</Pressable>
 				<Text style={styles.headerTitle}>Edit Diary</Text>
 				<View style={styles.iconButton} />
@@ -310,10 +318,11 @@ function DiaryRouteOfflineState({
 	message: string;
 	onBack: () => void;
 }) {
+	const { globalStyles, themeColors, styles } = useThemeStyles();
 	return (
 		<View style={globalStyles.screenContent}>
 			<View style={[globalStyles.card, styles.offlineCard]}>
-				<Ionicons color={colors.light.textSecondary} name="cloud-offline-outline" size={32} />
+				<Ionicons color={themeColors.textSecondary} name="cloud-offline-outline" size={32} />
 				<Text style={styles.offlineTitle}>Diary unavailable offline</Text>
 				<Text style={styles.offlineText}>{message}</Text>
 				<Pressable accessibilityRole="button" onPress={onBack} style={styles.offlineButton}>
@@ -324,7 +333,8 @@ function DiaryRouteOfflineState({
 	);
 }
 
-const styles = StyleSheet.create({
+function createStyles(themeColors: ThemeColors) {
+	return StyleSheet.create({
 	header: {
 		alignItems: "center",
 		flexDirection: "row",
@@ -334,7 +344,7 @@ const styles = StyleSheet.create({
 	},
 	headerTitle: {
 		...typography.sectionTitle,
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 	},
 	iconButton: {
 		alignItems: "center",
@@ -343,7 +353,7 @@ const styles = StyleSheet.create({
 		width: 44,
 	},
 	offlineButton: {
-		backgroundColor: colors.light.primary,
+		backgroundColor: themeColors.primary,
 		borderRadius: 999,
 		marginTop: spacing.sm,
 		paddingHorizontal: spacing.lg,
@@ -351,7 +361,7 @@ const styles = StyleSheet.create({
 	},
 	offlineButtonText: {
 		...typography.caption,
-		color: colors.light.surface,
+		color: themeColors.surface,
 		fontWeight: "700",
 	},
 	offlineCard: {
@@ -361,12 +371,13 @@ const styles = StyleSheet.create({
 	},
 	offlineText: {
 		...typography.body,
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 		textAlign: "center",
 	},
 	offlineTitle: {
 		...typography.sectionTitle,
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 		textAlign: "center",
 	},
 });
+}

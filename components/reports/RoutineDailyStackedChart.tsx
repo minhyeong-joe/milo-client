@@ -8,9 +8,9 @@ import type {
 	RoutineStatsDay,
 	SleepPatternLog,
 } from "@/services/api/routine";
-import { colors, globalStyles, spacing, typography } from "@/styles/globalStyles";
+import { spacing, typography, type ThemeColors } from "@/styles/globalStyles";
+import { useAppTheme , useAppPreferences } from "@/context/AppPreferencesContext";
 import { formatDuration, formatVolume } from "@/utils/routineDisplay";
-import { useAppPreferences } from "@/context/AppPreferencesContext";
 
 const DEFAULT_CHART_WIDTH = 300;
 const Y_AXIS_LABEL_WIDTH = 34;
@@ -79,6 +79,13 @@ type AggregatedDay = {
 	totalCount: number;
 };
 
+function useThemeStyles() {
+	const { globalStyles, themeColors } = useAppTheme();
+	const styles = useMemo(() => createStyles(themeColors), [themeColors]);
+
+	return { globalStyles, styles, themeColors };
+}
+
 export default function RoutineDailyStackedChart({
 	days,
 	kind,
@@ -86,6 +93,7 @@ export default function RoutineDailyStackedChart({
 	days: RoutineStatsDay[];
 	kind: RoutineKind;
 }) {
+	const { globalStyles, styles } = useThemeStyles();
 	const {
 		preferredVolumeUnit,
 	} = useAppPreferences();
@@ -458,6 +466,7 @@ function AxisDateLabel({
 	showLabel: boolean;
 	showYear: boolean;
 }) {
+	const { styles } = useThemeStyles();
 	return (
 		<View
 			style={[
@@ -495,6 +504,7 @@ function LegendDot({
 	color: string;
 	label: string;
 }) {
+	const { styles } = useThemeStyles();
 	return (
 		<View style={styles.legendItem}>
 			<View style={[styles.legendDot, { backgroundColor: color }]} />
@@ -503,24 +513,25 @@ function LegendDot({
 	);
 }
 
-const styles = StyleSheet.create({
+function createStyles(themeColors: ThemeColors) {
+	return StyleSheet.create({
 	axisDateLabel: {
 		alignItems: "center",
 	},
 	axisDateText: {
 		...typography.caption,
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 		fontSize: 10,
 		lineHeight: 12,
 		textAlign: "center",
 	},
 	axisLabel: {
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 		fontSize: 10,
 	},
 	axisYearText: {
 		...typography.caption,
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 		fontSize: 9,
 		lineHeight: 11,
 		textAlign: "center",
@@ -534,8 +545,8 @@ const styles = StyleSheet.create({
 	},
 	detailCard: {
 		alignItems: "flex-start",
-		backgroundColor: "#F7F8FC",
-		borderColor: colors.light.border,
+		backgroundColor: themeColors.secondary,
+		borderColor: themeColors.border,
 		borderRadius: 12,
 		borderWidth: 1,
 		flexDirection: "row",
@@ -545,7 +556,7 @@ const styles = StyleSheet.create({
 	},
 	detailDate: {
 		...typography.caption,
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 	},
 	detailMeta: {
 		alignItems: "flex-end",
@@ -554,12 +565,12 @@ const styles = StyleSheet.create({
 	},
 	detailText: {
 		...typography.caption,
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 		textAlign: "right",
 	},
 	detailTitle: {
 		...typography.itemTitle,
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 		marginTop: 2,
 	},
 	emptyState: {
@@ -586,12 +597,13 @@ const styles = StyleSheet.create({
 	},
 	legendText: {
 		...typography.caption,
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 		fontSize: 10,
 	},
 	subtitle: {
 		...typography.caption,
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 		marginTop: 2,
 	},
 });
+}

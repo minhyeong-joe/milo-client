@@ -1,3 +1,5 @@
+import { useAppTheme } from "@/context/AppPreferencesContext";
+import { useMemo } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker, {
 	type DateTimePickerEvent,
@@ -7,12 +9,19 @@ import { Directory, File, Paths } from "expo-file-system";
 import type { ComponentProps } from "react";
 import { Alert, Image, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import type { BabySex, CreateBabyAvatarUploadRequest } from "@/services/api/babies";
-import { colors, spacing, typography } from "@/styles/globalStyles";
+import { spacing, typography, type ThemeColors } from "@/styles/globalStyles";
 
 type IoniconName = ComponentProps<typeof Ionicons>["name"];
 type AvatarContentType = "image/jpeg" | "image/png" | "image/webp";
 
 const fallbackBabyAvatar = require("@/assets/images/baby.png");
+
+function useThemeStyles() {
+	const { globalStyles, themeColors } = useAppTheme();
+	const styles = useMemo(() => createStyles(themeColors), [themeColors]);
+
+	return { globalStyles, styles, themeColors };
+}
 
 export function BabyAvatarField({
 	avatarObjectKey,
@@ -32,6 +41,7 @@ export function BabyAvatarField({
 		localUri: string;
 	}) => Promise<unknown> | unknown;
 }) {
+	const { styles } = useThemeStyles();
 	const canEdit = Boolean(babyId) && !disabled;
 
 	const changeAvatar = async () => {
@@ -125,6 +135,7 @@ export function BabyNameField({
 	placeholder?: string;
 	value: string;
 }) {
+	const { themeColors, styles } = useThemeStyles();
 	return (
 		<View style={styles.field}>
 			<Text style={styles.fieldLabel}>{label}</Text>
@@ -132,7 +143,7 @@ export function BabyNameField({
 				autoCapitalize="words"
 				onChangeText={onChangeText}
 				placeholder={placeholder}
-				placeholderTextColor={colors.light.textSecondary}
+				placeholderTextColor={themeColors.textSecondary}
 				style={styles.input}
 				value={value}
 			/>
@@ -157,6 +168,7 @@ export function BabyBirthdateField({
 	timeZone?: string;
 	value: Date;
 }) {
+	const { themeColors, styles } = useThemeStyles();
 	return (
 		<View style={styles.field}>
 			<Text style={styles.fieldLabel}>{label}</Text>
@@ -167,7 +179,7 @@ export function BabyBirthdateField({
 			>
 				<Text style={styles.dateButtonText}>{formatBirthdate(value, timeZone)}</Text>
 				<Ionicons
-					color={colors.light.textSecondary}
+					color={themeColors.textSecondary}
 					name="calendar-outline"
 					size={20}
 				/>
@@ -194,6 +206,7 @@ export function BabySexSelector({
 	onChange: (value: BabySex) => void;
 	value: BabySex;
 }) {
+	const { styles } = useThemeStyles();
 	return (
 		<View style={styles.field}>
 			<Text style={styles.fieldLabel}>{label}</Text>
@@ -226,6 +239,7 @@ export function SexButton({
 	label: string;
 	onPress: () => void;
 }) {
+	const { themeColors, styles } = useThemeStyles();
 	return (
 		<Pressable
 			onPress={onPress}
@@ -236,7 +250,7 @@ export function SexButton({
 			]}
 		>
 			<Ionicons
-				color={active ? colors.light.primary : colors.light.textSecondary}
+				color={active ? themeColors.primary : themeColors.textSecondary}
 				name={icon}
 				size={18}
 			/>
@@ -312,10 +326,11 @@ function getAvatarErrorMessage(error: unknown) {
 	return "Could not update profile picture. Please try again.";
 }
 
-const styles = StyleSheet.create({
+function createStyles(themeColors: ThemeColors) {
+	return StyleSheet.create({
 	avatarButton: {
 		alignItems: "center",
-		backgroundColor: colors.light.primary,
+		backgroundColor: themeColors.primary,
 		borderRadius: 12,
 		paddingVertical: 12,
 	},
@@ -324,11 +339,11 @@ const styles = StyleSheet.create({
 	},
 	avatarButtonText: {
 		...typography.label,
-		color: colors.light.surface,
+		color: themeColors.surface,
 	},
 	avatarPreview: {
 		backgroundColor: "#D9BFAE",
-		borderColor: colors.light.border,
+		borderColor: themeColors.border,
 		borderRadius: 10,
 		borderWidth: 1,
 		height: 300,
@@ -340,12 +355,12 @@ const styles = StyleSheet.create({
 	},
 	avatarRemoveText: {
 		...typography.label,
-		color: colors.light.error,
+		color: themeColors.error,
 	},
 	dateButton: {
 		alignItems: "center",
-		backgroundColor: colors.light.background,
-		borderColor: colors.light.border,
+		backgroundColor: themeColors.background,
+		borderColor: themeColors.border,
 		borderRadius: 14,
 		borderWidth: 1,
 		flexDirection: "row",
@@ -355,23 +370,23 @@ const styles = StyleSheet.create({
 	},
 	dateButtonText: {
 		...typography.body,
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 	},
 	field: {
 		gap: spacing.xs,
 	},
 	fieldLabel: {
 		...typography.caption,
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 		textTransform: "uppercase",
 	},
 	input: {
 		...typography.body,
-		backgroundColor: colors.light.background,
-		borderColor: colors.light.border,
+		backgroundColor: themeColors.background,
+		borderColor: themeColors.border,
 		borderRadius: 14,
 		borderWidth: 1,
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 		minHeight: 50,
 		paddingHorizontal: spacing.md,
 	},
@@ -388,10 +403,10 @@ const styles = StyleSheet.create({
 		minHeight: 42,
 	},
 	sexButtonActive: {
-		backgroundColor: colors.light.surface,
+		backgroundColor: themeColors.surface,
 	},
 	sexRow: {
-		backgroundColor: colors.light.background,
+		backgroundColor: themeColors.background,
 		borderRadius: 14,
 		flexDirection: "row",
 		gap: spacing.sm,
@@ -399,9 +414,10 @@ const styles = StyleSheet.create({
 	},
 	sexText: {
 		...typography.label,
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 	},
 	sexTextActive: {
-		color: colors.light.primary,
+		color: themeColors.primary,
 	},
 });
+}

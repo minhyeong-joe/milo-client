@@ -1,5 +1,7 @@
+import { useMemo } from "react";
 import type { RoutineConfig, RoutineEvent, RoutineStyle } from "@/data/homeData";
-import { colors, globalStyles } from "@/styles/globalStyles";
+import { type ThemeColors } from "@/styles/globalStyles";
+import { useAppTheme } from "@/context/AppPreferencesContext";
 import {
 	formatClockTime,
 	formatDuration,
@@ -56,6 +58,13 @@ function getEventDisplay(
 	throw new Error("Unsupported routine event");
 }
 
+function useThemeStyles() {
+	const { globalStyles, themeColors } = useAppTheme();
+	const styles = useMemo(() => createStyles(themeColors), [themeColors]);
+
+	return { globalStyles, styles, themeColors };
+}
+
 export function TimelineRow({
 	config,
 	currentTime,
@@ -69,6 +78,7 @@ export function TimelineRow({
 	isLast: boolean;
 	timeZone?: string;
 }) {
+	const { globalStyles, themeColors, styles } = useThemeStyles();
 	const display = getEventDisplay(event, config, currentTime);
 	const isSleep = event.kind === "sleep";
 
@@ -122,7 +132,7 @@ export function TimelineRow({
 					) : null}
 				</View>
 				<Ionicons
-					color={colors.light.textSecondary}
+					color={themeColors.textSecondary}
 					name="chevron-forward"
 					size={20}
 				/>
@@ -131,14 +141,15 @@ export function TimelineRow({
 	);
 }
 
-const styles = StyleSheet.create({
+function createStyles(themeColors: ThemeColors) {
+	return StyleSheet.create({
 	sleepCard: {
-		backgroundColor: "#F7FAFF",
+		backgroundColor: themeColors.sleep,
 	},
 	timelineCard: {
 		alignItems: "center",
-		backgroundColor: colors.light.surface,
-		borderColor: colors.light.border,
+		backgroundColor: themeColors.surface,
+		borderColor: themeColors.border,
 		borderRadius: 14,
 		borderWidth: 1,
 		flex: 1,
@@ -148,7 +159,7 @@ const styles = StyleSheet.create({
 		paddingVertical: 8,
 	},
 	timelineDetail: {
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 		fontSize: 14,
 		fontWeight: "500",
 		marginTop: 2,
@@ -167,7 +178,7 @@ const styles = StyleSheet.create({
 		width: 40,
 	},
 	timelineLine: {
-		backgroundColor: colors.light.border,
+		backgroundColor: themeColors.border,
 		flex: 1,
 		marginTop: 4,
 		width: 2,
@@ -186,10 +197,11 @@ const styles = StyleSheet.create({
 		flex: 1,
 	},
 	timelineTime: {
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 		fontSize: 13,
 		fontWeight: "600",
 		paddingTop: 20,
 		width: 74,
 	},
 });
+}

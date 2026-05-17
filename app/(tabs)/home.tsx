@@ -2,7 +2,7 @@ import { BabyHeader } from "@/components/routine/BabyHeader";
 import { QuickActionGrid } from "@/components/routine/QuickActionGrid";
 import { RoutineDayCard } from "@/components/routine/RoutineDayCard";
 import { SyncStatusCard } from "@/components/sync/SyncStatusCard";
-import { useAppPreferences, useTimelineTimeZone } from "@/context/AppPreferencesContext";
+import { useAppPreferences, useTimelineTimeZone , useAppTheme } from "@/context/AppPreferencesContext";
 import { useAuthSession } from "@/context/AuthSessionContext";
 import { useBabySelection } from "@/context/BabySelectionContext";
 import { useRoutineData } from "@/context/RoutineDataContext";
@@ -18,7 +18,7 @@ import {
 	loadCachedRoutineHome,
 	saveRoutineHomeCache,
 } from "@/services/routine/routineOfflineStore";
-import { colors, globalStyles, spacing } from "@/styles/globalStyles";
+import { spacing, type ThemeColors } from "@/styles/globalStyles";
 import { formatBabyAge } from "@/utils/routineDisplay";
 import { useCurrentMinute } from "@/utils/useCurrentMinute";
 import { useRouter } from "expo-router";
@@ -42,10 +42,19 @@ type LoadLatestRoutineOptions = {
 	trigger?: "initial" | "manual";
 };
 
+function useThemeStyles() {
+	const { globalStyles, themeColors } = useAppTheme();
+	const styles = useMemo(() => createStyles(themeColors), [themeColors]);
+
+	return { globalStyles, styles, themeColors };
+}
+
 export default function HomeScreen() {
 	const router = useRouter();
+	const { globalStyles, themeColors, styles } = useThemeStyles();
 	const { authStatus, session } = useAuthSession();
 	const { preferredVolumeUnit } = useAppPreferences();
+
 	const {
 		babies,
 		error: babyError,
@@ -368,7 +377,7 @@ export default function HomeScreen() {
 						</Text>
 						{isBabyLoading && (
 							<ActivityIndicator
-								color={colors.light.primary}
+								color={themeColors.primary}
 								size="small"
 								style={styles.inlineSpinner}
 							/>
@@ -400,10 +409,10 @@ export default function HomeScreen() {
 					}}
 					refreshControl={
 						<RefreshControl
-							colors={[colors.light.primary]}
+							colors={[themeColors.primary]}
 							onRefresh={() => void refreshHome()}
 							refreshing={isRefreshing}
-							tintColor={colors.light.primary}
+							tintColor={themeColors.primary}
 						/>
 					}
 					scrollEventThrottle={250}
@@ -426,7 +435,7 @@ export default function HomeScreen() {
 						<View style={[globalStyles.card, styles.routineStateCard]}>
 							<Text style={styles.routineStateTitle}>Loading routine history...</Text>
 							<ActivityIndicator
-								color={colors.light.primary}
+								color={themeColors.primary}
 								size="small"
 								style={styles.inlineSpinner}
 							/>
@@ -478,31 +487,32 @@ export default function HomeScreen() {
 	);
 }
 
-const styles = StyleSheet.create({
+function createStyles(themeColors: ThemeColors) {
+	return StyleSheet.create({
 	babyStateCard: {
 		marginBottom: spacing.md,
 	},
 	babyStateText: {
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 		fontSize: 14,
 		lineHeight: 20,
 		marginTop: spacing.xs,
 	},
 	babyStateTitle: {
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 		fontSize: 17,
 		fontWeight: "800",
 	},
 	retryButton: {
 		alignSelf: "flex-start",
-		backgroundColor: colors.light.primary,
+		backgroundColor: themeColors.primary,
 		borderRadius: 8,
 		marginTop: spacing.md,
 		paddingHorizontal: spacing.md,
 		paddingVertical: spacing.sm,
 	},
 	retryButtonText: {
-		color: colors.light.surface,
+		color: themeColors.surface,
 		fontSize: 14,
 		fontWeight: "800",
 	},
@@ -510,18 +520,18 @@ const styles = StyleSheet.create({
 		marginBottom: spacing.md,
 	},
 	routineStateText: {
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 		fontSize: 14,
 		lineHeight: 20,
 		marginTop: spacing.xs,
 	},
 	routineStateTitle: {
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 		fontSize: 17,
 		fontWeight: "800",
 	},
 	loadingMoreText: {
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 		fontSize: 13,
 		fontWeight: "700",
 		paddingBottom: spacing.md,
@@ -533,8 +543,8 @@ const styles = StyleSheet.create({
 	},
 	syncBanner: {
 		alignItems: "center",
-		backgroundColor: colors.light.surface,
-		borderColor: colors.light.border,
+		backgroundColor: themeColors.surface,
+		borderColor: themeColors.border,
 		borderRadius: 12,
 		borderWidth: 1,
 		flexDirection: "row",
@@ -544,23 +554,24 @@ const styles = StyleSheet.create({
 		paddingVertical: spacing.sm,
 	},
 	syncBannerText: {
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 		flex: 1,
 		fontSize: 13,
 		fontWeight: "700",
 	},
 	syncRetryButton: {
-		backgroundColor: colors.light.primary,
+		backgroundColor: themeColors.primary,
 		borderRadius: 8,
 		paddingHorizontal: spacing.sm,
 		paddingVertical: spacing.xs,
 	},
 	syncRetryText: {
-		color: colors.light.surface,
+		color: themeColors.surface,
 		fontSize: 12,
 		fontWeight: "800",
 	},
 });
+}
 
 function getDateKeyInTimeZone(value: Date, timeZone: string) {
 	const parts = new Intl.DateTimeFormat("en-US", {

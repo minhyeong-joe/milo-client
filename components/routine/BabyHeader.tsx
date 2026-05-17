@@ -1,15 +1,23 @@
 import { BabySelectorAvatar, BabySelectorModal } from "@/components/baby/BabySelectorModal";
 import type { BabyListItem } from "@/services/api/babies";
-import { colors, spacing, globalStyles } from "@/styles/globalStyles";
+import { spacing, type ThemeColors } from "@/styles/globalStyles";
+import { useAppTheme } from "@/context/AppPreferencesContext";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
 	Pressable,
 	StyleSheet,
 	Text,
 	View,
 } from "react-native";
+
+function useThemeStyles() {
+	const { globalStyles, themeColors } = useAppTheme();
+	const styles = useMemo(() => createStyles(themeColors), [themeColors]);
+
+	return { globalStyles, styles, themeColors };
+}
 
 export function BabyHeader({
 	ageLabel,
@@ -24,6 +32,7 @@ export function BabyHeader({
 }) {
 	const router = useRouter();
 	const [isSelectorOpen, setIsSelectorOpen] = useState(false);
+	const { globalStyles, themeColors, styles } = useThemeStyles();
 
 	return (
 		<View style={[globalStyles.rowBetween, styles.header]}>
@@ -46,7 +55,7 @@ export function BabyHeader({
 						<View style={[globalStyles.rowCenter, styles.nameRow]}>
 							<Text style={styles.babyName}>{baby.name}</Text>
 							<Ionicons
-								color={colors.light.textPrimary}
+								color={themeColors.textPrimary}
 								name="chevron-down"
 								size={18}
 							/>
@@ -57,12 +66,12 @@ export function BabyHeader({
 			</View>
 			<View style={[globalStyles.rowCenter, styles.headerActions]}>
 				<Ionicons
-					color={colors.light.textPrimary}
+					color={themeColors.textPrimary}
 					name="notifications-outline"
 					size={25}
 				/>
 				<Ionicons
-					color={colors.light.textPrimary}
+					color={themeColors.textPrimary}
 					name="calendar-outline"
 					size={25}
 				/>
@@ -78,15 +87,16 @@ export function BabyHeader({
 	);
 }
 
-const styles = StyleSheet.create({
+function createStyles(themeColors: ThemeColors) {
+	return StyleSheet.create({
 	babyAge: {
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 		fontSize: 15,
 		fontWeight: "600",
 		marginTop: 2,
 	},
 	babyName: {
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 		fontSize: 24,
 		fontWeight: "800",
 	},
@@ -103,3 +113,4 @@ const styles = StyleSheet.create({
 		gap: spacing.md,
 	},
 });
+}

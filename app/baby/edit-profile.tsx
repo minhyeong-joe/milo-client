@@ -8,11 +8,12 @@ import {
 import { TimeZoneSelector } from "@/components/settings/TimeZoneSelector";
 import { useBabySelection } from "@/context/BabySelectionContext";
 import type { BabySex, CreateBabyAvatarUploadRequest } from "@/services/api/babies";
-import { colors, globalStyles, spacing } from "@/styles/globalStyles";
+import { spacing, type ThemeColors } from "@/styles/globalStyles";
+import { useAppTheme } from "@/context/AppPreferencesContext";
 import { getDeviceTimeZone } from "@/utils/timeZones";
 import type { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
 	KeyboardAvoidingView,
 	Platform,
@@ -39,8 +40,16 @@ type InitialBabyProfile = {
 	timezone: string;
 };
 
+function useThemeStyles() {
+	const { globalStyles, themeColors } = useAppTheme();
+	const styles = useMemo(() => createStyles(themeColors), [themeColors]);
+
+	return { globalStyles, styles, themeColors };
+}
+
 export default function EditBabyProfileScreen() {
 	const router = useRouter();
+	const { globalStyles, styles } = useThemeStyles();
 	const {
 		saveSelectedBabyProfileDraft,
 		selectedBaby,
@@ -224,9 +233,10 @@ function getErrorMessage(error: unknown) {
 	return "Could not save baby profile. Please try again.";
 }
 
-const styles = StyleSheet.create({
+function createStyles(themeColors: ThemeColors) {
+	return StyleSheet.create({
 	cancelText: {
-		color: colors.light.primary,
+		color: themeColors.primary,
 		fontSize: 15,
 		fontWeight: "700",
 	},
@@ -235,13 +245,13 @@ const styles = StyleSheet.create({
 		padding: spacing.md,
 	},
 	errorText: {
-		color: colors.light.error,
+		color: themeColors.error,
 		fontSize: 13,
 		fontWeight: "700",
 		marginBottom: spacing.sm,
 	},
 	footer: {
-		backgroundColor: colors.light.background,
+		backgroundColor: themeColors.background,
 		padding: spacing.md,
 	},
 	header: {
@@ -260,7 +270,7 @@ const styles = StyleSheet.create({
 	},
 	saveButton: {
 		alignItems: "center",
-		backgroundColor: colors.light.primary,
+		backgroundColor: themeColors.primary,
 		borderRadius: 16,
 		paddingVertical: 16,
 	},
@@ -268,8 +278,9 @@ const styles = StyleSheet.create({
 		opacity: 0.5,
 	},
 	saveButtonText: {
-		color: colors.light.surface,
+		color: themeColors.surface,
 		fontSize: 16,
 		fontWeight: "800",
 	},
 });
+}

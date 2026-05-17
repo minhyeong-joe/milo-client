@@ -1,18 +1,19 @@
 import { ConfirmDeleteModal } from "@/components/routine/ConfirmDeleteModal";
-import { useTimelineTimeZone } from "@/context/AppPreferencesContext";
+import { useTimelineTimeZone , useAppTheme } from "@/context/AppPreferencesContext";
 import { useBabySelection } from "@/context/BabySelectionContext";
 import { RoutineIcon } from "@/components/routine/RoutineIcon";
 import { useRoutineData } from "@/context/RoutineDataContext";
 import type { SleepEvent, SleepType } from "@/data/homeData";
 import { routineConfig } from "@/data/homeData";
-import { colors, globalStyles, spacing } from "@/styles/globalStyles";
+import { spacing, type ThemeColors } from "@/styles/globalStyles";
+
 import { formatClockTime, formatDuration, getSleepDurationMinutes } from "@/utils/routineDisplay";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker, {
 	DateTimePickerEvent,
 } from "@react-native-community/datetimepicker";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
 	KeyboardAvoidingView,
 	Platform,
@@ -52,9 +53,10 @@ function DateTimeRow({
 	onPress: () => void;
 	value: string;
 }) {
+	const { themeColors, styles } = useThemeStyles();
 	return (
 		<Pressable accessibilityRole="button" onPress={onPress} style={styles.dateTimeField}>
-			<Ionicons color={colors.light.textSecondary} name={icon} size={20} />
+			<Ionicons color={themeColors.textSecondary} name={icon} size={20} />
 			<View>
 				<Text style={styles.dateTimeValue}>{value}</Text>
 				<Text style={styles.dateTimeHint}>{hint}</Text>
@@ -63,8 +65,16 @@ function DateTimeRow({
 	);
 }
 
+function useThemeStyles() {
+	const { globalStyles, themeColors } = useAppTheme();
+	const styles = useMemo(() => createStyles(themeColors), [themeColors]);
+
+	return { globalStyles, styles, themeColors };
+}
+
 export default function AddSleepScreen() {
 	const router = useRouter();
+	const { globalStyles, themeColors, styles } = useThemeStyles();
 	const { sleepId } = useLocalSearchParams<{ sleepId?: string }>();
 	const { selectedBaby } = useBabySelection();
 	const { addSleep, dailyLogs, getLatestSleep, lastLogged, removeSleep, updateSleep } = useRoutineData();
@@ -309,7 +319,7 @@ export default function AddSleepScreen() {
 								onPress={() => setEndTime(new Date())}
 								style={styles.addEndButton}
 							>
-								<Ionicons color={colors.light.primary} name="add" size={20} />
+								<Ionicons color={themeColors.primary} name="add" size={20} />
 								<Text style={styles.addEndText}>Add end time</Text>
 							</Pressable>
 						)}
@@ -336,7 +346,7 @@ export default function AddSleepScreen() {
 							multiline
 							onChangeText={setNotes}
 							placeholder="Optional notes..."
-							placeholderTextColor={colors.light.textSecondary}
+							placeholderTextColor={themeColors.textSecondary}
 							style={styles.notesInput}
 							textAlignVertical="top"
 							value={notes}
@@ -370,11 +380,12 @@ export default function AddSleepScreen() {
 	);
 }
 
-const styles = StyleSheet.create({
+function createStyles(themeColors: ThemeColors) {
+	return StyleSheet.create({
 	addEndButton: {
 		alignItems: "center",
-		backgroundColor: colors.light.surface,
-		borderColor: colors.light.border,
+		backgroundColor: themeColors.surface,
+		borderColor: themeColors.border,
 		borderRadius: 14,
 		borderWidth: 1,
 		flexDirection: "row",
@@ -383,12 +394,12 @@ const styles = StyleSheet.create({
 		padding: spacing.md,
 	},
 	addEndText: {
-		color: colors.light.primary,
+		color: themeColors.primary,
 		fontSize: 15,
 		fontWeight: "800",
 	},
 	cancelText: {
-		color: colors.light.primary,
+		color: themeColors.primary,
 		fontSize: 15,
 		fontWeight: "700",
 	},
@@ -399,8 +410,8 @@ const styles = StyleSheet.create({
 	},
 	dateTimeField: {
 		alignItems: "center",
-		backgroundColor: colors.light.surface,
-		borderColor: colors.light.border,
+		backgroundColor: themeColors.surface,
+		borderColor: themeColors.border,
 		borderRadius: 14,
 		borderWidth: 1,
 		flexDirection: "row",
@@ -408,18 +419,18 @@ const styles = StyleSheet.create({
 		padding: spacing.md,
 	},
 	dateTimeHint: {
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 		fontSize: 12,
 		fontWeight: "600",
 		marginTop: 2,
 	},
 	dateTimeValue: {
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 		fontSize: 16,
 		fontWeight: "800",
 	},
 	durationText: {
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 		fontSize: 13,
 		fontWeight: "700",
 	},
@@ -429,13 +440,13 @@ const styles = StyleSheet.create({
 		fontWeight: "700",
 	},
 	formErrorText: {
-		color: colors.light.error,
+		color: themeColors.error,
 		fontSize: 13,
 		fontWeight: "700",
 		marginBottom: spacing.sm,
 	},
 	footer: {
-		backgroundColor: colors.light.background,
+		backgroundColor: themeColors.background,
 		padding: spacing.md,
 	},
 	header: {
@@ -451,7 +462,7 @@ const styles = StyleSheet.create({
 	},
 	deleteIcon: {
 		alignSelf: "flex-end",
-		color: colors.light.error,
+		color: themeColors.error,
 	},
 	headerSpacer: {
 		width: 72,
@@ -462,7 +473,7 @@ const styles = StyleSheet.create({
 		gap: spacing.sm,
 	},
 	inlineAction: {
-		color: colors.light.primary,
+		color: themeColors.primary,
 		fontSize: 13,
 		fontWeight: "800",
 	},
@@ -470,16 +481,16 @@ const styles = StyleSheet.create({
 		flex: 1,
 	},
 	notesCount: {
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 		fontSize: 12,
 		fontWeight: "700",
 	},
 	notesInput: {
-		backgroundColor: colors.light.surface,
-		borderColor: colors.light.border,
+		backgroundColor: themeColors.surface,
+		borderColor: themeColors.border,
 		borderRadius: 14,
 		borderWidth: 1,
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 		fontSize: 15,
 		minHeight: 96,
 		padding: spacing.md,
@@ -494,7 +505,7 @@ const styles = StyleSheet.create({
 		opacity: 0.5,
 	},
 	saveButtonText: {
-		color: colors.light.surface,
+		color: themeColors.surface,
 		fontSize: 16,
 		fontWeight: "800",
 	},
@@ -502,13 +513,13 @@ const styles = StyleSheet.create({
 		gap: spacing.sm,
 	},
 	sectionLabel: {
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 		fontSize: 15,
 		fontWeight: "800",
 	},
 	segmentButton: {
 		alignItems: "center",
-		borderColor: colors.light.border,
+		borderColor: themeColors.border,
 		borderRadius: 14,
 		borderWidth: 1,
 		flex: 1,
@@ -524,7 +535,7 @@ const styles = StyleSheet.create({
 		gap: spacing.sm,
 	},
 	segmentText: {
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 		fontSize: 14,
 		fontWeight: "700",
 		textAlign: "center",
@@ -533,6 +544,7 @@ const styles = StyleSheet.create({
 		color: routineConfig.quickActions.sleep.accentColor,
 	},
 });
+}
 
 function getErrorMessage(error: unknown) {
 	if (error instanceof Error) {

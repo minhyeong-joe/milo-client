@@ -2,21 +2,29 @@ import { DiaryActionsModal } from "@/components/diary/DiaryActionsModal";
 import { DiaryHeroCarousel } from "@/components/diary/DiaryMediaPreview";
 import { DiaryTagPill } from "@/components/diary/DiaryTagPill";
 import { ConfirmDeleteModal } from "@/components/routine/ConfirmDeleteModal";
-import { useTimelineTimeZone } from "@/context/AppPreferencesContext";
+import { useTimelineTimeZone , useAppTheme } from "@/context/AppPreferencesContext";
 import { useBabySelection } from "@/context/BabySelectionContext";
 import { useDiaryCache } from "@/context/DiaryCacheContext";
 import { useSync } from "@/context/SyncContext";
 import { deleteDiaryEntry, type DiaryEntry } from "@/services/api/diary";
-import { colors, globalStyles, spacing, typography } from "@/styles/globalStyles";
+import { spacing, typography, type ThemeColors } from "@/styles/globalStyles";
 import { formatBabyAge } from "@/utils/routineDisplay";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
+function useThemeStyles() {
+	const { globalStyles, themeColors } = useAppTheme();
+	const styles = useMemo(() => createStyles(themeColors), [themeColors]);
+
+	return { globalStyles, styles, themeColors };
+}
+
 export default function DiaryDetailScreen() {
 	const router = useRouter();
+	const { globalStyles, themeColors, styles } = useThemeStyles();
 	const params = useLocalSearchParams<{ diaryId: string; entry?: string }>();
 	const { selectedBaby } = useBabySelection();
 	const timelineTimeZone = useTimelineTimeZone(selectedBaby);
@@ -100,7 +108,7 @@ export default function DiaryDetailScreen() {
 					onPress={() => router.back()}
 					style={styles.iconButton}
 				>
-					<Ionicons color={colors.light.textPrimary} name="chevron-back" size={24} />
+					<Ionicons color={themeColors.textPrimary} name="chevron-back" size={24} />
 				</Pressable>
 				<Pressable
 					accessibilityRole="button"
@@ -123,7 +131,7 @@ export default function DiaryDetailScreen() {
 					onPress={() => setIsActionsVisible(true)}
 					style={styles.iconButton}
 				>
-					<Ionicons color={colors.light.textSecondary} name="ellipsis-horizontal" size={22} />
+					<Ionicons color={themeColors.textSecondary} name="ellipsis-horizontal" size={22} />
 				</Pressable>
 			</View>
 
@@ -156,7 +164,7 @@ export default function DiaryDetailScreen() {
 									) : null}
 						<View style={[globalStyles.card, styles.aiCard]}>
 							<View style={styles.aiHeader}>
-								<Ionicons color={colors.light.primary} name="sparkles" size={22} />
+								<Ionicons color={themeColors.primary} name="sparkles" size={22} />
 								<Text style={styles.aiTitle}>AI Reflection</Text>
 							</View>
 							<Text style={styles.aiText}>
@@ -225,6 +233,7 @@ function showDiaryOfflineAlert(message: string) {
 }
 
 function MetadataRow({ label, value }: { label: string; value: string }) {
+	const { styles } = useThemeStyles();
 	return (
 		<View style={styles.metadataRow}>
 			<Text style={styles.metadataLabel}>{label}</Text>
@@ -297,20 +306,21 @@ function formatUser(
 	return fallbackId;
 }
 
-const styles = StyleSheet.create({
+function createStyles(themeColors: ThemeColors) {
+	return StyleSheet.create({
 	content: {
 		paddingHorizontal: spacing.md,
 		paddingTop: spacing.md,
 	},
 	contentText: {
 		...typography.body,
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 		fontSize: 16,
 		lineHeight: 24,
 	},
 	dateText: {
 		...typography.caption,
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 	},
 	dateButton: {
 		alignItems: "center",
@@ -328,13 +338,13 @@ const styles = StyleSheet.create({
 	},
 	headerTitle: {
 		...typography.sectionTitle,
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 		flexShrink: 1,
 		textAlign: "center",
 	},
 	headerSubtitle: {
 		...typography.caption,
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 		textAlign: "center",
 	},
 	iconButton: {
@@ -344,8 +354,8 @@ const styles = StyleSheet.create({
 		width: 44,
 	},
 	aiCard: {
-		backgroundColor: "#F8F3FF",
-		borderColor: "#ECE0FF",
+		backgroundColor: themeColors.secondary,
+		borderColor: themeColors.border,
 		borderWidth: 1,
 		gap: spacing.sm,
 		marginTop: spacing.md,
@@ -357,12 +367,12 @@ const styles = StyleSheet.create({
 	},
 	aiText: {
 		...typography.body,
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 		lineHeight: 22,
 	},
 	aiTitle: {
 		...typography.label,
-		color: colors.light.primary,
+		color: themeColors.primary,
 		fontWeight: "800",
 	},
 	metadataBackdrop: {
@@ -374,7 +384,7 @@ const styles = StyleSheet.create({
 	},
 	metadataLabel: {
 		...typography.caption,
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 	},
 	metadataRow: {
 		flexDirection: "row",
@@ -383,12 +393,12 @@ const styles = StyleSheet.create({
 	},
 	metadataValue: {
 		...typography.caption,
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 		flex: 1,
 		textAlign: "right",
 	},
 	metadataPopover: {
-		backgroundColor: colors.light.surface,
+		backgroundColor: themeColors.surface,
 		borderRadius: 18,
 		gap: spacing.sm,
 		padding: spacing.lg,
@@ -396,7 +406,7 @@ const styles = StyleSheet.create({
 	},
 	sectionLabel: {
 		...typography.label,
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 	},
 	quoteBadge: {
 		alignItems: "center",
@@ -407,7 +417,7 @@ const styles = StyleSheet.create({
 		width: 40,
 	},
 	quoteText: {
-		color: colors.light.primary,
+		color: themeColors.primary,
 		fontSize: 34,
 		fontWeight: "800",
 		lineHeight: 50,
@@ -427,7 +437,7 @@ const styles = StyleSheet.create({
 	},
 	storyTitle: {
 		...typography.sectionTitle,
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 		fontSize: 22,
 		lineHeight: 28,
 	},
@@ -437,3 +447,4 @@ const styles = StyleSheet.create({
 		gap: spacing.sm,
 	},
 });
+}

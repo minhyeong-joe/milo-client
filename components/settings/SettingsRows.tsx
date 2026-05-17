@@ -1,9 +1,18 @@
-import { colors, globalStyles, spacing, typography } from "@/styles/globalStyles";
+import { useMemo } from "react";
+import { spacing, typography, type ThemeColors } from "@/styles/globalStyles";
+import { useAppTheme } from "@/context/AppPreferencesContext";
 import { Ionicons } from "@expo/vector-icons";
 import type { ComponentProps, ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 type IconName = ComponentProps<typeof Ionicons>["name"];
+
+function useThemeStyles() {
+	const { globalStyles, themeColors } = useAppTheme();
+	const styles = useMemo(() => createStyles(themeColors), [themeColors]);
+
+	return { globalStyles, styles, themeColors };
+}
 
 export function SettingsHeader({
 	onBack,
@@ -12,11 +21,12 @@ export function SettingsHeader({
 	onBack?: () => void;
 	title: string;
 }) {
+	const { globalStyles, themeColors, styles } = useThemeStyles();
 	return (
 		<View style={styles.header}>
 			{onBack ? (
 				<Pressable accessibilityRole="button" onPress={onBack} style={styles.headerButton}>
-					<Ionicons color={colors.light.textPrimary} name="chevron-back" size={24} />
+					<Ionicons color={themeColors.textPrimary} name="chevron-back" size={24} />
 				</Pressable>
 			) : (
 				<View style={styles.headerButton} />
@@ -28,6 +38,7 @@ export function SettingsHeader({
 }
 
 export function SettingsGroup({ children }: { children: ReactNode }) {
+	const { styles } = useThemeStyles();
 	return <View style={styles.group}>{children}</View>;
 }
 
@@ -35,7 +46,7 @@ export function SettingsRow({
 	disabled = false,
 	icon,
 	iconBackground = "#F7F8FC",
-	iconColor = colors.light.textSecondary,
+	iconColor,
 	onPress,
 	subtitle,
 	title,
@@ -50,6 +61,8 @@ export function SettingsRow({
 	title: string;
 	trailing?: ReactNode;
 }) {
+	const { themeColors, styles } = useThemeStyles();
+	const resolvedIconColor = iconColor ?? themeColors.textSecondary;
 	return (
 		<Pressable
 			accessibilityRole={onPress ? "button" : undefined}
@@ -62,7 +75,7 @@ export function SettingsRow({
 			]}
 		>
 			<View style={[styles.iconWrap, { backgroundColor: iconBackground }]}>
-				<Ionicons color={iconColor} name={icon} size={22} />
+				<Ionicons color={resolvedIconColor} name={icon} size={22} />
 			</View>
 			<View style={styles.rowTextWrap}>
 				<Text style={styles.rowTitle}>{title}</Text>
@@ -70,7 +83,7 @@ export function SettingsRow({
 			</View>
 			{trailing ?? (
 				onPress ? (
-					<Ionicons color={colors.light.textSecondary} name="chevron-forward" size={20} />
+					<Ionicons color={themeColors.textSecondary} name="chevron-forward" size={20} />
 				) : null
 			)}
 		</Pressable>
@@ -86,10 +99,12 @@ export function PlaceholderCard({
 	message: string;
 	title: string;
 }) {
+	const { globalStyles, themeColors, styles } = useThemeStyles();
+	
 	return (
 		<View style={[globalStyles.card, styles.placeholderCard]}>
 			<View style={styles.placeholderIcon}>
-				<Ionicons color={colors.light.primary} name={icon} size={28} />
+				<Ionicons color={themeColors.primary} name={icon} size={28} />
 			</View>
 			<Text style={styles.placeholderTitle}>{title}</Text>
 			<Text style={styles.placeholderText}>{message}</Text>
@@ -97,13 +112,14 @@ export function PlaceholderCard({
 	);
 }
 
-const styles = StyleSheet.create({
+function createStyles(themeColors: ThemeColors) {
+	return StyleSheet.create({
 	disabled: {
 		opacity: 0.55,
 	},
 	group: {
-		backgroundColor: colors.light.surface,
-		borderColor: colors.light.border,
+		backgroundColor: themeColors.surface,
+		borderColor: themeColors.border,
 		borderRadius: 16,
 		borderWidth: 1,
 		overflow: "hidden",
@@ -143,19 +159,19 @@ const styles = StyleSheet.create({
 	},
 	placeholderText: {
 		...typography.body,
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 		textAlign: "center",
 	},
 	placeholderTitle: {
 		...typography.sectionTitle,
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 	},
 	pressed: {
 		opacity: 0.72,
 	},
 	row: {
 		alignItems: "center",
-		borderBottomColor: colors.light.border,
+		borderBottomColor: themeColors.border,
 		borderBottomWidth: StyleSheet.hairlineWidth,
 		flexDirection: "row",
 		gap: spacing.md,
@@ -165,7 +181,7 @@ const styles = StyleSheet.create({
 	},
 	rowSubtitle: {
 		...typography.caption,
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 		marginTop: 2,
 	},
 	rowTextWrap: {
@@ -173,6 +189,7 @@ const styles = StyleSheet.create({
 	},
 	rowTitle: {
 		...typography.label,
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 	},
 });
+}

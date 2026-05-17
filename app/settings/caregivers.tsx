@@ -1,13 +1,23 @@
+import { useMemo } from "react";
 import { PlaceholderCard, SettingsGroup, SettingsHeader, SettingsRow } from "@/components/settings/SettingsRows";
 import { useAuthSession } from "@/context/AuthSessionContext";
 import { useBabySelection } from "@/context/BabySelectionContext";
-import { colors, globalStyles, spacing, typography } from "@/styles/globalStyles";
+import { spacing, typography, type ThemeColors } from "@/styles/globalStyles";
+import { useAppTheme } from "@/context/AppPreferencesContext";
 import { useRouter } from "expo-router";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+function useThemeStyles() {
+	const { globalStyles, themeColors } = useAppTheme();
+	const styles = useMemo(() => createStyles(themeColors), [themeColors]);
+
+	return { globalStyles, styles, themeColors };
+}
+
 export default function ManageCaregiversScreen() {
 	const router = useRouter();
+	const { globalStyles, themeColors, styles } = useThemeStyles();
 	const { session } = useAuthSession();
 	const { selectedBaby } = useBabySelection();
 
@@ -39,7 +49,7 @@ export default function ManageCaregiversScreen() {
 						disabled
 						icon="mail-outline"
 						iconBackground="#F1ECFF"
-						iconColor={colors.light.primary}
+						iconColor={themeColors.primary}
 						subtitle="Invite by email"
 						title="Send Invitation"
 					/>
@@ -67,7 +77,8 @@ function formatRole(role?: string) {
 	return role.toLowerCase().replace(/^\w/, (letter) => letter.toUpperCase());
 }
 
-const styles = StyleSheet.create({
+function createStyles(themeColors: ThemeColors) {
+	return StyleSheet.create({
 	content: {
 		gap: spacing.md,
 		padding: spacing.md,
@@ -83,20 +94,20 @@ const styles = StyleSheet.create({
 	},
 	initialText: {
 		...typography.label,
-		color: colors.light.primary,
+		color: themeColors.primary,
 	},
 	sectionTitle: {
 		...typography.sectionTitle,
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 	},
 	userMeta: {
 		...typography.caption,
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 		marginTop: 2,
 	},
 	userName: {
 		...typography.label,
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 	},
 	userRow: {
 		alignItems: "center",
@@ -108,3 +119,4 @@ const styles = StyleSheet.create({
 		flex: 1,
 	},
 });
+}

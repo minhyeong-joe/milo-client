@@ -14,7 +14,8 @@ import {
 	saveTagsCache,
 	upsertPendingTag,
 } from "@/services/tags/tagOfflineStore";
-import { colors, globalStyles, spacing, typography } from "@/styles/globalStyles";
+import { spacing, typography, type ThemeColors } from "@/styles/globalStyles";
+import { useAppTheme } from "@/context/AppPreferencesContext";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -39,8 +40,16 @@ const TAG_COLORS = [
 ];
 const DEFAULT_TAG_TYPE_ORDER = ["milestone", "emotions", "event"];
 
+function useThemeStyles() {
+	const { globalStyles, themeColors } = useAppTheme();
+	const styles = useMemo(() => createStyles(themeColors), [themeColors]);
+
+	return { globalStyles, styles, themeColors };
+}
+
 export default function MilestoneTagsScreen() {
 	const router = useRouter();
+	const { globalStyles, themeColors, styles } = useThemeStyles();
 	const { session } = useAuthSession();
 	const { selectedBaby } = useBabySelection();
 	const { removeTagFromDiaryCache, updateTagInDiaryCache } = useDiaryCache();
@@ -268,7 +277,7 @@ export default function MilestoneTagsScreen() {
 					<RefreshControl
 						onRefresh={() => void load({ forceNetwork: true })}
 						refreshing={isLoading}
-						tintColor={colors.light.primary}
+						tintColor={themeColors.primary}
 					/>
 				}
 			>
@@ -298,7 +307,7 @@ export default function MilestoneTagsScreen() {
 						<View style={globalStyles.rowBetween}>
 							<Text style={styles.sectionTitle}>Edit Custom Tag</Text>
 							<Pressable onPress={() => setSelectedTag(null)} style={styles.iconButton}>
-								<Ionicons color={colors.light.textSecondary} name="close" size={20} />
+								<Ionicons color={themeColors.textSecondary} name="close" size={20} />
 							</Pressable>
 						</View>
 						<View style={styles.previewRow}>
@@ -311,7 +320,7 @@ export default function MilestoneTagsScreen() {
 							maxLength={40}
 							onChangeText={setName}
 							placeholder="Tag name"
-							placeholderTextColor={colors.light.textSecondary}
+							placeholderTextColor={themeColors.textSecondary}
 							style={styles.input}
 							value={name}
 						/>
@@ -370,7 +379,7 @@ export default function MilestoneTagsScreen() {
 							<Text style={styles.helper}>Common tags provided for ease of access.</Text>
 						</View>
 						<Ionicons
-							color={colors.light.textSecondary}
+							color={themeColors.textSecondary}
 							name={areDefaultTagsExpanded ? "chevron-up" : "chevron-down"}
 							size={22}
 						/>
@@ -460,7 +469,8 @@ function getErrorMessage(error: unknown) {
 	return "Could not update tags. Please try again.";
 }
 
-const styles = StyleSheet.create({
+function createStyles(themeColors: ThemeColors) {
+	return StyleSheet.create({
 	actionButton: {
 		alignItems: "center",
 		borderRadius: 12,
@@ -491,24 +501,24 @@ const styles = StyleSheet.create({
 		justifyContent: "space-between",
 	},
 	deleteButton: {
-		backgroundColor: colors.light.surface,
-		borderColor: colors.light.error,
+		backgroundColor: themeColors.surface,
+		borderColor: themeColors.error,
 		borderWidth: 1,
 	},
 	deleteText: {
 		...typography.label,
-		color: colors.light.error,
+		color: themeColors.error,
 	},
 	disabled: {
 		opacity: 0.5,
 	},
 	errorText: {
 		...typography.caption,
-		color: colors.light.error,
+		color: themeColors.error,
 	},
 	helper: {
 		...typography.caption,
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 		lineHeight: 18,
 		marginTop: spacing.xs,
 	},
@@ -533,16 +543,16 @@ const styles = StyleSheet.create({
 	},
 	input: {
 		...typography.body,
-		borderColor: colors.light.border,
+		borderColor: themeColors.border,
 		borderRadius: 12,
 		borderWidth: 1,
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 		marginTop: spacing.xs,
 		padding: spacing.md,
 	},
 	label: {
 		...typography.caption,
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 		marginTop: spacing.md,
 		textTransform: "uppercase",
 	},
@@ -553,18 +563,18 @@ const styles = StyleSheet.create({
 		marginTop: spacing.md,
 	},
 	saveButton: {
-		backgroundColor: colors.light.primary,
+		backgroundColor: themeColors.primary,
 	},
 	saveText: {
 		...typography.label,
-		color: colors.light.surface,
+		color: themeColors.surface,
 	},
 	sectionTitle: {
 		...typography.sectionTitle,
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 	},
 	swatch: {
-		borderColor: colors.light.surface,
+		borderColor: themeColors.surface,
 		borderRadius: 999,
 		borderWidth: 3,
 		height: 34,
@@ -577,7 +587,7 @@ const styles = StyleSheet.create({
 		marginTop: spacing.sm,
 	},
 	swatchSelected: {
-		borderColor: colors.light.textPrimary,
+		borderColor: themeColors.textPrimary,
 	},
 	tagButton: {
 		alignSelf: "flex-start",
@@ -590,8 +600,9 @@ const styles = StyleSheet.create({
 	},
 	typeLabel: {
 		...typography.caption,
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 		fontWeight: "800",
 		textTransform: "uppercase",
 	},
 });
+}

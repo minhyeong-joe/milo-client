@@ -1,5 +1,7 @@
+import { useMemo } from "react";
 import type { RoutineConfig, RoutineKind } from "@/data/homeData";
-import { colors, spacing, globalStyles } from "@/styles/globalStyles";
+import { spacing, type ThemeColors } from "@/styles/globalStyles";
+import { useAppTheme } from "@/context/AppPreferencesContext";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { RoutineIcon } from "./RoutineIcon";
 
@@ -12,6 +14,7 @@ function QuickActionButton({
 	config: RoutineConfig;
 	onPress?: (kind: RoutineKind) => void;
 }) {
+	const { globalStyles, styles } = useThemeStyles();
 	const iconInfo: RoutineConfig["quickActions"][RoutineKind] = config.quickActions[action.id];
 
 	return (
@@ -31,6 +34,13 @@ function QuickActionButton({
 	);
 }
 
+function useThemeStyles() {
+	const { globalStyles, themeColors } = useAppTheme();
+	const styles = useMemo(() => createStyles(themeColors), [themeColors]);
+
+	return { globalStyles, styles, themeColors };
+}
+
 export function QuickActionGrid({
 	actions,
 	config,
@@ -40,6 +50,7 @@ export function QuickActionGrid({
 	config: RoutineConfig;
 	onActionPress?: (kind: RoutineKind) => void;
 }) {
+	const { styles } = useThemeStyles();
 	return (
 		<View style={styles.quickGrid}>
 			{actions.map((action) => (
@@ -54,13 +65,14 @@ export function QuickActionGrid({
 	);
 }
 
-const styles = StyleSheet.create({
+function createStyles(themeColors: ThemeColors) {
+	return StyleSheet.create({
 	quickAction: {
 		alignItems: "center",
 		flex: 1,
 	},
 	quickDetail: {
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 		fontSize: 12,
 		fontWeight: "600",
 		marginTop: spacing.xs,
@@ -83,3 +95,4 @@ const styles = StyleSheet.create({
 		textAlign: "center",
 	},
 });
+}

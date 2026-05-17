@@ -7,7 +7,8 @@ import {
 } from "@/components/baby/BabyProfileFields";
 import { useAuthSession } from "@/context/AuthSessionContext";
 import type { BabyRole, BabySex } from "@/services/api/babies";
-import { colors, globalStyles, spacing, typography } from "@/styles/globalStyles";
+import { spacing, typography, type ThemeColors } from "@/styles/globalStyles";
+import { useAppTheme } from "@/context/AppPreferencesContext";
 import type { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -27,8 +28,16 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 type SetupMode = "addBaby" | "inviteCode";
 
+function useThemeStyles() {
+	const { globalStyles, themeColors } = useAppTheme();
+	const styles = useMemo(() => createStyles(themeColors), [themeColors]);
+
+	return { globalStyles, styles, themeColors };
+}
+
 export default function BabySetupScreen() {
 	const router = useRouter();
+	const { globalStyles, styles } = useThemeStyles();
 	const { clearError, completeSignupWithBaby, error, isLoading } = useAuthSession();
 	const [setupMode, setSetupMode] = useState<SetupMode>("addBaby");
 	const [babyName, setBabyName] = useState("");
@@ -185,6 +194,7 @@ function SetupChoice({
 	label: string;
 	onPress: () => void;
 }) {
+	const { themeColors, styles } = useThemeStyles();
 	return (
 		<Pressable
 			onPress={onPress}
@@ -195,7 +205,7 @@ function SetupChoice({
 			]}
 		>
 			<Ionicons
-				color={active ? colors.light.primary : colors.light.textSecondary}
+				color={active ? themeColors.primary : themeColors.textSecondary}
 				name={icon}
 				size={22}
 			/>
@@ -210,11 +220,12 @@ function FormField({
 }: {
 	label: string;
 } & ComponentProps<typeof TextInput>) {
+	const { themeColors, styles } = useThemeStyles();
 	return (
 		<View style={styles.field}>
 			<Text style={styles.fieldLabel}>{label}</Text>
 			<TextInput
-				placeholderTextColor={colors.light.textSecondary}
+				placeholderTextColor={themeColors.textSecondary}
 				style={styles.input}
 				{...inputProps}
 			/>
@@ -229,6 +240,7 @@ function RoleSelector({
 	onChange: (role: BabyRole) => void;
 	role: BabyRole;
 }) {
+	const { styles } = useThemeStyles();
 	return (
 		<View style={styles.field}>
 			<Text style={styles.fieldLabel}>I am a</Text>
@@ -254,6 +266,7 @@ function RoleButton({
 	label: string;
 	onPress: () => void;
 }) {
+	const { styles } = useThemeStyles();
 	return (
 		<Pressable
 			onPress={onPress}
@@ -268,7 +281,8 @@ function RoleButton({
 	);
 }
 
-const styles = StyleSheet.create({
+function createStyles(themeColors: ThemeColors) {
+	return StyleSheet.create({
 	keyboardView: {
 		flex: 1,
 	},
@@ -291,12 +305,12 @@ const styles = StyleSheet.create({
 	},
 	title: {
 		...typography.title,
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 		marginBottom: spacing.sm,
 	},
 	body: {
 		...typography.body,
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 	},
 	choiceGrid: {
 		flexDirection: "row",
@@ -305,8 +319,8 @@ const styles = StyleSheet.create({
 	},
 	choice: {
 		alignItems: "center",
-		backgroundColor: colors.light.surface,
-		borderColor: colors.light.border,
+		backgroundColor: themeColors.surface,
+		borderColor: themeColors.border,
 		borderRadius: 16,
 		borderWidth: 1,
 		flex: 1,
@@ -315,14 +329,14 @@ const styles = StyleSheet.create({
 	},
 	choiceActive: {
 		backgroundColor: "#F7F3FF",
-		borderColor: colors.light.primary,
+		borderColor: themeColors.primary,
 	},
 	choiceText: {
 		...typography.label,
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 	},
 	choiceTextActive: {
-		color: colors.light.primary,
+		color: themeColors.primary,
 	},
 	formCard: {
 		gap: spacing.md,
@@ -332,21 +346,21 @@ const styles = StyleSheet.create({
 	},
 	fieldLabel: {
 		...typography.caption,
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 		textTransform: "uppercase",
 	},
 	input: {
 		...typography.body,
-		backgroundColor: colors.light.background,
-		borderColor: colors.light.border,
+		backgroundColor: themeColors.background,
+		borderColor: themeColors.border,
 		borderRadius: 14,
 		borderWidth: 1,
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 		minHeight: 50,
 		paddingHorizontal: spacing.md,
 	},
 	roleRow: {
-		backgroundColor: colors.light.background,
+		backgroundColor: themeColors.background,
 		borderRadius: 14,
 		flexDirection: "row",
 		gap: spacing.xs,
@@ -361,19 +375,19 @@ const styles = StyleSheet.create({
 		paddingHorizontal: spacing.xs,
 	},
 	roleButtonActive: {
-		backgroundColor: colors.light.surface,
+		backgroundColor: themeColors.surface,
 	},
 	roleText: {
 		...typography.caption,
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 		textAlign: "center",
 	},
 	roleTextActive: {
-		color: colors.light.primary,
+		color: themeColors.primary,
 	},
 	primaryButton: {
 		alignItems: "center",
-		backgroundColor: colors.light.primary,
+		backgroundColor: themeColors.primary,
 		borderRadius: 16,
 		justifyContent: "center",
 		marginTop: spacing.xs,
@@ -387,15 +401,16 @@ const styles = StyleSheet.create({
 	},
 	primaryButtonText: {
 		...typography.label,
-		color: colors.light.surface,
+		color: themeColors.surface,
 	},
 	helpText: {
 		...typography.body,
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 	},
 	errorText: {
 		...typography.body,
-		color: colors.light.error,
+		color: themeColors.error,
 		textAlign: "center",
 	},
 });
+}

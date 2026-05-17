@@ -1,3 +1,5 @@
+import { useAppTheme , useAppPreferences } from "@/context/AppPreferencesContext";
+import { useMemo } from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { RoutineIcon } from "@/components/routine/RoutineIcon";
 import { type RoutineKind, routineConfig } from "@/data/homeData";
@@ -7,9 +9,15 @@ import {
     type RoutineStatsSummary,
     type SleepAverage,
 } from "@/services/api/routine";
-import { colors, spacing, typography } from "@/styles/globalStyles";
+import { spacing, typography, type ThemeColors } from "@/styles/globalStyles";
 import { formatDuration, formatVolume, getAveragePerActiveDay } from "@/utils/routineDisplay";
-import { useAppPreferences } from "@/context/AppPreferencesContext";
+
+function useThemeStyles() {
+	const { globalStyles, themeColors } = useAppTheme();
+	const styles = useMemo(() => createStyles(themeColors), [themeColors]);
+
+	return { globalStyles, styles, themeColors };
+}
 
 export default function AverageSummaryCard({
     title,
@@ -20,6 +28,7 @@ export default function AverageSummaryCard({
     kind: RoutineKind;
     summary: RoutineStatsSummary[RoutineKind];
 }) {
+	const { styles } = useThemeStyles();
     const { preferredVolumeUnit } = useAppPreferences();
     const primaryAverage = getPrimaryAverage(kind, summary);
     const details = getDetailItems(kind, summary, preferredVolumeUnit);
@@ -173,10 +182,11 @@ function formatSolidAverage(summary: MealAverage) {
     return parts.join(" + ") + (parts.length > 0 ? " / day" : "");
 }
 
-const styles = StyleSheet.create({
+function createStyles(themeColors: ThemeColors) {
+	return StyleSheet.create({
     detailChip: {
-        backgroundColor: "#F7F8FC",
-        borderColor: colors.light.border,
+        backgroundColor: themeColors.secondary,
+        borderColor: themeColors.border,
         borderRadius: 10,
         borderWidth: 1,
         flexGrow: 1,
@@ -193,18 +203,18 @@ const styles = StyleSheet.create({
     },
     detailLabel: {
         ...typography.caption,
-        color: colors.light.textSecondary,
+        color: themeColors.textSecondary,
         fontSize: 11,
     },
     detailValue: {
-        color: colors.light.textPrimary,
+        color: themeColors.textPrimary,
         fontSize: 12,
         fontWeight: "800",
         lineHeight: 17,
         marginTop: 1,
     },
     emptyDetail: {
-        color: colors.light.textSecondary,
+        color: themeColors.textSecondary,
         fontSize: 12,
         fontWeight: "600",
         lineHeight: 17,
@@ -219,7 +229,7 @@ const styles = StyleSheet.create({
     },
     summaryRow: {
         alignItems: "flex-start",
-        borderColor: colors.light.border,
+        borderColor: themeColors.border,
         borderRadius: 14,
         borderWidth: 1,
         flexDirection: "row",
@@ -227,7 +237,7 @@ const styles = StyleSheet.create({
         padding: spacing.md,
     },
     summaryTitle: {
-        color: colors.light.textPrimary,
+        color: themeColors.textPrimary,
         fontSize: 15,
         fontWeight: "800",
     },
@@ -235,3 +245,4 @@ const styles = StyleSheet.create({
         gap: 2,
     },
 });
+}

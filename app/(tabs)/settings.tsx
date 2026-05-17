@@ -1,17 +1,26 @@
 import { BabySelectorModal } from "@/components/baby/BabySelectorModal";
 import { SettingsGroup, SettingsRow } from "@/components/settings/SettingsRows";
 import { useBabySelection } from "@/context/BabySelectionContext";
-import { colors, globalStyles, spacing, typography } from "@/styles/globalStyles";
+import { spacing, typography, type ThemeColors } from "@/styles/globalStyles";
+import { useAppTheme } from "@/context/AppPreferencesContext";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const fallbackBabyAvatar = require("@/assets/images/baby.png");
 
+function useThemeStyles() {
+	const { globalStyles, themeColors } = useAppTheme();
+	const styles = useMemo(() => createStyles(themeColors), [themeColors]);
+
+	return { globalStyles, styles, themeColors };
+}
+
 export default function SettingsScreen() {
 	const router = useRouter();
+	const { globalStyles, themeColors, styles } = useThemeStyles();
 	const { babies, selectBaby, selectedBaby } = useBabySelection();
 	const [isSelectorOpen, setIsSelectorOpen] = useState(false);
 
@@ -38,14 +47,14 @@ export default function SettingsScreen() {
 								: "Create or choose a baby profile"}
 						</Text>
 					</View>
-					<Ionicons color={colors.light.textSecondary} name="chevron-down" size={22} />
+					<Ionicons color={themeColors.textSecondary} name="chevron-down" size={22} />
 				</Pressable>
 
 				<SettingsGroup>
 					<SettingsRow
 						icon="create-outline"
 						iconBackground="#F1ECFF"
-						iconColor={colors.light.primary}
+						iconColor={themeColors.primary}
 						onPress={() => router.push("/baby/edit-profile")}
 						subtitle="Name, birthday, photo"
 						title="Edit Baby Profile"
@@ -150,7 +159,8 @@ function formatAge(dateKey: string) {
 	return `${months} months • ${days} days`;
 }
 
-const styles = StyleSheet.create({
+function createStyles(themeColors: ThemeColors) {
+	return StyleSheet.create({
 	avatar: {
 		backgroundColor: "#D9BFAE",
 		borderRadius: 28,
@@ -159,7 +169,7 @@ const styles = StyleSheet.create({
 	},
 	babyName: {
 		...typography.label,
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 	},
 	content: {
 		gap: spacing.md,
@@ -171,8 +181,8 @@ const styles = StyleSheet.create({
 	},
 	profileCard: {
 		alignItems: "center",
-		backgroundColor: colors.light.surface,
-		borderColor: colors.light.border,
+		backgroundColor: themeColors.surface,
+		borderColor: themeColors.border,
 		borderRadius: 16,
 		borderWidth: 1,
 		flexDirection: "row",
@@ -181,7 +191,7 @@ const styles = StyleSheet.create({
 	},
 	profileSubtitle: {
 		...typography.caption,
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 		lineHeight: 18,
 		marginTop: 3,
 	},
@@ -189,3 +199,4 @@ const styles = StyleSheet.create({
 		flex: 1,
 	},
 });
+}

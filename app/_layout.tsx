@@ -1,4 +1,4 @@
-import { AppPreferencesProvider } from "@/context/AppPreferencesContext";
+import { AppPreferencesProvider, useAppTheme } from "@/context/AppPreferencesContext";
 import { AuthSessionProvider } from "@/context/AuthSessionContext";
 import { BabySelectionProvider } from "@/context/BabySelectionContext";
 import { DiaryCacheProvider } from "@/context/DiaryCacheContext";
@@ -11,6 +11,15 @@ import { Stack } from "expo-router";
 export default function RootLayout() {
   return (
     <AppPreferencesProvider>
+      <ThemedRootLayout />
+    </AppPreferencesProvider>
+  );
+}
+
+function ThemedRootLayout() {
+  const { resolvedTheme, themeColors } = useAppTheme();
+
+  return (
       <AuthSessionProvider>
         <BabySelectionProvider>
           <RoutineDataProvider>
@@ -18,11 +27,18 @@ export default function RootLayout() {
               <DiaryCacheProvider>
                 <SyncProvider>
                   <StatusBar
-                    backgroundColor="#F8F8FB"
-                    style="dark"
+                    backgroundColor={themeColors.background}
+                    style={resolvedTheme === "dark" ? "light" : "dark"}
                     translucent={false}
                   />
-                  <Stack screenOptions={{ headerShown: false }}>
+                  <Stack
+                    screenOptions={{
+                      headerShown: false,
+                      contentStyle: {
+                        backgroundColor: themeColors.background,
+                      },
+                    }}
+                  >
                     <Stack.Screen name="(auth)" />
                     <Stack.Screen name="(tabs)" />
                     <Stack.Screen name="baby/add-measurement" />
@@ -47,6 +63,5 @@ export default function RootLayout() {
           </RoutineDataProvider>
         </BabySelectionProvider>
       </AuthSessionProvider>
-    </AppPreferencesProvider>
   );
 }

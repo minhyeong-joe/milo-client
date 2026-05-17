@@ -1,12 +1,22 @@
+import { useMemo } from "react";
 import { SettingsGroup, SettingsHeader, SettingsRow } from "@/components/settings/SettingsRows";
 import { useAuthSession } from "@/context/AuthSessionContext";
-import { colors, globalStyles, spacing, typography } from "@/styles/globalStyles";
+import { spacing, typography, type ThemeColors } from "@/styles/globalStyles";
+import { useAppTheme } from "@/context/AppPreferencesContext";
 import { useRouter } from "expo-router";
 import { ScrollView, StyleSheet, Text, View, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+function useThemeStyles() {
+	const { globalStyles, themeColors } = useAppTheme();
+	const styles = useMemo(() => createStyles(themeColors), [themeColors]);
+
+	return { globalStyles, styles, themeColors };
+}
+
 export default function AccountScreen() {
 	const router = useRouter();
+	const { globalStyles, styles } = useThemeStyles();
 	const { session, signOut } = useAuthSession();
 	const user = session?.user;
 
@@ -50,6 +60,7 @@ export default function AccountScreen() {
 }
 
 function InfoRow({ label, value }: { label: string; value: string }) {
+	const { styles } = useThemeStyles();
 	return (
 		<View style={styles.infoRow}>
 			<Text style={styles.infoLabel}>{label}</Text>
@@ -66,7 +77,8 @@ function formatProvider(provider?: string) {
 	return provider.charAt(0).toUpperCase() + provider.slice(1);
 }
 
-const styles = StyleSheet.create({
+function createStyles(themeColors: ThemeColors) {
+	return StyleSheet.create({
 	content: {
 		gap: spacing.md,
 		padding: spacing.md,
@@ -74,7 +86,7 @@ const styles = StyleSheet.create({
 	},
 	infoLabel: {
 		...typography.caption,
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 		textTransform: "uppercase",
 	},
 	infoRow: {
@@ -83,16 +95,16 @@ const styles = StyleSheet.create({
 	},
 	infoValue: {
 		...typography.body,
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 	},
 	sectionTitle: {
 		...typography.sectionTitle,
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 	},
 	signOutButton: {
 		alignItems: "center",
-		backgroundColor: colors.light.surface,
-		borderColor: colors.light.error,
+		backgroundColor: themeColors.surface,
+		borderColor: themeColors.error,
 		borderRadius: 16,
 		borderWidth: 1,
 		justifyContent: "center",
@@ -100,9 +112,10 @@ const styles = StyleSheet.create({
 	},
 	signOutText: {
 		...typography.label,
-		color: colors.light.error,
+		color: themeColors.error,
 	},
 	pressed: {
 		opacity: 0.72,
 	},
 });
+}

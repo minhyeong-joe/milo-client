@@ -1,5 +1,7 @@
+import { useMemo } from "react";
 import type { BabyListItem } from "@/services/api/babies";
-import { colors, globalStyles, spacing } from "@/styles/globalStyles";
+import { spacing, type ThemeColors } from "@/styles/globalStyles";
+import { useAppTheme } from "@/context/AppPreferencesContext";
 import { formatBabyAge } from "@/utils/routineDisplay";
 import { Ionicons } from "@expo/vector-icons";
 import {
@@ -14,6 +16,13 @@ import {
 
 const fallbackBabyAvatar = require("@/assets/images/baby.png");
 
+function useThemeStyles() {
+	const { globalStyles, themeColors } = useAppTheme();
+	const styles = useMemo(() => createStyles(themeColors), [themeColors]);
+
+	return { globalStyles, styles, themeColors };
+}
+
 export function BabySelectorModal({
 	babies,
 	onClose,
@@ -27,6 +36,7 @@ export function BabySelectorModal({
 	selectedBaby: BabyListItem | null;
 	visible: boolean;
 }) {
+	const { globalStyles, themeColors, styles } = useThemeStyles();
 	const currentDate = new Date();
 
 	const handleSelectBaby = (babyId: string) => {
@@ -74,7 +84,7 @@ export function BabySelectorModal({
 									</View>
 									{isSelected && (
 										<Ionicons
-											color={colors.light.primary}
+											color={themeColors.primary}
 											name="checkmark"
 											size={22}
 										/>
@@ -90,6 +100,7 @@ export function BabySelectorModal({
 }
 
 export function BabySelectorAvatar({ baby }: { baby: BabyListItem }) {
+	const { styles } = useThemeStyles();
 	return (
 		<Image
 			source={baby.avatarUrl ? { uri: baby.avatarUrl } : fallbackBabyAvatar}
@@ -98,7 +109,8 @@ export function BabySelectorAvatar({ baby }: { baby: BabyListItem }) {
 	);
 }
 
-const styles = StyleSheet.create({
+function createStyles(themeColors: ThemeColors) {
+	return StyleSheet.create({
 	avatar: {
 		alignItems: "center",
 		backgroundColor: "#D9BFAE",
@@ -119,7 +131,7 @@ const styles = StyleSheet.create({
 		gap: spacing.md,
 	},
 	selectorAge: {
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 		fontSize: 13,
 		fontWeight: "600",
 		marginTop: 2,
@@ -136,20 +148,20 @@ const styles = StyleSheet.create({
 		backgroundColor: "#F1EEFF",
 	},
 	selectorName: {
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 		fontSize: 16,
 		fontWeight: "800",
 	},
 	selectorPanel: {
-		backgroundColor: colors.light.surface,
-		borderColor: colors.light.border,
+		backgroundColor: themeColors.surface,
+		borderColor: themeColors.border,
 		borderRadius: 8,
 		borderWidth: 1,
 		maxHeight: 320,
 		padding: spacing.sm,
 	},
 	selectorTitle: {
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 		fontSize: 12,
 		fontWeight: "800",
 		paddingHorizontal: spacing.md,
@@ -157,3 +169,4 @@ const styles = StyleSheet.create({
 		textTransform: "uppercase",
 	},
 });
+}

@@ -1,9 +1,11 @@
+import { useMemo } from "react";
 import {
 	AUTH_REQUIRED_SYNC_MESSAGE,
 	OFFLINE_SYNC_MESSAGE,
 	type SyncStatus,
 } from "@/context/SyncContext";
-import { colors, globalStyles, spacing } from "@/styles/globalStyles";
+import { spacing, type ThemeColors } from "@/styles/globalStyles";
+import { useAppTheme } from "@/context/AppPreferencesContext";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 
 type SyncStatusCardProps = {
@@ -12,17 +14,25 @@ type SyncStatusCardProps = {
 	status: Extract<SyncStatus, "syncing" | "offline" | "authRequired">;
 };
 
+function useThemeStyles() {
+	const { globalStyles, themeColors } = useAppTheme();
+	const styles = useMemo(() => createStyles(themeColors), [themeColors]);
+
+	return { globalStyles, styles, themeColors };
+}
+
 export function SyncStatusCard({
 	message,
 	onRetry,
 	status,
 }: SyncStatusCardProps) {
+	const { globalStyles, themeColors, styles } = useThemeStyles();
 	const isSyncing = status === "syncing";
 	const text = message ?? getDefaultMessage(status);
 
 	return (
 		<View style={[globalStyles.card, styles.card]}>
-			{isSyncing && <ActivityIndicator color={colors.light.primary} size="small" />}
+			{isSyncing && <ActivityIndicator color={themeColors.primary} size="small" />}
 			<Text style={styles.text}>{text}</Text>
 			{!isSyncing && onRetry ? (
 				<Pressable
@@ -49,10 +59,11 @@ function getDefaultMessage(status: SyncStatusCardProps["status"]) {
 	return OFFLINE_SYNC_MESSAGE;
 }
 
-const styles = StyleSheet.create({
+function createStyles(themeColors: ThemeColors) {
+	return StyleSheet.create({
 	card: {
 		alignItems: "center",
-		borderColor: colors.light.border,
+		borderColor: themeColors.border,
 		flexDirection: "row",
 		gap: spacing.sm,
 		marginBottom: spacing.md,
@@ -60,20 +71,21 @@ const styles = StyleSheet.create({
 		paddingVertical: spacing.sm,
 	},
 	retryButton: {
-		backgroundColor: colors.light.primary,
+		backgroundColor: themeColors.primary,
 		borderRadius: 8,
 		paddingHorizontal: spacing.sm,
 		paddingVertical: spacing.xs,
 	},
 	retryText: {
-		color: colors.light.surface,
+		color: themeColors.surface,
 		fontSize: 12,
 		fontWeight: "800",
 	},
 	text: {
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 		flex: 1,
 		fontSize: 13,
 		fontWeight: "700",
 	},
 });
+}

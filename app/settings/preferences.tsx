@@ -1,27 +1,34 @@
 import { SettingsHeader } from "@/components/settings/SettingsRows";
 import { TimeZoneSelector } from "@/components/settings/TimeZoneSelector";
 import { useAppPreferences } from "@/context/AppPreferencesContext";
-import { colors, globalStyles, spacing, typography } from "@/styles/globalStyles";
+import { spacing, type ThemeColors, typography } from "@/styles/globalStyles";
 import { getTimeZoneDisplayLabel } from "@/utils/timeZones";
 import { useRouter } from "expo-router";
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+
+type PreferencesStyles = ReturnType<typeof createStyles>;
 
 export default function AppPreferencesScreen() {
 	const router = useRouter();
 	const {
+		globalStyles,
 		preferredLengthUnit,
 		preferredVolumeUnit,
 		preferredWeightUnit,
 		setPreferredLengthUnit,
 		setPreferredVolumeUnit,
 		setPreferredWeightUnit,
+		setThemePreference,
 		setTimelineTimeZone,
 		setTimelineTimeZoneMode,
+		themeColors,
+		themePreference,
 		timelineTimeZone,
 		timelineTimeZoneMode,
 	} = useAppPreferences();
+	const styles = useMemo(() => createStyles(themeColors), [themeColors]);
 
 	return (
 		<SafeAreaView style={globalStyles.screen}>
@@ -29,53 +36,79 @@ export default function AppPreferencesScreen() {
 			<ScrollView contentContainerStyle={styles.content}>
 				<View style={globalStyles.card}>
 					<Text style={styles.sectionTitle}>Unit Preference</Text>
-					<PreferenceRow label="Volume">
+					<PreferenceRow label="Volume" styles={styles}>
 						<SegmentButton
 							active={preferredVolumeUnit === "ml"}
 							label="mL"
 							onPress={() => void setPreferredVolumeUnit("ml")}
+							styles={styles}
 						/>
 						<SegmentButton
 							active={preferredVolumeUnit === "oz"}
 							label="oz"
 							onPress={() => void setPreferredVolumeUnit("oz")}
+							styles={styles}
 						/>
 					</PreferenceRow>
-					<PreferenceRow label="Length">
+					<PreferenceRow label="Length" styles={styles}>
 						<SegmentButton
 							active={preferredLengthUnit === "cm"}
 							label="cm"
 							onPress={() => void setPreferredLengthUnit("cm")}
+							styles={styles}
 						/>
 						<SegmentButton
 							active={preferredLengthUnit === "in"}
 							label="in"
 							onPress={() => void setPreferredLengthUnit("in")}
+							styles={styles}
 						/>
 					</PreferenceRow>
-					<PreferenceRow label="Weight">
+					<PreferenceRow label="Weight" styles={styles}>
 						<SegmentButton
 							active={preferredWeightUnit === "kg"}
 							label="kg"
 							onPress={() => void setPreferredWeightUnit("kg")}
+							styles={styles}
 						/>
 						<SegmentButton
 							active={preferredWeightUnit === "lb"}
 							label="lb"
 							onPress={() => void setPreferredWeightUnit("lb")}
+							styles={styles}
 						/>
 					</PreferenceRow>
 				</View>
 
 				<View style={globalStyles.card}>
 					<Text style={styles.sectionTitle}>App Preference</Text>
-					<PreferenceRow helper="Coming Soon" label="Theme">
-						<DisabledPill label="Light" />
-						<DisabledPill label="Dark" />
+					<PreferenceRow
+						helper="Follow the device, or pin Milo to one theme."
+						label="Theme"
+						styles={styles}
+					>
+						<SegmentButton
+							active={themePreference === "system"}
+							label="System"
+							onPress={() => void setThemePreference("system")}
+							styles={styles}
+						/>
+						<SegmentButton
+							active={themePreference === "light"}
+							label="Light"
+							onPress={() => void setThemePreference("light")}
+							styles={styles}
+						/>
+						<SegmentButton
+							active={themePreference === "dark"}
+							label="Dark"
+							onPress={() => void setThemePreference("dark")}
+							styles={styles}
+						/>
 					</PreferenceRow>
-					<PreferenceRow helper="Coming Soon" label="Language">
-						<DisabledPill label="English" />
-						<DisabledPill label="Korean" />
+					<PreferenceRow helper="Coming Soon" label="Language" styles={styles}>
+						<DisabledPill label="English" styles={styles} />
+						<DisabledPill label="Korean" styles={styles} />
 					</PreferenceRow>
 					<PreferenceRow
 						helper={
@@ -84,16 +117,19 @@ export default function AppPreferencesScreen() {
 								: `Show times in ${getTimeZoneDisplayLabel(timelineTimeZone)}.`
 						}
 						label="Timeline timezone"
+						styles={styles}
 					>
 						<SegmentButton
 							active={timelineTimeZoneMode === "baby"}
 							label="Baby"
 							onPress={() => void setTimelineTimeZoneMode("baby")}
+							styles={styles}
 						/>
 						<SegmentButton
 							active={timelineTimeZoneMode === "device"}
 							label="Device"
 							onPress={() => void setTimelineTimeZoneMode("device")}
+							styles={styles}
 						/>
 					</PreferenceRow>
 					{timelineTimeZoneMode === "device" ? (
@@ -113,10 +149,12 @@ function PreferenceRow({
 	children,
 	helper,
 	label,
+	styles,
 }: {
 	children: ReactNode;
 	helper?: string;
 	label: string;
+	styles: PreferencesStyles;
 }) {
 	return (
 		<View style={styles.preferenceRow}>
@@ -133,10 +171,12 @@ function SegmentButton({
 	active,
 	label,
 	onPress,
+	styles,
 }: {
 	active: boolean;
 	label: string;
 	onPress: () => void;
+	styles: PreferencesStyles;
 }) {
 	return (
 		<Pressable
@@ -150,7 +190,7 @@ function SegmentButton({
 	);
 }
 
-function DisabledPill({ label }: { label: string }) {
+function DisabledPill({ label, styles }: { label: string; styles: PreferencesStyles }) {
 	return (
 		<View style={[styles.segmentButton, styles.disabledPill]}>
 			<Text style={styles.disabledPillText}>{label}</Text>
@@ -158,68 +198,70 @@ function DisabledPill({ label }: { label: string }) {
 	);
 }
 
-const styles = StyleSheet.create({
-	content: {
-		gap: spacing.md,
-		padding: spacing.md,
-		paddingBottom: spacing.xl,
-	},
-	disabledPill: {
-		opacity: 0.55,
-	},
-	disabledPillText: {
-		...typography.caption,
-		color: colors.light.textSecondary,
-		fontWeight: "800",
-	},
-	helper: {
-		...typography.caption,
-		color: colors.light.textSecondary,
-		marginTop: 2,
-	},
-	label: {
-		...typography.label,
-		color: colors.light.textPrimary,
-	},
-	preferenceRow: {
-		alignItems: "center",
-		flexDirection: "row",
-		gap: spacing.md,
-		marginTop: spacing.md,
-	},
-	preferenceText: {
-		flex: 1,
-	},
-	sectionTitle: {
-		...typography.sectionTitle,
-		color: colors.light.textPrimary,
-	},
-	segmentButton: {
-		alignItems: "center",
-		borderRadius: 10,
-		flex: 1,
-		justifyContent: "center",
-		minHeight: 38,
-		paddingHorizontal: spacing.sm,
-	},
-	segmentButtonActive: {
-		backgroundColor: colors.light.primary,
-	},
-	segmentedControl: {
-		backgroundColor: colors.light.background,
-		borderColor: colors.light.border,
-		borderRadius: 13,
-		borderWidth: 1,
-		flexDirection: "row",
-		minWidth: 144,
-		padding: 3,
-	},
-	segmentText: {
-		...typography.caption,
-		color: colors.light.textSecondary,
-		fontWeight: "800",
-	},
-	segmentTextActive: {
-		color: colors.light.surface,
-	},
-});
+function createStyles(themeColors: ThemeColors) {
+	return StyleSheet.create({
+		content: {
+			gap: spacing.md,
+			padding: spacing.md,
+			paddingBottom: spacing.xl,
+		},
+		disabledPill: {
+			opacity: 0.55,
+		},
+		disabledPillText: {
+			...typography.caption,
+			color: themeColors.textSecondary,
+			fontWeight: "800",
+		},
+		helper: {
+			...typography.caption,
+			color: themeColors.textSecondary,
+			marginTop: 2,
+		},
+		label: {
+			...typography.label,
+			color: themeColors.textPrimary,
+		},
+		preferenceRow: {
+			alignItems: "center",
+			flexDirection: "row",
+			gap: spacing.md,
+			marginTop: spacing.md,
+		},
+		preferenceText: {
+			flex: 1,
+		},
+		sectionTitle: {
+			...typography.sectionTitle,
+			color: themeColors.textPrimary,
+		},
+		segmentButton: {
+			alignItems: "center",
+			borderRadius: 10,
+			flex: 1,
+			justifyContent: "center",
+			minHeight: 38,
+			paddingHorizontal: spacing.sm,
+		},
+		segmentButtonActive: {
+			backgroundColor: themeColors.primary,
+		},
+		segmentedControl: {
+			backgroundColor: themeColors.background,
+			borderColor: themeColors.border,
+			borderRadius: 13,
+			borderWidth: 1,
+			flexDirection: "row",
+			minWidth: 144,
+			padding: 3,
+		},
+		segmentText: {
+			...typography.caption,
+			color: themeColors.textSecondary,
+			fontWeight: "800",
+		},
+		segmentTextActive: {
+			color: "#FFFFFF",
+		},
+	});
+}

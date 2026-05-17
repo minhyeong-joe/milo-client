@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import type { PatternRangeMode } from "@/app/(tabs)/reports";
 import type { RoutineStatsResponse } from "@/services/api/routine";
-import { colors, globalStyles, spacing, typography } from "@/styles/globalStyles";
+import { spacing, typography, type ThemeColors } from "@/styles/globalStyles";
+import { useAppTheme } from "@/context/AppPreferencesContext";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker, { type DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import {
@@ -20,6 +21,13 @@ import SummaryCardButton from "@/components/reports/SummaryCardButton";
 import { RoutineKind } from "@/data/homeData";
 import RoutineDailyStackedChart from "@/components/reports/RoutineDailyStackedChart";
 import AverageSummaryCard from "@/components/reports/AverageSummaryCard";
+
+function useThemeStyles() {
+	const { globalStyles, themeColors } = useAppTheme();
+	const styles = useMemo(() => createStyles(themeColors), [themeColors]);
+
+	return { globalStyles, styles, themeColors };
+}
 
 export default function PatternReportsContent({
 	canShiftNext,
@@ -50,6 +58,7 @@ export default function PatternReportsContent({
 	stats: RoutineStatsResponse;
 	timeZone?: string;
 }) {
+	const { globalStyles, themeColors, styles } = useThemeStyles();
 	const [showMeal, setShowMeal] = useState(true);
 	const [showDiaper, setShowDiaper] = useState(true);
 	const [showSleep, setShowSleep] = useState(true);
@@ -73,7 +82,7 @@ export default function PatternReportsContent({
 			refreshControl={
 				<RefreshControl
 					refreshing={isRefreshing}
-					tintColor={colors.light.primary}
+					tintColor={themeColors.primary}
 					onRefresh={() => void onRefresh()}
 				/>
 			}
@@ -87,7 +96,7 @@ export default function PatternReportsContent({
 						onPress={() => onShiftRange(-1)}
 					>
 						<Ionicons
-							color={colors.light.textPrimary}
+							color={themeColors.textPrimary}
 							name="chevron-back"
 							size={20}
 						/>
@@ -99,7 +108,7 @@ export default function PatternReportsContent({
 					>
 						<Text style={styles.rangeLabel}>{formatRangeLabel(startDate, endDate, timeZone)}</Text>
 						<Ionicons
-							color={colors.light.textSecondary}
+							color={themeColors.textSecondary}
 							name="calendar-outline"
 							size={15}
 						/>
@@ -114,7 +123,7 @@ export default function PatternReportsContent({
 						onPress={() => onShiftRange(1)}
 					>
 						<Ionicons
-							color={canShiftNext ? colors.light.textPrimary : colors.light.textSecondary}
+							color={canShiftNext ? themeColors.textPrimary : themeColors.textSecondary}
 							name="chevron-forward"
 							size={20}
 						/>
@@ -224,7 +233,7 @@ export default function PatternReportsContent({
 				</View>
 				<View style={styles.footnoteRow}>
 					<Ionicons
-						color={colors.light.textSecondary}
+						color={themeColors.textSecondary}
 						name="information-circle-outline"
 						size={16}
 					/>
@@ -249,7 +258,7 @@ export default function PatternReportsContent({
 								onPress={() => setIsCustomRangeModalVisible(false)}
 							>
 								<Ionicons
-									color={colors.light.textSecondary}
+									color={themeColors.textSecondary}
 									name="close"
 									size={22}
 								/>
@@ -338,6 +347,7 @@ function DateField({
 	timeZone?: string;
 	value: Date;
 }) {
+	const { themeColors, styles } = useThemeStyles();
 	return (
 		<Pressable
 			accessibilityRole="button"
@@ -349,7 +359,7 @@ function DateField({
 				<Text style={styles.dateFieldValue}>{formatFullDate(value, timeZone)}</Text>
 			</View>
 			<Ionicons
-				color={colors.light.textSecondary}
+				color={themeColors.textSecondary}
 				name="calendar-outline"
 				size={20}
 			/>
@@ -366,6 +376,7 @@ function RangeButton({
 	label: string;
 	onPress: () => void;
 }) {
+	const { styles } = useThemeStyles();
 	return (
 		<Pressable
 			style={[styles.rangeButton, isSelected && styles.rangeButtonSelected]}
@@ -461,10 +472,11 @@ function handleDatePickerChange({
 	}
 }
 
-const styles = StyleSheet.create({
+function createStyles(themeColors: ThemeColors) {
+	return StyleSheet.create({
 	applyButton: {
 		alignItems: "center",
-		backgroundColor: colors.light.primary,
+		backgroundColor: themeColors.primary,
 		borderRadius: 12,
 		flex: 1,
 		paddingVertical: spacing.md,
@@ -473,7 +485,7 @@ const styles = StyleSheet.create({
 		opacity: 0.45,
 	},
 	applyButtonText: {
-		color: colors.light.surface,
+		color: themeColors.surface,
 		fontSize: 15,
 		fontWeight: "800",
 	},
@@ -483,14 +495,14 @@ const styles = StyleSheet.create({
 	},
 	cancelButton: {
 		alignItems: "center",
-		borderColor: colors.light.border,
+		borderColor: themeColors.border,
 		borderRadius: 12,
 		borderWidth: 1,
 		flex: 1,
 		paddingVertical: spacing.md,
 	},
 	cancelButtonText: {
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 		fontSize: 15,
 		fontWeight: "800",
 	},
@@ -506,7 +518,7 @@ const styles = StyleSheet.create({
 	},
 	dateField: {
 		alignItems: "center",
-		borderColor: colors.light.border,
+		borderColor: themeColors.border,
 		borderRadius: 14,
 		borderWidth: 1,
 		flexDirection: "row",
@@ -515,15 +527,15 @@ const styles = StyleSheet.create({
 	},
 	dateFieldActive: {
 		backgroundColor: "#F7F3FF",
-		borderColor: colors.light.primary,
+		borderColor: themeColors.primary,
 	},
 	dateFieldLabel: {
 		...typography.caption,
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 	},
 	dateFieldValue: {
 		...typography.label,
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 		marginTop: 2,
 	},
 	rangeButton: {
@@ -533,14 +545,14 @@ const styles = StyleSheet.create({
 		paddingVertical: spacing.xs,
 	},
 	rangeButtonSelected: {
-		backgroundColor: colors.light.surface,
+		backgroundColor: themeColors.surface,
 	},
 	rangeButtonText: {
 		...typography.caption,
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 	},
 	rangeButtonTextSelected: {
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 	},
 	rangeHeader: {
 		alignItems: "center",
@@ -551,7 +563,7 @@ const styles = StyleSheet.create({
 	},
 	rangeLabel: {
 		...typography.label,
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 		textAlign: "center",
 	},
 	rangeLabelButton: {
@@ -571,7 +583,7 @@ const styles = StyleSheet.create({
 		gap: spacing.xs,
 	},
 	rangeToggle: {
-		backgroundColor: "#ECEEF5",
+		backgroundColor: themeColors.border,
 		borderRadius: 999,
 		flexDirection: "row",
 		gap: spacing.xs,
@@ -591,7 +603,7 @@ const styles = StyleSheet.create({
 		padding: spacing.lg,
 	},
 	modalCard: {
-		backgroundColor: colors.light.surface,
+		backgroundColor: themeColors.surface,
 		borderRadius: 20,
 		gap: spacing.md,
 		padding: spacing.lg,
@@ -599,7 +611,7 @@ const styles = StyleSheet.create({
 	},
 	modalSubtitle: {
 		...typography.caption,
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 	},
 	routineToggleButtonGroup: { 
 		justifyContent: "center", 
@@ -617,7 +629,7 @@ const styles = StyleSheet.create({
 	},
 	footnoteText: {
 		...typography.caption,
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 		flex: 1,
 	},
 	summaryCardButtonGroup: {
@@ -628,12 +640,13 @@ const styles = StyleSheet.create({
 	},
 	summarySubtitle: {
 		...typography.caption,
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 		marginTop: 2,
 	},
 	validationText: {
-		color: colors.light.error,
+		color: themeColors.error,
 		fontSize: 12,
 		fontWeight: "700",
 	},
 });
+}

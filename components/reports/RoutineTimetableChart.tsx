@@ -5,7 +5,8 @@ import type {
 	RoutinePatternLog,
 	RoutineStatsDay,
 } from "@/services/api/routine";
-import { colors, globalStyles, spacing, typography } from "@/styles/globalStyles";
+import { spacing, typography, type ThemeColors } from "@/styles/globalStyles";
+import { useAppTheme } from "@/context/AppPreferencesContext";
 
 const DAY_MINUTES = 1440;
 const POINT_EVENT_MINUTES = 20;
@@ -31,6 +32,13 @@ type TimetableBlock = {
 	type: string;
 };
 
+function useThemeStyles() {
+	const { globalStyles, themeColors } = useAppTheme();
+	const styles = useMemo(() => createStyles(themeColors), [themeColors]);
+
+	return { globalStyles, styles, themeColors };
+}
+
 export default function RoutineTimetableChart({
 	days,
 	showDiaper,
@@ -42,6 +50,7 @@ export default function RoutineTimetableChart({
 	showMeal: boolean;
 	showSleep: boolean;
 }) {
+	const { globalStyles, styles } = useThemeStyles();
 	const [chartWidth, setChartWidth] = useState(DEFAULT_CHART_WIDTH);
 	const visibleKinds = useMemo(
 		() => ({
@@ -414,6 +423,7 @@ function AxisDateLabel({
 	showLabel: boolean;
 	showYear: boolean;
 }) {
+	const { styles } = useThemeStyles();
 	return (
 		<View
 			style={[
@@ -451,6 +461,7 @@ function LegendDot({
 	color: string;
 	label: string;
 }) {
+	const { styles } = useThemeStyles();
 	return (
 		<View style={styles.legendItem}>
 			<View style={[styles.legendDot, { backgroundColor: color }]} />
@@ -459,24 +470,25 @@ function LegendDot({
 	);
 }
 
-const styles = StyleSheet.create({
+function createStyles(themeColors: ThemeColors) {
+	return StyleSheet.create({
 	axisDateLabel: {
 		alignItems: "center",
 	},
 	axisDateText: {
 		...typography.caption,
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 		fontSize: 10,
 		lineHeight: 12,
 		textAlign: "center",
 	},
 	axisLabel: {
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 		fontSize: 10,
 	},
 	axisYearText: {
 		...typography.caption,
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 		fontSize: 9,
 		lineHeight: 11,
 		textAlign: "center",
@@ -503,12 +515,13 @@ const styles = StyleSheet.create({
 	},
 	legendText: {
 		...typography.caption,
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 		fontSize: 10,
 	},
 	subtitle: {
 		...typography.caption,
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 		marginTop: 2,
 	},
 });
+}

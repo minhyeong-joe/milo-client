@@ -1,8 +1,10 @@
+import { useAppTheme } from "@/context/AppPreferencesContext";
+import { useMemo } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { Modal, Platform, Pressable, StyleSheet, Text } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { colors, spacing, typography } from "@/styles/globalStyles";
+import { spacing, typography, type ThemeColors } from "@/styles/globalStyles";
 
 type DiaryActionsModalProps = {
 	onClose: () => void;
@@ -11,12 +13,20 @@ type DiaryActionsModalProps = {
 	visible: boolean;
 };
 
+function useThemeStyles() {
+	const { globalStyles, themeColors } = useAppTheme();
+	const styles = useMemo(() => createStyles(themeColors), [themeColors]);
+
+	return { globalStyles, styles, themeColors };
+}
+
 export function DiaryActionsModal({
 	onClose,
 	onDelete,
 	onEdit,
 	visible,
 }: DiaryActionsModalProps) {
+	const { themeColors, styles } = useThemeStyles();
 	const insets = useSafeAreaInsets();
 	const androidButtonOffset =
 		Platform.OS === "android" ? Math.max(insets.bottom, 48) : 0;
@@ -37,7 +47,7 @@ export function DiaryActionsModal({
 						onPress={onEdit}
 						style={styles.actionRow}
 					>
-						<Ionicons color={colors.light.textPrimary} name="create-outline" size={20} />
+						<Ionicons color={themeColors.textPrimary} name="create-outline" size={20} />
 						<Text style={styles.actionText}>Edit</Text>
 					</Pressable>
 					<Pressable
@@ -45,7 +55,7 @@ export function DiaryActionsModal({
 						onPress={onDelete}
 						style={styles.actionRow}
 					>
-						<Ionicons color={colors.light.error} name="trash-outline" size={20} />
+						<Ionicons color={themeColors.error} name="trash-outline" size={20} />
 						<Text style={[styles.actionText, styles.deleteText]}>Delete</Text>
 					</Pressable>
 				</Pressable>
@@ -54,7 +64,8 @@ export function DiaryActionsModal({
 	);
 }
 
-const styles = StyleSheet.create({
+function createStyles(themeColors: ThemeColors) {
+	return StyleSheet.create({
 	actionRow: {
 		alignItems: "center",
 		borderRadius: 12,
@@ -65,7 +76,7 @@ const styles = StyleSheet.create({
 	},
 	actionText: {
 		...typography.body,
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 		fontWeight: "700",
 	},
 	backdrop: {
@@ -76,13 +87,14 @@ const styles = StyleSheet.create({
 		padding: spacing.lg,
 	},
 	card: {
-		backgroundColor: colors.light.surface,
+		backgroundColor: themeColors.surface,
 		borderRadius: 18,
 		gap: spacing.xs,
 		padding: spacing.md,
 		width: "100%",
 	},
 	deleteText: {
-		color: colors.light.error,
+		color: themeColors.error,
 	},
 });
+}

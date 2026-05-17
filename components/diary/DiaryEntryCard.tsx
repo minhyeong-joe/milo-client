@@ -1,10 +1,12 @@
+import { useMemo } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { DiaryMediaPreview } from "@/components/diary/DiaryMediaPreview";
 import { DiaryTagPill } from "@/components/diary/DiaryTagPill";
 import type { DiaryEntry } from "@/services/api/diary";
-import { colors, globalStyles, spacing, typography } from "@/styles/globalStyles";
+import { spacing, typography, type ThemeColors } from "@/styles/globalStyles";
+import { useAppTheme } from "@/context/AppPreferencesContext";
 
 type DiaryEntryCardProps = {
 	entry: DiaryEntry;
@@ -14,6 +16,13 @@ type DiaryEntryCardProps = {
 	timeZone?: string;
 };
 
+function useThemeStyles() {
+	const { globalStyles, themeColors } = useAppTheme();
+	const styles = useMemo(() => createStyles(themeColors), [themeColors]);
+
+	return { globalStyles, styles, themeColors };
+}
+
 export function DiaryEntryCard({
 	entry,
 	onMorePress,
@@ -21,6 +30,7 @@ export function DiaryEntryCard({
 	timeZone,
 	todayDate,
 }: DiaryEntryCardProps) {
+	const { globalStyles, themeColors, styles } = useThemeStyles();
 	const hasSingleMedia = entry.media.length === 1;
 
 	return (
@@ -48,7 +58,7 @@ export function DiaryEntryCard({
 					}}
 					style={styles.moreButton}
 				>
-					<Ionicons color={colors.light.textSecondary} name="ellipsis-horizontal" size={18} />
+					<Ionicons color={themeColors.textSecondary} name="ellipsis-horizontal" size={18} />
 				</Pressable>
 			</View>
 			{hasSingleMedia ? (
@@ -78,6 +88,7 @@ export function DiaryEntryCard({
 }
 
 function CardTextContent({ entry }: { entry: DiaryEntry }) {
+	const { styles } = useThemeStyles();
 	const title = entry.title?.trim();
 
 	return (
@@ -114,18 +125,19 @@ function formatDateLabel(dateKey: string, timeZone?: string) {
 	}).format(date);
 }
 
-const styles = StyleSheet.create({
+function createStyles(themeColors: ThemeColors) {
+	return StyleSheet.create({
 	card: {
 		borderRadius: 14,
 		gap: spacing.sm,
 	},
 	contentText: {
 		...typography.body,
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 	},
 	dateText: {
 		...typography.caption,
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 	},
 	headerRow: {
 		alignItems: "center",
@@ -159,8 +171,9 @@ const styles = StyleSheet.create({
 	},
 	titleText: {
 		...typography.label,
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 		fontSize: 16,
 		fontWeight: "800",
 	},
 });
+}

@@ -1,11 +1,13 @@
 import { PlaceholderCard, SettingsHeader } from "@/components/settings/SettingsRows";
-import { globalStyles, spacing } from "@/styles/globalStyles";
+import { spacing } from "@/styles/globalStyles";
+import { useAppTheme } from "@/context/AppPreferencesContext";
 import { useRouter } from "expo-router";
 import { ScrollView, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function AIInsightsSettingsScreen() {
 	const router = useRouter();
+	const { globalStyles } = useAppTheme();
 
 	return (
 		<SafeAreaView style={globalStyles.screen}>

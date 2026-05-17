@@ -1,3 +1,4 @@
+import { useAppTheme } from "@/context/AppPreferencesContext";
 import { Ionicons } from "@expo/vector-icons";
 import { VideoView, useVideoPlayer } from "expo-video";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -15,7 +16,7 @@ import {
 } from "react-native";
 
 import type { DiaryMedia } from "@/services/api/diary";
-import { colors, spacing, typography } from "@/styles/globalStyles";
+import { spacing, typography, type ThemeColors } from "@/styles/globalStyles";
 
 export type DiaryMediaPreviewItem = Pick<
 	DiaryMedia,
@@ -44,12 +45,20 @@ type DiaryMediaPreviewProps = {
 
 type ImageRatioBucket = "horizontal" | "square" | "vertical";
 
+function useThemeStyles() {
+	const { globalStyles, themeColors } = useAppTheme();
+	const styles = useMemo(() => createStyles(themeColors), [themeColors]);
+
+	return { globalStyles, styles, themeColors };
+}
+
 export function DiaryMediaPreview({
 	media,
 	onMediaPress,
 	onRemove,
 	variant = "card",
 }: DiaryMediaPreviewProps) {
+	const { styles } = useThemeStyles();
 	const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
 	const [selectedVideoUri, setSelectedVideoUri] = useState<string | null>(null);
 	const [selectedGalleryIndex, setSelectedGalleryIndex] = useState<number | null>(null);
@@ -140,6 +149,7 @@ export function DiaryMediaPreview({
 }
 
 export function DiaryHeroCarousel({ media }: { media: DiaryMediaPreviewItem[] }) {
+	const { styles } = useThemeStyles();
 	const [activeIndex, setActiveIndex] = useState(0);
 	const [selectedGalleryIndex, setSelectedGalleryIndex] = useState<number | null>(null);
 	const heroScrollViewRef = useRef<ScrollView | null>(null);
@@ -224,6 +234,7 @@ export function DiaryHeroCarousel({ media }: { media: DiaryMediaPreviewItem[] })
 }
 
 function HeroMedia({ item }: { item: DiaryMediaPreviewItem }) {
+	const { themeColors, styles } = useThemeStyles();
 	const imageUri = getMediaPreviewUri(item);
 
 	return (
@@ -232,14 +243,14 @@ function HeroMedia({ item }: { item: DiaryMediaPreviewItem }) {
 				<Image source={{ uri: imageUri }} style={styles.heroImage} />
 			) : (
 				<Ionicons
-					color={colors.light.textSecondary}
+					color={themeColors.textSecondary}
 					name={isVideo(item.fileType) ? "play-circle-outline" : "image-outline"}
 					size={42}
 				/>
 			)}
 			{isVideo(item.fileType) ? (
 				<View style={styles.heroPlayBadge}>
-					<Ionicons color={colors.light.surface} name="play" size={24} />
+					<Ionicons color={themeColors.surface} name="play" size={24} />
 				</View>
 			) : null}
 		</View>
@@ -265,18 +276,19 @@ function MediaTile({
 	onRemove?: (objectKey: string) => void;
 	variant: NonNullable<DiaryMediaPreviewProps["variant"]>;
 }) {
+	const { themeColors, styles } = useThemeStyles();
 	const imageUri = getMediaPreviewUri(item);
 	const ratio = useImageRatio(imageUri);
 	const ratioBucket = getImageRatioBucket(ratio);
 	const tileStyle = useMemo(
 		() => [
 			variant === "detail" ? styles.detailMediaTile : styles.mediaCard,
-			getVariantStyle(variant),
+			getVariantStyle(variant, styles),
 			variant === "detail"
 				? getDetailRatioStyle(ratio)
-				: getRatioStyle(variant, ratioBucket),
+				: getRatioStyle(variant, ratioBucket, styles),
 		],
-		[ratio, ratioBucket, variant],
+		[ratio, ratioBucket, styles, variant],
 	);
 
 	return (
@@ -315,7 +327,7 @@ function MediaTile({
 				/>
 			) : (
 				<Ionicons
-					color={colors.light.textSecondary}
+					color={themeColors.textSecondary}
 					name={isVideo(item.fileType) ? "play-circle-outline" : "image-outline"}
 					size={28}
 				/>
@@ -328,7 +340,7 @@ function MediaTile({
 					]}
 				>
 					<View style={styles.videoBadge}>
-						<Ionicons color={colors.light.surface} name="play" size={12} />
+						<Ionicons color={themeColors.surface} name="play" size={12} />
 						<Text style={styles.videoBadgeText}>Video</Text>
 					</View>
 				</View>
@@ -339,7 +351,7 @@ function MediaTile({
 					onPress={() => onRemove(item.objectKey)}
 					style={styles.removeButton}
 				>
-					<Ionicons color={colors.light.surface} name="close" size={14} />
+					<Ionicons color={themeColors.surface} name="close" size={14} />
 				</Pressable>
 			) : null}
 		</Pressable>
@@ -357,6 +369,7 @@ function FullscreenMediaGallery({
 	onClose: () => void;
 	onIndexChange: (index: number) => void;
 }) {
+	const { themeColors, styles } = useThemeStyles();
 	const item = media[index];
 	const scrollViewRef = useRef<ScrollView | null>(null);
 	const { width } = useWindowDimensions();
@@ -414,7 +427,7 @@ function FullscreenMediaGallery({
 					onPress={onClose}
 					style={styles.videoCloseButton}
 				>
-					<Ionicons color={colors.light.surface} name="close" size={22} />
+					<Ionicons color={themeColors.surface} name="close" size={22} />
 				</Pressable>
 				<View style={styles.galleryCountBadge}>
 					<Text style={styles.heroCountText}>
@@ -433,6 +446,7 @@ function FullscreenMediaContent({
 	isActive: boolean;
 	item: DiaryMediaPreviewItem;
 }) {
+	const { themeColors, styles } = useThemeStyles();
 	if (isVideo(item.fileType) && item.mediaUrl) {
 		return <FullscreenVideo isActive={isActive} key={item.objectKey} uri={item.mediaUrl} />;
 	}
@@ -442,7 +456,7 @@ function FullscreenMediaContent({
 	return imageUri ? (
 		<Image source={{ uri: imageUri }} style={styles.fullImage} />
 	) : (
-		<Ionicons color={colors.light.surface} name="image-outline" size={42} />
+		<Ionicons color={themeColors.surface} name="image-outline" size={42} />
 	);
 }
 
@@ -455,6 +469,7 @@ function getMediaPreviewUri(item: DiaryMediaPreviewItem) {
 }
 
 function FullscreenVideo({ isActive, uri }: { isActive: boolean; uri: string }) {
+	const { styles } = useThemeStyles();
 	const player = useVideoPlayer(uri, (playerInstance) => {
 		playerInstance.loop = false;
 	});
@@ -479,6 +494,7 @@ function FullscreenVideo({ isActive, uri }: { isActive: boolean; uri: string }) 
 }
 
 function VideoModal({ onClose, uri }: { onClose: () => void; uri: string }) {
+	const { themeColors, styles } = useThemeStyles();
 	const player = useVideoPlayer(uri, (playerInstance) => {
 		playerInstance.loop = false;
 	});
@@ -496,7 +512,7 @@ function VideoModal({ onClose, uri }: { onClose: () => void; uri: string }) {
 					onPress={onClose}
 					style={styles.videoCloseButton}
 				>
-					<Ionicons color={colors.light.surface} name="close" size={22} />
+					<Ionicons color={themeColors.surface} name="close" size={22} />
 				</Pressable>
 				<VideoView
 					contentFit="contain"
@@ -529,6 +545,7 @@ function getDetailRatioStyle(ratio: number | null) {
 function getRatioStyle(
 	variant: NonNullable<DiaryMediaPreviewProps["variant"]>,
 	ratioBucket: ImageRatioBucket,
+	styles: ReturnType<typeof createStyles>,
 ) {
 	if (variant === "singleCard") {
 		return styles.singleCardMedia;
@@ -565,7 +582,10 @@ function getRatioStyle(
 	return styles.cardMedia;
 }
 
-function getVariantStyle(variant: NonNullable<DiaryMediaPreviewProps["variant"]>) {
+function getVariantStyle(
+	variant: NonNullable<DiaryMediaPreviewProps["variant"]>,
+	styles: ReturnType<typeof createStyles>,
+) {
 	if (variant === "singleCard") {
 		return styles.singleCardMedia;
 	}
@@ -710,7 +730,8 @@ function useImageRatio(uri: string | null): number | null {
 	return ratio;
 }
 
-const styles = StyleSheet.create({
+function createStyles(themeColors: ThemeColors) {
+	return StyleSheet.create({
 	cardMedia: {
 		height: 96,
 		width: 144,
@@ -734,7 +755,7 @@ const styles = StyleSheet.create({
 	},
 	countText: {
 		...typography.label,
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 	},
 	detailHorizontalMedia: {
 		aspectRatio: 4 / 3,
@@ -846,17 +867,17 @@ const styles = StyleSheet.create({
 	},
 	heroCountText: {
 		...typography.caption,
-		color: colors.light.surface,
+		color: themeColors.surface,
 		fontWeight: "700",
 	},
 	heroDot: {
-		backgroundColor: colors.light.border,
+		backgroundColor: themeColors.border,
 		borderRadius: 999,
 		height: 7,
 		width: 7,
 	},
 	heroDotActive: {
-		backgroundColor: colors.light.primary,
+		backgroundColor: themeColors.primary,
 		width: 18,
 	},
 	heroDots: {
@@ -874,7 +895,7 @@ const styles = StyleSheet.create({
 	heroMedia: {
 		alignItems: "center",
 		backgroundColor: "#F7F8FC",
-		borderColor: colors.light.border,
+		borderColor: themeColors.border,
 		borderRadius: 24,
 		borderWidth: 1,
 		height: 300,
@@ -913,7 +934,7 @@ const styles = StyleSheet.create({
 	mediaCard: {
 		alignItems: "center",
 		backgroundColor: "#F7F8FC",
-		borderColor: colors.light.border,
+		borderColor: themeColors.border,
 		borderRadius: 8,
 		borderWidth: 1,
 		justifyContent: "center",
@@ -980,7 +1001,8 @@ const styles = StyleSheet.create({
 	},
 	videoBadgeText: {
 		...typography.caption,
-		color: colors.light.surface,
+		color: themeColors.surface,
 		fontSize: 10,
 	},
 });
+}

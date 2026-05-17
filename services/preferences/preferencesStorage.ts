@@ -10,16 +10,19 @@ const DEFAULT_SOLID_FOOD_UNIT: PreferredSolidFoodUnit = "servings";
 const DEFAULT_LENGTH_UNIT: PreferredLengthUnit = "cm";
 const DEFAULT_WEIGHT_UNIT: PreferredWeightUnit = "kg";
 const DEFAULT_TIMELINE_TIME_ZONE_MODE: TimelineTimeZoneMode = "baby";
+const DEFAULT_THEME_PREFERENCE: ThemePreference = "system";
 
 export type PreferredSolidFoodUnit = "servings" | "grams";
 export type PreferredLengthUnit = "cm" | "in";
 export type PreferredWeightUnit = "kg" | "lb";
+export type ThemePreference = "system" | "light" | "dark";
 
 export type StoredPreferences = {
 	preferredVolumeUnit: PreferredVolumeUnit;
 	preferredSolidFoodUnit: PreferredSolidFoodUnit;
 	preferredLengthUnit: PreferredLengthUnit;
 	preferredWeightUnit: PreferredWeightUnit;
+	themePreference: ThemePreference;
 	timelineTimeZone: string;
 	timelineTimeZoneMode: TimelineTimeZoneMode;
 };
@@ -47,6 +50,9 @@ export async function loadStoredPreferences(): Promise<StoredPreferences> {
 			preferredWeightUnit: isPreferredWeightUnit(parsed.preferredWeightUnit)
 				? parsed.preferredWeightUnit
 				: DEFAULT_WEIGHT_UNIT,
+			themePreference: isThemePreference(parsed.themePreference)
+				? parsed.themePreference
+				: DEFAULT_THEME_PREFERENCE,
 			timelineTimeZone: normalizeTimeZone(parsed.timelineTimeZone),
 			timelineTimeZoneMode: isTimelineTimeZoneMode(parsed.timelineTimeZoneMode)
 				? parsed.timelineTimeZoneMode
@@ -68,6 +74,7 @@ function getDefaultPreferences(): StoredPreferences {
 		preferredSolidFoodUnit: DEFAULT_SOLID_FOOD_UNIT,
 		preferredLengthUnit: DEFAULT_LENGTH_UNIT,
 		preferredWeightUnit: DEFAULT_WEIGHT_UNIT,
+		themePreference: DEFAULT_THEME_PREFERENCE,
 		timelineTimeZone: getDeviceTimeZone(),
 		timelineTimeZoneMode: DEFAULT_TIMELINE_TIME_ZONE_MODE,
 	};
@@ -91,6 +98,10 @@ function isPreferredWeightUnit(value: unknown): value is PreferredWeightUnit {
 
 function isTimelineTimeZoneMode(value: unknown): value is TimelineTimeZoneMode {
 	return value === "baby" || value === "device";
+}
+
+function isThemePreference(value: unknown): value is ThemePreference {
+	return value === "system" || value === "light" || value === "dark";
 }
 
 async function readPreferencesValue() {

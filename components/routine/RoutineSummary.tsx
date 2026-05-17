@@ -1,9 +1,11 @@
+import { useAppTheme } from "@/context/AppPreferencesContext";
+import { useMemo } from "react";
 import type {
 	DailyRoutineSummary,
 	RoutineConfig,
 	RoutineKind,
 } from "@/data/homeData";
-import { colors } from "@/styles/globalStyles";
+import { type ThemeColors } from "@/styles/globalStyles";
 import { formatDuration, formatVolume } from "@/utils/routineDisplay";
 import type { ReactNode } from "react";
 import { StyleSheet, Text, View } from "react-native";
@@ -36,6 +38,7 @@ function SummaryRow({
 	title: string;
 	total: string;
 }) {
+	const { styles } = useThemeStyles();
 	const iconInfo = config.quickActions[kind];
 
 	return (
@@ -57,7 +60,15 @@ function SummaryRow({
 }
 
 function DetailText({ children }: { children: ReactNode }) {
+	const { styles } = useThemeStyles();
 	return <Text style={styles.detailText}>{children}</Text>;
+}
+
+function useThemeStyles() {
+	const { globalStyles, themeColors } = useAppTheme();
+	const styles = useMemo(() => createStyles(themeColors), [themeColors]);
+
+	return { globalStyles, styles, themeColors };
 }
 
 export function RoutineSummary({
@@ -67,6 +78,7 @@ export function RoutineSummary({
 	config: RoutineConfig;
 	summary: DailyRoutineSummary;
 }) {
+	const { styles } = useThemeStyles();
 	const { breastfeed, breastMilk, formula, solid } = summary.meals.byType;
 	const { both, dirty, dry, wet } = summary.diapers.byType;
 	const { nap, nighttime } = summary.sleep.byType;
@@ -160,9 +172,10 @@ export function RoutineSummary({
 	);
 }
 
-const styles = StyleSheet.create({
+function createStyles(themeColors: ThemeColors) {
+	return StyleSheet.create({
 	detailText: {
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 		fontSize: 12,
 		fontWeight: "600",
 		lineHeight: 17,
@@ -193,7 +206,7 @@ const styles = StyleSheet.create({
 	},
 	summaryRow: {
 		alignItems: "flex-start",
-		borderColor: colors.light.border,
+		borderColor: themeColors.border,
 		borderRadius: 14,
 		borderWidth: 1,
 		flexDirection: "row",
@@ -201,13 +214,14 @@ const styles = StyleSheet.create({
 		padding: 12,
 	},
 	summaryTitle: {
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 		fontSize: 15,
 		fontWeight: "800",
 	},
 	summaryTotal: {
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 		fontSize: 13,
 		fontWeight: "800",
 	},
 });
+}

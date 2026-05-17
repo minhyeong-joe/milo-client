@@ -1,7 +1,7 @@
-import { useAppPreferences, useTimelineTimeZone } from "@/context/AppPreferencesContext";
+import { useAppPreferences, useTimelineTimeZone , useAppTheme } from "@/context/AppPreferencesContext";
 import { useBabySelection } from "@/context/BabySelectionContext";
 import { useGrowthData } from "@/context/GrowthDataContext";
-import { colors, globalStyles, spacing } from "@/styles/globalStyles";
+import { spacing, type ThemeColors } from "@/styles/globalStyles";
 import DateTimePicker, { type DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -21,8 +21,16 @@ import { ConfirmDeleteModal } from "@/components/routine/ConfirmDeleteModal";
 
 const NOTES_LIMIT = 200;
 
+function useThemeStyles() {
+	const { globalStyles, themeColors } = useAppTheme();
+	const styles = useMemo(() => createStyles(themeColors), [themeColors]);
+
+	return { globalStyles, styles, themeColors };
+}
+
 export default function AddMeasurementScreen() {
 	const router = useRouter();
+	const { globalStyles, themeColors, styles } = useThemeStyles();
 	const { growthId } = useLocalSearchParams<{ growthId?: string }>();
 	const { selectedBaby } = useBabySelection();
 	const timelineTimeZone = useTimelineTimeZone(selectedBaby);
@@ -167,7 +175,7 @@ export default function AddMeasurementScreen() {
 							onPress={() => setIsPickerOpen(true)}
 							style={styles.dateField}
 						>
-							<Ionicons color={colors.light.textSecondary} name="calendar-outline" size={20} />
+							<Ionicons color={themeColors.textSecondary} name="calendar-outline" size={20} />
 							<Text style={styles.dateText}>{formatDate(measuredDate, timelineTimeZone)}</Text>
 						</Pressable>
 						{isPickerOpen ? (
@@ -207,7 +215,7 @@ export default function AddMeasurementScreen() {
 							multiline
 							onChangeText={setNotes}
 							placeholder="Optional notes..."
-							placeholderTextColor={colors.light.textSecondary}
+							placeholderTextColor={themeColors.textSecondary}
 							style={styles.notesInput}
 							textAlignVertical="top"
 							value={notes}
@@ -253,6 +261,7 @@ function MeasurementInput({
 	suffix: string;
 	value: string;
 }) {
+	const { themeColors, styles } = useThemeStyles();
 	return (
 		<View style={styles.section}>
 			<Text style={styles.sectionLabel}>{label}</Text>
@@ -261,7 +270,7 @@ function MeasurementInput({
 					keyboardType="decimal-pad"
 					onChangeText={(text) => onChangeText(sanitizeDecimalInput(text))}
 					placeholder={placeholder}
-					placeholderTextColor={colors.light.textSecondary}
+					placeholderTextColor={themeColors.textSecondary}
 					style={styles.measurementInput}
 					value={value}
 				/>
@@ -346,9 +355,10 @@ function getErrorMessage(error: unknown) {
 	return "Could not save measurement. Please try again.";
 }
 
-const styles = StyleSheet.create({
+function createStyles(themeColors: ThemeColors) {
+	return StyleSheet.create({
 	cancelText: {
-		color: colors.light.primary,
+		color: themeColors.primary,
 		fontSize: 15,
 		fontWeight: "700",
 	},
@@ -358,8 +368,8 @@ const styles = StyleSheet.create({
 	},
 	dateField: {
 		alignItems: "center",
-		backgroundColor: colors.light.surface,
-		borderColor: colors.light.border,
+		backgroundColor: themeColors.surface,
+		borderColor: themeColors.border,
 		borderRadius: 14,
 		borderWidth: 1,
 		flexDirection: "row",
@@ -367,22 +377,22 @@ const styles = StyleSheet.create({
 		padding: spacing.md,
 	},
 	dateText: {
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 		fontSize: 16,
 		fontWeight: "800",
 	},
 	deleteIcon: {
-		color: colors.light.error,
+		color: themeColors.error,
 		alignSelf: "flex-end",
 	},
 	errorText: {
-		color: colors.light.error,
+		color: themeColors.error,
 		fontSize: 13,
 		fontWeight: "700",
 		marginBottom: spacing.sm,
 	},
 	footer: {
-		backgroundColor: colors.light.background,
+		backgroundColor: themeColors.background,
 		padding: spacing.md,
 	},
 	header: {
@@ -403,7 +413,7 @@ const styles = StyleSheet.create({
 		flex: 1,
 	},
 	measurementInput: {
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 		flex: 1,
 		fontSize: 18,
 		fontWeight: "800",
@@ -411,8 +421,8 @@ const styles = StyleSheet.create({
 	},
 	measurementInputGroup: {
 		alignItems: "center",
-		backgroundColor: colors.light.surface,
-		borderColor: colors.light.border,
+		backgroundColor: themeColors.surface,
+		borderColor: themeColors.border,
 		borderRadius: 14,
 		borderWidth: 1,
 		flexDirection: "row",
@@ -420,28 +430,28 @@ const styles = StyleSheet.create({
 		padding: spacing.md,
 	},
 	measurementSuffix: {
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 		fontSize: 16,
 		fontWeight: "800",
 	},
 	notesCount: {
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 		fontSize: 12,
 		fontWeight: "700",
 	},
 	notesInput: {
-		backgroundColor: colors.light.surface,
-		borderColor: colors.light.border,
+		backgroundColor: themeColors.surface,
+		borderColor: themeColors.border,
 		borderRadius: 14,
 		borderWidth: 1,
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 		fontSize: 15,
 		minHeight: 96,
 		padding: spacing.md,
 	},
 	saveButton: {
 		alignItems: "center",
-		backgroundColor: colors.light.primary,
+		backgroundColor: themeColors.primary,
 		borderRadius: 16,
 		paddingVertical: 16,
 	},
@@ -449,7 +459,7 @@ const styles = StyleSheet.create({
 		opacity: 0.5,
 	},
 	saveButtonText: {
-		color: colors.light.surface,
+		color: themeColors.surface,
 		fontSize: 16,
 		fontWeight: "800",
 	},
@@ -457,8 +467,9 @@ const styles = StyleSheet.create({
 		gap: spacing.sm,
 	},
 	sectionLabel: {
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 		fontSize: 15,
 		fontWeight: "800",
 	},
 });
+}

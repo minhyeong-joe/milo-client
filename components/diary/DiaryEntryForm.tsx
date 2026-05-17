@@ -36,7 +36,8 @@ import {
 	isDiaryVideoContentType,
 	type DiaryMediaContentType,
 } from "@/services/diary/diaryMediaConfig";
-import { colors, globalStyles, spacing, typography } from "@/styles/globalStyles";
+import { spacing, typography, type ThemeColors } from "@/styles/globalStyles";
+import { useAppTheme } from "@/context/AppPreferencesContext";
 
 const MAX_CONTENT_LENGTH = 500;
 const MAX_TITLE_LENGTH = 80;
@@ -102,6 +103,13 @@ type DiaryEntryFormProps = {
 	availableTags: DiaryTag[];
 };
 
+function useThemeStyles() {
+	const { globalStyles, themeColors } = useAppTheme();
+	const styles = useMemo(() => createStyles(themeColors), [themeColors]);
+
+	return { globalStyles, styles, themeColors };
+}
+
 export function DiaryEntryForm({
 	babyId,
 	error,
@@ -121,6 +129,7 @@ export function DiaryEntryForm({
 	timeZone,
 	availableTags,
 }: DiaryEntryFormProps) {
+	const { globalStyles, themeColors, styles } = useThemeStyles();
 	const insets = useSafeAreaInsets();
 	const scrollViewRef = useRef<ScrollView | null>(null);
 	const tagsCardYRef = useRef(0);
@@ -475,7 +484,7 @@ export function DiaryEntryForm({
 						onPress={() => setShowDatePicker(true)}
 						style={styles.dateButton}
 					>
-						<Ionicons color={colors.light.primary} name="calendar-outline" size={20} />
+						<Ionicons color={themeColors.primary} name="calendar-outline" size={20} />
 						<Text style={styles.dateText}>{formatDisplayDate(date, timeZone)}</Text>
 					</Pressable>
 					{showDatePicker ? (
@@ -500,7 +509,7 @@ export function DiaryEntryForm({
 						maxLength={MAX_TITLE_LENGTH}
 						onChangeText={setTitle}
 						placeholder="Give this memory a title"
-						placeholderTextColor={colors.light.textSecondary}
+						placeholderTextColor={themeColors.textSecondary}
 						style={styles.titleInput}
 						value={title}
 					/>
@@ -518,7 +527,7 @@ export function DiaryEntryForm({
 						multiline
 						onChangeText={setContent}
 						placeholder="Capture a tiny moment from today."
-						placeholderTextColor={colors.light.textSecondary}
+						placeholderTextColor={themeColors.textSecondary}
 						style={styles.textInput}
 						textAlignVertical="top"
 						value={content}
@@ -532,7 +541,7 @@ export function DiaryEntryForm({
 						onPress={addMedia}
 						style={styles.mediaPlaceholder}
 					>
-						<Ionicons color={colors.light.textSecondary} name="image-outline" size={24} />
+						<Ionicons color={themeColors.textSecondary} name="image-outline" size={24} />
 						<Text style={styles.helperText}>
 							{isUploadingMedia ? "Uploading..." : "Add Photo or Video"}
 						</Text>
@@ -587,7 +596,7 @@ export function DiaryEntryForm({
 										style={styles.selectedTag}
 									>
 										<DiaryTagPill tag={tag} />
-										<Ionicons color={colors.light.textSecondary} name="close-circle" size={16} />
+										<Ionicons color={themeColors.textSecondary} name="close-circle" size={16} />
 									</Pressable>
 								))}
 						</View>
@@ -620,7 +629,7 @@ export function DiaryEntryForm({
 					</View>
 
 					<View style={styles.tagInputRow}>
-						<Ionicons color={colors.light.textSecondary} name="search-outline" size={18} />
+						<Ionicons color={themeColors.textSecondary} name="search-outline" size={18} />
 						<TextInput
 							autoCapitalize="words"
 							onChangeText={setTagInput}
@@ -629,7 +638,7 @@ export function DiaryEntryForm({
 								scrollTagsIntoViewAfterKeyboard();
 							}}
 							placeholder="Search or create a tag"
-							placeholderTextColor={colors.light.textSecondary}
+							placeholderTextColor={themeColors.textSecondary}
 							style={styles.tagInput}
 							value={tagInput}
 						/>
@@ -659,7 +668,7 @@ export function DiaryEntryForm({
 								onPress={handleCreateTag}
 								style={styles.createTagButton}
 							>
-								<Ionicons color={colors.light.primary} name="add-circle-outline" size={18} />
+								<Ionicons color={themeColors.primary} name="add-circle-outline" size={18} />
 								<Text style={styles.createTagText}>
 									{isCreatingTag ? "Creating..." : `Create "${trimmedTagInput}"`}
 								</Text>
@@ -676,7 +685,7 @@ export function DiaryEntryForm({
 								{isTagPoolExpanded ? "Show less" : "Show more"}
 							</Text>
 							<Ionicons
-								color={colors.light.primary}
+								color={themeColors.primary}
 								name={isTagPoolExpanded ? "chevron-up" : "chevron-down"}
 								size={16}
 							/>
@@ -976,18 +985,19 @@ function toDateKey(date: Date) {
 	return `${year}-${month}-${day}`;
 }
 
-const styles = StyleSheet.create({
+function createStyles(themeColors: ThemeColors) {
+	return StyleSheet.create({
 	content: {
 		paddingHorizontal: spacing.md,
 		paddingTop: spacing.md,
 	},
 	countText: {
 		...typography.caption,
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 	},
 	createTagButton: {
 		alignItems: "center",
-		borderColor: colors.light.border,
+		borderColor: themeColors.border,
 		borderRadius: 12,
 		borderWidth: 1,
 		flexDirection: "row",
@@ -996,11 +1006,11 @@ const styles = StyleSheet.create({
 	},
 	createTagText: {
 		...typography.caption,
-		color: colors.light.primary,
+		color: themeColors.primary,
 	},
 	dateButton: {
 		alignItems: "center",
-		borderColor: colors.light.border,
+		borderColor: themeColors.border,
 		borderRadius: 12,
 		borderWidth: 1,
 		flexDirection: "row",
@@ -1010,7 +1020,7 @@ const styles = StyleSheet.create({
 	},
 	dateText: {
 		...typography.body,
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 		fontWeight: "700",
 	},
 	disabledButton: {
@@ -1018,7 +1028,7 @@ const styles = StyleSheet.create({
 	},
 	errorText: {
 		...typography.caption,
-		color: colors.light.error,
+		color: themeColors.error,
 	},
 	footerButton: {
 		alignItems: "center",
@@ -1032,7 +1042,7 @@ const styles = StyleSheet.create({
 	},
 	helperText: {
 		...typography.caption,
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 		lineHeight: 18,
 	},
 	keyboardView: {
@@ -1040,7 +1050,7 @@ const styles = StyleSheet.create({
 	},
 	label: {
 		...typography.label,
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 	},
 	labelRow: {
 		alignItems: "center",
@@ -1049,7 +1059,7 @@ const styles = StyleSheet.create({
 	},
 	mediaPlaceholder: {
 		alignItems: "center",
-		borderColor: colors.light.border,
+		borderColor: themeColors.border,
 		borderRadius: 12,
 		borderStyle: "dashed",
 		borderWidth: 1,
@@ -1058,24 +1068,24 @@ const styles = StyleSheet.create({
 		padding: spacing.lg,
 	},
 	primaryButton: {
-		backgroundColor: colors.light.primary,
+		backgroundColor: themeColors.primary,
 	},
 	primaryButtonText: {
 		...typography.label,
-		color: colors.light.surface,
+		color: themeColors.surface,
 	},
 	secondaryButton: {
-		backgroundColor: colors.light.surface,
-		borderColor: colors.light.border,
+		backgroundColor: themeColors.surface,
+		borderColor: themeColors.border,
 		borderWidth: 1,
 	},
 	secondaryButtonText: {
 		...typography.label,
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 	},
 	selectedTag: {
 		alignItems: "center",
-		borderColor: colors.light.border,
+		borderColor: themeColors.border,
 		borderRadius: 999,
 		borderWidth: 1,
 		flexDirection: "row",
@@ -1099,7 +1109,7 @@ const styles = StyleSheet.create({
 	},
 	showMoreTagsText: {
 		...typography.caption,
-		color: colors.light.primary,
+		color: themeColors.primary,
 		fontWeight: "800",
 	},
 	suggestionList: {
@@ -1118,13 +1128,13 @@ const styles = StyleSheet.create({
 	},
 	tagInput: {
 		...typography.body,
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 		flex: 1,
 		paddingVertical: 0,
 	},
 	tagInputRow: {
 		alignItems: "center",
-		borderColor: colors.light.border,
+		borderColor: themeColors.border,
 		borderRadius: 12,
 		borderWidth: 1,
 		flexDirection: "row",
@@ -1150,30 +1160,30 @@ const styles = StyleSheet.create({
 	},
 	textInput: {
 		...typography.body,
-		borderColor: colors.light.border,
+		borderColor: themeColors.border,
 		borderRadius: 12,
 		borderWidth: 1,
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 		marginTop: spacing.sm,
 		minHeight: 150,
 		padding: spacing.md,
 	},
 	titleInput: {
 		...typography.body,
-		borderColor: colors.light.border,
+		borderColor: themeColors.border,
 		borderRadius: 12,
 		borderWidth: 1,
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 		marginTop: spacing.sm,
 		padding: spacing.md,
 	},
 	uploadProgressFill: {
-		backgroundColor: colors.light.primary,
+		backgroundColor: themeColors.primary,
 		borderRadius: 999,
 		height: "100%",
 	},
 	uploadProgressTrack: {
-		backgroundColor: colors.light.border,
+		backgroundColor: themeColors.border,
 		borderRadius: 999,
 		height: 6,
 		overflow: "hidden",
@@ -1184,3 +1194,4 @@ const styles = StyleSheet.create({
 		marginTop: spacing.md,
 	},
 });
+}

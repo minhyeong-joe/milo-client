@@ -1,7 +1,7 @@
-import type { RoutineStyle } from "@/data/homeData";
+import { routineConfig, type RoutineConfig, type RoutineKind } from "@/data/homeData";
 import { Ionicons } from "@expo/vector-icons";
 import { Image, StyleSheet, View } from "react-native";
-import { type RoutineKind, routineConfig, type RoutineConfig } from "@/data/homeData";
+
 
 export function RoutineIcon({
 	size,

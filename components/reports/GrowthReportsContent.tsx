@@ -1,10 +1,19 @@
+import { useMemo } from "react";
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View, Pressable } from "react-native";
-import { colors, globalStyles, spacing } from "@/styles/globalStyles";
+import { spacing, type ThemeColors } from "@/styles/globalStyles";
+import { useAppTheme } from "@/context/AppPreferencesContext";
 import { useBabySelection } from "@/context/BabySelectionContext";
 import { type GrowthRecord } from "@/services/api/growth";
 import GrowthChartCard from "./GrowthChartCard";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+
+function useThemeStyles() {
+	const { globalStyles, themeColors } = useAppTheme();
+	const styles = useMemo(() => createStyles(themeColors), [themeColors]);
+
+	return { globalStyles, styles, themeColors };
+}
 
 export default function GrowthReportsContent({
     isLoading,
@@ -24,6 +33,7 @@ export default function GrowthReportsContent({
     weightUnit: "kg" | "lb";
 }) {
     const router = useRouter();
+    const { globalStyles, themeColors, styles } = useThemeStyles();
 
     if (!selectedBaby) {
         return (
@@ -39,7 +49,7 @@ export default function GrowthReportsContent({
     if (isLoading && records.length === 0) {
         return (
             <View style={styles.loadingContainer}>
-                <ActivityIndicator color={colors.light.primary} />
+                <ActivityIndicator color={themeColors.primary} />
                 <Text style={globalStyles.bodyText}>Loading growth records...</Text>
             </View>
         );
@@ -51,7 +61,7 @@ export default function GrowthReportsContent({
             refreshControl={
                 <RefreshControl
                     refreshing={isRefreshing}
-                    tintColor={colors.light.primary}
+                    tintColor={themeColors.primary}
                     onRefresh={() => void onRefresh()}
                 />
             }
@@ -97,7 +107,8 @@ export default function GrowthReportsContent({
     );
 }
 
-const styles = StyleSheet.create({
+function createStyles(themeColors: ThemeColors) {
+	return StyleSheet.create({
     loadingContainer: {
         alignItems: "center",
         flex: 1,
@@ -106,15 +117,16 @@ const styles = StyleSheet.create({
     },
 	profileActionButton: {
 		alignItems: "center",
-		backgroundColor: colors.light.primary,
+		backgroundColor: themeColors.primary,
 		borderRadius: 12,
 		paddingVertical: 14,
 		width: "100%",
         marginTop: spacing.md,
 	},
 	profileActionText: {
-		color: colors.light.surface,
+		color: themeColors.surface,
 		fontSize: 15,
 		fontWeight: "800",
 	},
 });
+}

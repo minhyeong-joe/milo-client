@@ -1,15 +1,15 @@
 import { ConfirmDeleteModal } from "@/components/routine/ConfirmDeleteModal";
-import { useAppPreferences, useTimelineTimeZone } from "@/context/AppPreferencesContext";
+import { useAppPreferences, useTimelineTimeZone , useAppTheme } from "@/context/AppPreferencesContext";
 import { useBabySelection } from "@/context/BabySelectionContext";
 import type { MealEvent, MealType } from "@/data/homeData";
 import { routineConfig } from "@/data/homeData";
 import { useRoutineData } from "@/context/RoutineDataContext";
-import { colors, globalStyles, spacing } from "@/styles/globalStyles";
+import { spacing, type ThemeColors } from "@/styles/globalStyles";
 import { formatClockTime, formatOzInput, mlToOz, ozToMl } from "@/utils/routineDisplay";
 import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import {
 	KeyboardAvoidingView,
 	Platform,
@@ -48,8 +48,16 @@ function formatDate(value: Date, timeZone?: string) {
 	}).format(value);
 }
 
+function useThemeStyles() {
+	const { globalStyles, themeColors } = useAppTheme();
+	const styles = useMemo(() => createStyles(themeColors), [themeColors]);
+
+	return { globalStyles, styles, themeColors };
+}
+
 export default function AddMealScreen() {
 	const router = useRouter();
+	const { globalStyles, themeColors, styles } = useThemeStyles();
 	const { mealId } = useLocalSearchParams<{ mealId?: string }>();
 	const { selectedBaby } = useBabySelection();
 	const { addMeal, dailyLogs, getLatestMeal, updateMeal, removeMeal } = useRoutineData();
@@ -268,7 +276,7 @@ export default function AddMealScreen() {
 							onPress={() => setActivePicker("date")}
 							style={styles.dateTimeField}
 						>
-							<Ionicons color={colors.light.textSecondary} name="calendar-outline" size={20} />
+							<Ionicons color={themeColors.textSecondary} name="calendar-outline" size={20} />
 							<View>
 								<Text style={styles.dateTimeValue}>{formatDate(mealTime, timelineTimeZone)}</Text>
 								<Text style={styles.dateTimeHint}>Date</Text>
@@ -279,7 +287,7 @@ export default function AddMealScreen() {
 							onPress={() => setActivePicker("time")}
 							style={styles.dateTimeField}
 						>
-							<Ionicons color={colors.light.textSecondary} name="time-outline" size={20} />
+							<Ionicons color={themeColors.textSecondary} name="time-outline" size={20} />
 							<View>
 								<Text style={styles.dateTimeValue}>{formatClockTime(mealTime.toISOString(), timelineTimeZone)}</Text>
 								<Text style={styles.dateTimeHint}>Time</Text>
@@ -446,7 +454,7 @@ export default function AddMealScreen() {
 							multiline
 							onChangeText={setNotes}
 							placeholder="Optional notes..."
-							placeholderTextColor={colors.light.textSecondary}
+							placeholderTextColor={themeColors.textSecondary}
 							style={styles.notesInput}
 							textAlignVertical="top"
 							value={notes}
@@ -487,9 +495,10 @@ function StepperButton({
 	icon: "add" | "remove";
 	onPress: () => void;
 }) {
+	const { themeColors, styles } = useThemeStyles();
 	return (
 		<Pressable accessibilityRole="button" onPress={onPress} style={styles.stepperButton}>
-			<Ionicons color={colors.light.primary} name={icon} size={22} />
+			<Ionicons color={themeColors.primary} name={icon} size={22} />
 		</Pressable>
 	);
 }
@@ -503,6 +512,7 @@ function SolidModeButton({
 	label: string;
 	onPress: () => void;
 }) {
+	const { styles } = useThemeStyles();
 	return (
 		<Pressable
 			accessibilityRole="button"
@@ -532,6 +542,7 @@ function StepperNumberInput({
 	suffix: string;
 	value: string;
 }) {
+	const { themeColors, styles } = useThemeStyles();
 	return (
 		<View style={styles.stepperInputGroup}>
 			<TextInput
@@ -545,7 +556,7 @@ function StepperNumberInput({
 					)
 				}
 				placeholder="0"
-				placeholderTextColor={colors.light.textSecondary}
+				placeholderTextColor={themeColors.textSecondary}
 				selectTextOnFocus
 				style={styles.stepperInput}
 				value={value}
@@ -555,7 +566,8 @@ function StepperNumberInput({
 	);
 }
 
-const styles = StyleSheet.create({
+function createStyles(themeColors: ThemeColors) {
+	return StyleSheet.create({
 	amountHeaderRow: {
 		alignItems: "center",
 		flexDirection: "row",
@@ -563,7 +575,7 @@ const styles = StyleSheet.create({
 		justifyContent: "space-between",
 	},
 	cancelText: {
-		color: colors.light.primary,
+		color: themeColors.primary,
 		fontSize: 15,
 		fontWeight: "700",
 	},
@@ -573,7 +585,7 @@ const styles = StyleSheet.create({
 		paddingBottom: spacing.xl,
 	},
 	footer: {
-		backgroundColor: colors.light.background,
+		backgroundColor: themeColors.background,
 		padding: spacing.md,
 	},
 	header: {
@@ -588,7 +600,7 @@ const styles = StyleSheet.create({
 		paddingVertical: spacing.sm,
 	},
 	deleteIcon: {
-		color: colors.light.error,
+		color: themeColors.error,
 		alignSelf: "flex-end",
 	},
 	headerSpacer: {
@@ -603,30 +615,30 @@ const styles = StyleSheet.create({
 		flex: 1,
 	},
 	notesCount: {
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 		fontSize: 12,
 		fontWeight: "700",
 	},
 	notesInput: {
-		backgroundColor: colors.light.surface,
-		borderColor: colors.light.border,
+		backgroundColor: themeColors.surface,
+		borderColor: themeColors.border,
 		borderRadius: 14,
 		borderWidth: 1,
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 		fontSize: 15,
 		minHeight: 96,
 		padding: spacing.md,
 	},
 	dateTimeHint: {
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 		fontSize: 12,
 		fontWeight: "600",
 		marginTop: 2,
 	},
 	dateTimeField: {
 		alignItems: "center",
-		backgroundColor: colors.light.surface,
-		borderColor: colors.light.border,
+		backgroundColor: themeColors.surface,
+		borderColor: themeColors.border,
 		borderRadius: 14,
 		borderWidth: 1,
 		flexDirection: "row",
@@ -634,13 +646,13 @@ const styles = StyleSheet.create({
 		padding: spacing.md,
 	},
 	dateTimeValue: {
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 		fontSize: 16,
 		fontWeight: "800",
 	},
 	saveButton: {
 		alignItems: "center",
-		backgroundColor: colors.light.primary,
+		backgroundColor: themeColors.primary,
 		borderRadius: 16,
 		paddingVertical: 16,
 	},
@@ -648,12 +660,12 @@ const styles = StyleSheet.create({
 		opacity: 0.5,
 	},
 	saveButtonText: {
-		color: colors.light.surface,
+		color: themeColors.surface,
 		fontSize: 16,
 		fontWeight: "800",
 	},
 	errorText: {
-		color: colors.light.error,
+		color: themeColors.error,
 		fontSize: 13,
 		fontWeight: "700",
 		marginBottom: spacing.sm,
@@ -662,13 +674,13 @@ const styles = StyleSheet.create({
 		gap: spacing.sm,
 	},
 	sectionLabel: {
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 		fontSize: 15,
 		fontWeight: "800",
 	},
 	segmentButton: {
 		alignItems: "center",
-		borderColor: colors.light.border,
+		borderColor: themeColors.border,
 		borderRadius: 14,
 		borderWidth: 1,
 		flexBasis: "48%",
@@ -685,7 +697,7 @@ const styles = StyleSheet.create({
 		gap: spacing.sm,
 	},
 	segmentText: {
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 		fontSize: 14,
 		fontWeight: "700",
 		textAlign: "center",
@@ -704,8 +716,8 @@ const styles = StyleSheet.create({
 		backgroundColor: routineConfig.quickActions.meal.accentColor,
 	},
 	solidModeControl: {
-		backgroundColor: colors.light.background,
-		borderColor: colors.light.border,
+		backgroundColor: themeColors.background,
+		borderColor: themeColors.border,
 		borderRadius: 12,
 		borderWidth: 1,
 		flexDirection: "row",
@@ -713,17 +725,17 @@ const styles = StyleSheet.create({
 		padding: 3,
 	},
 	solidModeText: {
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 		fontSize: 13,
 		fontWeight: "800",
 	},
 	solidModeTextSelected: {
-		color: colors.light.surface,
+		color: themeColors.surface,
 	},
 	stepperButton: {
 		alignItems: "center",
-		backgroundColor: colors.light.surface,
-		borderColor: colors.light.border,
+		backgroundColor: themeColors.surface,
+		borderColor: themeColors.border,
 		borderRadius: 14,
 		borderWidth: 1,
 		height: 48,
@@ -732,8 +744,8 @@ const styles = StyleSheet.create({
 	},
 	stepperRow: {
 		alignItems: "center",
-		backgroundColor: colors.light.surface,
-		borderColor: colors.light.border,
+		backgroundColor: themeColors.surface,
+		borderColor: themeColors.border,
 		borderRadius: 16,
 		borderWidth: 1,
 		flexDirection: "row",
@@ -748,7 +760,7 @@ const styles = StyleSheet.create({
 		minWidth: 112,
 	},
 	stepperInput: {
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 		fontSize: 20,
 		fontWeight: "800",
 		minWidth: 48,
@@ -756,11 +768,12 @@ const styles = StyleSheet.create({
 		textAlign: "center",
 	},
 	stepperSuffix: {
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 		fontSize: 20,
 		fontWeight: "800",
 	},
 });
+}
 
 function normalizePositiveInteger(value: string, fallback: number) {
 	const parsed = Number.parseInt(value, 10);

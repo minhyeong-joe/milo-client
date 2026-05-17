@@ -1,5 +1,5 @@
 import { SyncStatusCard } from "@/components/sync/SyncStatusCard";
-import { useAppPreferences, useTimelineTimeZone } from "@/context/AppPreferencesContext";
+import { useAppPreferences, useTimelineTimeZone , useAppTheme } from "@/context/AppPreferencesContext";
 import { useAuthSession } from "@/context/AuthSessionContext";
 import { useBabySelection } from "@/context/BabySelectionContext";
 import { useGrowthData } from "@/context/GrowthDataContext";
@@ -16,7 +16,7 @@ import {
 	loadCachedRoutineStats,
 	saveRoutineStatsCache,
 } from "@/services/routine/routineStatsCacheStore";
-import { colors, globalStyles, spacing, typography } from "@/styles/globalStyles";
+import { spacing, typography, type ThemeColors } from "@/styles/globalStyles";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
 	Pressable,
@@ -37,7 +37,15 @@ const PRESET_PATTERN_RANGE_DAYS: Record<Exclude<PatternRangeMode, "custom">, num
 };
 const REPORT_SYNC_TIMEOUT_MS = 10000;
 
+function useThemeStyles() {
+	const { globalStyles, themeColors } = useAppTheme();
+	const styles = useMemo(() => createStyles(themeColors), [themeColors]);
+
+	return { globalStyles, styles, themeColors };
+}
+
 export default function ReportsScreen() {
+	const { globalStyles, styles } = useThemeStyles();
 	const { selectedBaby } = useBabySelection();
 	const timelineTimeZone = useTimelineTimeZone(selectedBaby);
 	const { session } = useAuthSession();
@@ -692,6 +700,7 @@ function TabButton({
 	label: string;
 	onPress: () => void;
 }) {
+	const { styles } = useThemeStyles();
 	return (
 		<Pressable
 			style={[styles.tabButton, isSelected && styles.tabButtonSelected]}
@@ -870,9 +879,10 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number) {
 	});
 }
 
-const styles = StyleSheet.create({
+function createStyles(themeColors: ThemeColors) {
+	return StyleSheet.create({
 	segmentedControl: {
-		backgroundColor: "#ECEEF5",
+		backgroundColor: themeColors.border,
 		borderRadius: 14,
 		flexDirection: "row",
 		gap: spacing.xs,
@@ -886,13 +896,14 @@ const styles = StyleSheet.create({
 		paddingVertical: spacing.sm,
 	},
 	tabButtonSelected: {
-		backgroundColor: colors.light.surface,
+		backgroundColor: themeColors.surface,
 	},
 	tabButtonText: {
 		...typography.label,
-		color: colors.light.textSecondary,
+		color: themeColors.textSecondary,
 	},
 	tabButtonTextSelected: {
-		color: colors.light.textPrimary,
+		color: themeColors.textPrimary,
 	}
 });
+}
