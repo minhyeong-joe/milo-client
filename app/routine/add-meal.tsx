@@ -47,8 +47,8 @@ function isBottleMeal(type: MealType) {
 	return type === "breastMilk" || type === "formula";
 }
 
-function formatDate(value: Date, timeZone?: string) {
-	return new Intl.DateTimeFormat("en-US", {
+function formatDate(value: Date, timeZone?: string, locale = "en-US") {
+	return new Intl.DateTimeFormat(locale, {
 		day: "numeric",
 		month: "short",
 		timeZone,
@@ -70,6 +70,7 @@ export default function AddMealScreen() {
 	const { selectedBaby } = useBabySelection();
 	const { addMeal, dailyLogs, updateMeal, removeMeal } = useRoutineData();
 	const {
+		languagePreference,
 		preferredSolidFoodUnit,
 		preferredVolumeUnit,
 		setPreferredSolidFoodUnit,
@@ -383,7 +384,9 @@ export default function AddMealScreen() {
 						>
 							<Ionicons color={themeColors.textSecondary} name="calendar-outline" size={20} />
 							<View>
-								<Text style={styles.dateTimeValue}>{formatDate(mealTime, timelineTimeZone)}</Text>
+								<Text style={styles.dateTimeValue}>
+									{formatDate(mealTime, timelineTimeZone, languagePreference)}
+								</Text>
 								<Text style={styles.dateTimeHint}>Date</Text>
 							</View>
 						</Pressable>
@@ -394,7 +397,9 @@ export default function AddMealScreen() {
 						>
 							<Ionicons color={themeColors.textSecondary} name="time-outline" size={20} />
 							<View>
-								<Text style={styles.dateTimeValue}>{formatClockTime(mealTime.toISOString(), timelineTimeZone)}</Text>
+								<Text style={styles.dateTimeValue}>
+									{formatClockTime(mealTime.toISOString(), timelineTimeZone, languagePreference)}
+								</Text>
 								<Text style={styles.dateTimeHint}>Time</Text>
 							</View>
 						</Pressable>

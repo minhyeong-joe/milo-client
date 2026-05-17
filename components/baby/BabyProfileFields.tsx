@@ -1,4 +1,4 @@
-import { useAppTheme } from "@/context/AppPreferencesContext";
+import { useAppPreferences, useAppTheme } from "@/context/AppPreferencesContext";
 import { useMemo } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker, {
@@ -169,6 +169,7 @@ export function BabyBirthdateField({
 	value: Date;
 }) {
 	const { themeColors, styles } = useThemeStyles();
+	const { languagePreference } = useAppPreferences();
 	return (
 		<View style={styles.field}>
 			<Text style={styles.fieldLabel}>{label}</Text>
@@ -177,7 +178,9 @@ export function BabyBirthdateField({
 				onPress={onOpenPicker}
 				style={({ pressed }) => [styles.dateButton, pressed && styles.pressedButton]}
 			>
-				<Text style={styles.dateButtonText}>{formatBirthdate(value, timeZone)}</Text>
+				<Text style={styles.dateButtonText}>
+					{formatBirthdate(value, timeZone, languagePreference)}
+				</Text>
 				<Ionicons
 					color={themeColors.textSecondary}
 					name="calendar-outline"
@@ -267,8 +270,8 @@ export function formatBabyProfileDateKey(date: Date) {
 	return `${year}-${month}-${day}`;
 }
 
-export function formatBirthdate(date: Date, timeZone?: string) {
-	return new Intl.DateTimeFormat("en-US", {
+export function formatBirthdate(date: Date, timeZone?: string, locale = "en-US") {
+	return new Intl.DateTimeFormat(locale, {
 		day: "numeric",
 		month: "short",
 		timeZone,

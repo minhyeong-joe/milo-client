@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import type { RoutineConfig, RoutineEvent, RoutineStyle } from "@/data/homeData";
 import { type ThemeColors } from "@/styles/globalStyles";
-import { useAppTheme } from "@/context/AppPreferencesContext";
+import { useAppPreferences, useAppTheme } from "@/context/AppPreferencesContext";
 import {
 	formatClockTime,
 	formatDuration,
@@ -79,6 +79,7 @@ export function TimelineRow({
 	timeZone?: string;
 }) {
 	const { globalStyles, themeColors, styles } = useThemeStyles();
+	const { languagePreference } = useAppPreferences();
 	const display = getEventDisplay(event, config, currentTime);
 	const isSleep = event.kind === "sleep";
 
@@ -105,10 +106,12 @@ export function TimelineRow({
 		<View style={styles.timelineRow}>
 			{isSleep ? (
 				<Text style={styles.timelineTime}>
-					{`${formatClockTime(event.startTime, timeZone)}\n ${event.endTime ? `- ${formatClockTime(event.endTime, timeZone)}` : "- Now"}`}
+					{`${formatClockTime(event.startTime, timeZone, languagePreference)}\n ${event.endTime ? `- ${formatClockTime(event.endTime, timeZone, languagePreference)}` : "- Now"}`}
 				</Text>
 			) : (
-				<Text style={styles.timelineTime}>{formatClockTime(event.time, timeZone)}</Text>
+				<Text style={styles.timelineTime}>
+					{formatClockTime(event.time, timeZone, languagePreference)}
+				</Text>
 			)}
 
 			<View style={styles.timelineRail}>

@@ -1,5 +1,5 @@
 import { ConfirmDeleteModal } from "@/components/routine/ConfirmDeleteModal";
-import { useTimelineTimeZone , useAppTheme } from "@/context/AppPreferencesContext";
+import { useAppPreferences, useTimelineTimeZone , useAppTheme } from "@/context/AppPreferencesContext";
 import { useBabySelection } from "@/context/BabySelectionContext";
 import { RoutineIcon } from "@/components/routine/RoutineIcon";
 import { useRoutineData } from "@/context/RoutineDataContext";
@@ -31,8 +31,8 @@ const NOTES_LIMIT = 100;
 const diaperTypes: DiaperType[] = ["wet", "dirty", "both", "dry"];
 const diaperColors: DiaperColor[] = ["green", "brown", "yellow", "black"];
 
-function formatDate(value: Date, timeZone?: string) {
-	return new Intl.DateTimeFormat("en-US", {
+function formatDate(value: Date, timeZone?: string, locale = "en-US") {
+	return new Intl.DateTimeFormat(locale, {
 		day: "numeric",
 		month: "short",
 		timeZone,
@@ -57,6 +57,7 @@ export default function AddDiaperScreen() {
 	const { diaperId } = useLocalSearchParams<{ diaperId?: string }>();
 	const { selectedBaby } = useBabySelection();
 	const { addDiaper, dailyLogs, getLatestDiaper, removeDiaper, updateDiaper } = useRoutineData();
+	const { languagePreference } = useAppPreferences();
 	const timelineTimeZone = useTimelineTimeZone(selectedBaby);
 	const diaperToEdit = dailyLogs
 		.flatMap((day) => day.timeline)
@@ -204,7 +205,9 @@ export default function AddDiaperScreen() {
 								size={20}
 							/>
 							<View>
-							<Text style={styles.dateTimeValue}>{formatDate(diaperTime, timelineTimeZone)}</Text>
+							<Text style={styles.dateTimeValue}>
+								{formatDate(diaperTime, timelineTimeZone, languagePreference)}
+							</Text>
 								<Text style={styles.dateTimeHint}>Date</Text>
 							</View>
 						</Pressable>
@@ -220,7 +223,7 @@ export default function AddDiaperScreen() {
 							/>
 							<View>
 								<Text style={styles.dateTimeValue}>
-									{formatClockTime(diaperTime.toISOString(), timelineTimeZone)}
+									{formatClockTime(diaperTime.toISOString(), timelineTimeZone, languagePreference)}
 								</Text>
 								<Text style={styles.dateTimeHint}>Time</Text>
 							</View>

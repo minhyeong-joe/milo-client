@@ -2,7 +2,7 @@ import { DiaryActionsModal } from "@/components/diary/DiaryActionsModal";
 import { DiaryHeroCarousel } from "@/components/diary/DiaryMediaPreview";
 import { DiaryTagPill } from "@/components/diary/DiaryTagPill";
 import { ConfirmDeleteModal } from "@/components/routine/ConfirmDeleteModal";
-import { useTimelineTimeZone , useAppTheme } from "@/context/AppPreferencesContext";
+import { useAppPreferences, useTimelineTimeZone , useAppTheme } from "@/context/AppPreferencesContext";
 import { useBabySelection } from "@/context/BabySelectionContext";
 import { useDiaryCache } from "@/context/DiaryCacheContext";
 import { useSync } from "@/context/SyncContext";
@@ -25,6 +25,7 @@ function useThemeStyles() {
 export default function DiaryDetailScreen() {
 	const router = useRouter();
 	const { globalStyles, themeColors, styles } = useThemeStyles();
+	const { languagePreference } = useAppPreferences();
 	const params = useLocalSearchParams<{ diaryId: string; entry?: string }>();
 	const { selectedBaby } = useBabySelection();
 	const timelineTimeZone = useTimelineTimeZone(selectedBaby);
@@ -117,11 +118,11 @@ export default function DiaryDetailScreen() {
 					style={styles.dateButton}
 				>
 					<Text style={styles.headerTitle}>
-						{entry ? formatHeaderDate(entry.diaryDate, timelineTimeZone) : "Diary"}
+						{entry ? formatHeaderDate(entry.diaryDate, timelineTimeZone, languagePreference) : "Diary"}
 					</Text>
 					{entry ? (
 						<Text style={styles.headerSubtitle}>
-							{formatHeaderSubtitle(entry.diaryDate, selectedBaby?.birthdate, timelineTimeZone)}
+							{formatHeaderSubtitle(entry.diaryDate, selectedBaby?.birthdate, timelineTimeZone, languagePreference)}
 						</Text>
 					) : null}
 				</Pressable>
@@ -211,9 +212,9 @@ export default function DiaryDetailScreen() {
 						{entry ? (
 							<>
 								<MetadataRow label="Created by" value={formatUser(entry.createdBy, entry.createdById)} />
-								<MetadataRow label="Created at" value={formatDateTime(entry.createdAt, timelineTimeZone)} />
+								<MetadataRow label="Created at" value={formatDateTime(entry.createdAt, timelineTimeZone, languagePreference)} />
 								<MetadataRow label="Modified by" value={formatUser(entry.updatedBy, entry.updatedById)} />
-								<MetadataRow label="Modified at" value={formatDateTime(entry.updatedAt, timelineTimeZone)} />
+								<MetadataRow label="Modified at" value={formatDateTime(entry.updatedAt, timelineTimeZone, languagePreference)} />
 							</>
 						) : null}
 					</Pressable>
@@ -257,24 +258,24 @@ function parseEntryParam(value: string | undefined) {
 	}
 }
 
-function formatDateTime(value: string, timeZone?: string) {
+function formatDateTime(value: string, timeZone?: string, locale = "en-US") {
 	const date = new Date(value);
 
 	if (Number.isNaN(date.getTime())) {
 		return value;
 	}
 
-	return new Intl.DateTimeFormat("en-US", {
+	return new Intl.DateTimeFormat(locale, {
 		dateStyle: "medium",
 		timeZone,
 		timeStyle: "short",
 	}).format(date);
 }
 
-function formatHeaderDate(dateKey: string, timeZone?: string) {
+function formatHeaderDate(dateKey: string, timeZone?: string, locale = "en-US") {
 	const [year, month, day] = dateKey.split("-").map(Number);
 	const date = new Date(year, month - 1, day);
-	return new Intl.DateTimeFormat("en-US", {
+	return new Intl.DateTimeFormat(locale, {
 		day: "numeric",
 		month: "long",
 		timeZone,
@@ -282,10 +283,10 @@ function formatHeaderDate(dateKey: string, timeZone?: string) {
 	}).format(date);
 }
 
-function formatHeaderSubtitle(dateKey: string, birthdate?: string, timeZone?: string) {
+function formatHeaderSubtitle(dateKey: string, birthdate?: string, timeZone?: string, locale = "en-US") {
 	const [year, month, day] = dateKey.split("-").map(Number);
 	const entryDate = new Date(year, month - 1, day);
-	const weekday = new Intl.DateTimeFormat("en-US", { timeZone, weekday: "long" }).format(entryDate);
+	const weekday = new Intl.DateTimeFormat(locale, { timeZone, weekday: "long" }).format(entryDate);
 	const ageLabel = birthdate ? formatBabyAge(birthdate, entryDate) : null;
 
 	return ageLabel ? `${weekday} · ${ageLabel} old` : weekday;

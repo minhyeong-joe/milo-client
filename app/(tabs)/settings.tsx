@@ -2,7 +2,7 @@ import { BabySelectorModal } from "@/components/baby/BabySelectorModal";
 import { SettingsGroup, SettingsRow } from "@/components/settings/SettingsRows";
 import { useBabySelection } from "@/context/BabySelectionContext";
 import { spacing, typography, type ThemeColors } from "@/styles/globalStyles";
-import { useAppTheme } from "@/context/AppPreferencesContext";
+import { useAppPreferences, useAppTheme } from "@/context/AppPreferencesContext";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useState, useMemo } from "react";
@@ -21,6 +21,7 @@ function useThemeStyles() {
 export default function SettingsScreen() {
 	const router = useRouter();
 	const { globalStyles, themeColors, styles } = useThemeStyles();
+	const { languagePreference } = useAppPreferences();
 	const { babies, selectBaby, selectedBaby } = useBabySelection();
 	const [isSelectorOpen, setIsSelectorOpen] = useState(false);
 
@@ -43,7 +44,7 @@ export default function SettingsScreen() {
 						<Text style={styles.babyName}>{selectedBaby?.name ?? "Baby Profile"}</Text>
 						<Text style={styles.profileSubtitle}>
 							{selectedBaby
-								? `Born ${formatBirthdate(selectedBaby.birthdate, selectedBaby.timezone)}\n${formatAge(selectedBaby.birthdate)} old`
+								? `Born ${formatBirthdate(selectedBaby.birthdate, selectedBaby.timezone, languagePreference)}\n${formatAge(selectedBaby.birthdate)} old`
 								: "Create or choose a baby profile"}
 						</Text>
 					</View>
@@ -128,9 +129,9 @@ export default function SettingsScreen() {
 	);
 }
 
-function formatBirthdate(dateKey: string, timeZone?: string) {
+function formatBirthdate(dateKey: string, timeZone?: string, locale = "en-US") {
 	const date = new Date(`${dateKey}T00:00:00`);
-	return new Intl.DateTimeFormat("en-US", {
+	return new Intl.DateTimeFormat(locale, {
 		day: "numeric",
 		month: "short",
 		timeZone,

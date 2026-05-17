@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { DiaryMediaPreview } from "@/components/diary/DiaryMediaPreview";
 import { DiaryTagPill } from "@/components/diary/DiaryTagPill";
 import type { DiaryEntry } from "@/services/api/diary";
+import type { LanguagePreference } from "@/data/languages";
 import { spacing, typography, type ThemeColors } from "@/styles/globalStyles";
 import { useAppTheme } from "@/context/AppPreferencesContext";
 
@@ -14,6 +15,7 @@ type DiaryEntryCardProps = {
 	onMorePress?: (entry: DiaryEntry) => void;
 	todayDate: string;
 	timeZone?: string;
+	locale?: LanguagePreference;
 };
 
 function useThemeStyles() {
@@ -27,6 +29,7 @@ export function DiaryEntryCard({
 	entry,
 	onMorePress,
 	onPress,
+	locale = "en-US",
 	timeZone,
 	todayDate,
 }: DiaryEntryCardProps) {
@@ -46,7 +49,7 @@ export function DiaryEntryCard({
 		>
 			<View style={styles.headerRow}>
 				<Text style={styles.dateText}>
-					{formatDateLabel(entry.diaryDate, timeZone)}
+					{formatDateLabel(entry.diaryDate, timeZone, locale)}
 					{entry.diaryDate === todayDate ? " · Today" : ""}
 				</Text>
 				<Pressable
@@ -114,10 +117,10 @@ function CardTextContent({ entry }: { entry: DiaryEntry }) {
 	);
 }
 
-function formatDateLabel(dateKey: string, timeZone?: string) {
+function formatDateLabel(dateKey: string, timeZone?: string, locale = "en-US") {
 	const [year, month, day] = dateKey.split("-").map(Number);
 	const date = new Date(year, month - 1, day);
-	return new Intl.DateTimeFormat("en-US", {
+	return new Intl.DateTimeFormat(locale, {
 		day: "numeric",
 		month: "short",
 		timeZone,

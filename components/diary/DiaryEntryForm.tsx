@@ -37,7 +37,7 @@ import {
 	type DiaryMediaContentType,
 } from "@/services/diary/diaryMediaConfig";
 import { spacing, typography, type ThemeColors } from "@/styles/globalStyles";
-import { useAppTheme } from "@/context/AppPreferencesContext";
+import { useAppPreferences, useAppTheme } from "@/context/AppPreferencesContext";
 
 const MAX_CONTENT_LENGTH = 500;
 const MAX_TITLE_LENGTH = 80;
@@ -130,6 +130,7 @@ export function DiaryEntryForm({
 	availableTags,
 }: DiaryEntryFormProps) {
 	const { globalStyles, themeColors, styles } = useThemeStyles();
+	const { languagePreference } = useAppPreferences();
 	const insets = useSafeAreaInsets();
 	const scrollViewRef = useRef<ScrollView | null>(null);
 	const tagsCardYRef = useRef(0);
@@ -485,7 +486,9 @@ export function DiaryEntryForm({
 						style={styles.dateButton}
 					>
 						<Ionicons color={themeColors.primary} name="calendar-outline" size={20} />
-						<Text style={styles.dateText}>{formatDisplayDate(date, timeZone)}</Text>
+						<Text style={styles.dateText}>
+							{formatDisplayDate(date, timeZone, languagePreference)}
+						</Text>
 					</Pressable>
 					{showDatePicker ? (
 						<DateTimePicker
@@ -722,8 +725,8 @@ export function DiaryEntryForm({
 	);
 }
 
-function formatDisplayDate(date: Date, timeZone?: string) {
-	return new Intl.DateTimeFormat("en-US", {
+function formatDisplayDate(date: Date, timeZone?: string, locale = "en-US") {
+	return new Intl.DateTimeFormat(locale, {
 		day: "numeric",
 		month: "long",
 		timeZone,

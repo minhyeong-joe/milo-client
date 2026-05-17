@@ -3,6 +3,7 @@ export type TimelineTimeZoneMode = "baby" | "device";
 export type TimeZoneOption = {
 	abbreviation: string;
 	label: string;
+	offsetLabel: string;
 	offsetMinutes: number;
 	timeZone: string;
 };
@@ -11,24 +12,31 @@ const FALLBACK_TIME_ZONE = "America/Los_Angeles";
 
 const TIME_ZONE_LABELS: Record<string, string> = {
 	"Africa/Johannesburg": "South Africa",
-	"America/Anchorage": "US Alaska",
+
+	"America/Anchorage": "Alaska",
 	"America/Chicago": "US Central",
 	"America/Denver": "US Mountain",
-	"America/Los_Angeles": "US West",
-	"America/New_York": "US East",
-	"America/Phoenix": "US Arizona",
+	"America/Los_Angeles": "US Pacific",
+	"America/New_York": "US Eastern",
+	"America/Phoenix": "Arizona",
+
 	"America/Sao_Paulo": "Brazil",
+
 	"Asia/Dubai": "UAE",
 	"Asia/Hong_Kong": "Hong Kong",
 	"Asia/Seoul": "Korea",
 	"Asia/Shanghai": "China",
 	"Asia/Singapore": "Singapore",
 	"Asia/Tokyo": "Japan",
-	"Australia/Sydney": "Australia East",
+
+	"Australia/Sydney": "Australia Eastern",
+
 	"Europe/Berlin": "Central Europe",
-	"Europe/London": "UK",
+	"Europe/London": "United Kingdom",
+
 	"Pacific/Auckland": "New Zealand",
-	"Pacific/Honolulu": "US Hawaii",
+	"Pacific/Honolulu": "Hawaii",
+
 	UTC: "UTC",
 };
 
@@ -93,7 +101,8 @@ function toTimeZoneOption(timeZone: string, date: Date): TimeZoneOption {
 
 	return {
 		abbreviation,
-		label: `${friendlyName} (${abbreviation} ${offsetLabel})`,
+		label: `${friendlyName} (${abbreviation})`,
+		offsetLabel,
 		offsetMinutes,
 		timeZone,
 	};

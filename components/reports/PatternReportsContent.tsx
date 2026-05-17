@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import type { PatternRangeMode } from "@/app/(tabs)/reports";
 import type { RoutineStatsResponse } from "@/services/api/routine";
 import { spacing, typography, type ThemeColors } from "@/styles/globalStyles";
-import { useAppTheme } from "@/context/AppPreferencesContext";
+import { useAppPreferences, useAppTheme } from "@/context/AppPreferencesContext";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker, { type DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import {
@@ -59,6 +59,7 @@ export default function PatternReportsContent({
 	timeZone?: string;
 }) {
 	const { globalStyles, themeColors, styles } = useThemeStyles();
+	const { languagePreference } = useAppPreferences();
 	const [showMeal, setShowMeal] = useState(true);
 	const [showDiaper, setShowDiaper] = useState(true);
 	const [showSleep, setShowSleep] = useState(true);
@@ -106,7 +107,9 @@ export default function PatternReportsContent({
 						style={styles.rangeLabelButton}
 						onPress={openCustomRangeModal}
 					>
-						<Text style={styles.rangeLabel}>{formatRangeLabel(startDate, endDate, timeZone)}</Text>
+						<Text style={styles.rangeLabel}>
+							{formatRangeLabel(startDate, endDate, timeZone, languagePreference)}
+						</Text>
 						<Ionicons
 							color={themeColors.textSecondary}
 							name="calendar-outline"
@@ -177,7 +180,7 @@ export default function PatternReportsContent({
 							{getSnapshotTitle(rangeMode)}
 						</Text>
 						<Text style={styles.summarySubtitle}>
-							{formatRangeLabel(startDate, endDate, timeZone)} - Based on days with entries
+							{formatRangeLabel(startDate, endDate, timeZone, languagePreference)} - Based on days with entries
 						</Text>
 					</View>
 				</View>
@@ -348,6 +351,7 @@ function DateField({
 	value: Date;
 }) {
 	const { themeColors, styles } = useThemeStyles();
+	const { languagePreference } = useAppPreferences();
 	return (
 		<Pressable
 			accessibilityRole="button"
@@ -356,7 +360,9 @@ function DateField({
 		>
 			<View>
 				<Text style={styles.dateFieldLabel}>{label}</Text>
-				<Text style={styles.dateFieldValue}>{formatFullDate(value, timeZone)}</Text>
+				<Text style={styles.dateFieldValue}>
+					{formatFullDate(value, timeZone, languagePreference)}
+				</Text>
 			</View>
 			<Ionicons
 				color={themeColors.textSecondary}
@@ -395,15 +401,15 @@ function getSnapshotTitle(rangeMode: PatternRangeMode) {
 	return "Weekly Snapshot";
 }
 
-function formatRangeLabel(startDate: string, endDate: string, timeZone?: string) {
+function formatRangeLabel(startDate: string, endDate: string, timeZone?: string, locale = "en-US") {
 	const start = parseDateKey(startDate);
 	const end = parseDateKey(endDate);
-	const startLabel = new Intl.DateTimeFormat("en-US", {
+	const startLabel = new Intl.DateTimeFormat(locale, {
 		month: "short",
 		day: "numeric",
 		timeZone,
 	}).format(start);
-	const endLabel = new Intl.DateTimeFormat("en-US", {
+	const endLabel = new Intl.DateTimeFormat(locale, {
 		month: "short",
 		day: "numeric",
 		timeZone,
@@ -413,8 +419,8 @@ function formatRangeLabel(startDate: string, endDate: string, timeZone?: string)
 	return `${startLabel} - ${endLabel}`;
 }
 
-function formatFullDate(value: Date, timeZone?: string) {
-	return new Intl.DateTimeFormat("en-US", {
+function formatFullDate(value: Date, timeZone?: string, locale = "en-US") {
+	return new Intl.DateTimeFormat(locale, {
 		day: "numeric",
 		month: "short",
 		timeZone,

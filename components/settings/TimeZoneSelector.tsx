@@ -105,7 +105,7 @@ export function TimeZoneSelector({
 									>
 										<View style={styles.optionText}>
 											<Text style={styles.optionLabel}>{item.label}</Text>
-											<Text style={styles.optionSubtext}>{item.timeZone}</Text>
+											<Text style={styles.optionSubtext}>{item.offsetLabel}</Text>
 										</View>
 										{isSelected ? (
 											<Ionicons
@@ -129,6 +129,7 @@ function createStyles(themeColors: ThemeColors) {
 	return StyleSheet.create({
 	field: {
 		gap: spacing.xs,
+		marginTop: spacing.md
 	},
 	fieldLabel: {
 		...typography.caption,

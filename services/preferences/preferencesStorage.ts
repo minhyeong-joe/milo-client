@@ -1,4 +1,8 @@
 import type { PreferredVolumeUnit } from "@/data/homeData";
+import {
+	isLanguagePreference,
+	type LanguagePreference,
+} from "@/data/languages";
 import type { TimelineTimeZoneMode } from "@/utils/timeZones";
 import { getDeviceTimeZone, normalizeTimeZone } from "@/utils/timeZones";
 import * as SecureStore from "expo-secure-store";
@@ -11,11 +15,13 @@ const DEFAULT_LENGTH_UNIT: PreferredLengthUnit = "cm";
 const DEFAULT_WEIGHT_UNIT: PreferredWeightUnit = "kg";
 const DEFAULT_TIMELINE_TIME_ZONE_MODE: TimelineTimeZoneMode = "baby";
 const DEFAULT_THEME_PREFERENCE: ThemePreference = "system";
+const DEFAULT_LANGUAGE: LanguagePreference = "en-US";
 
 export type PreferredSolidFoodUnit = "servings" | "grams";
 export type PreferredLengthUnit = "cm" | "in";
 export type PreferredWeightUnit = "kg" | "lb";
 export type ThemePreference = "system" | "light" | "dark";
+export type { LanguagePreference } from "@/data/languages";
 
 export type StoredPreferences = {
 	preferredVolumeUnit: PreferredVolumeUnit;
@@ -23,6 +29,7 @@ export type StoredPreferences = {
 	preferredLengthUnit: PreferredLengthUnit;
 	preferredWeightUnit: PreferredWeightUnit;
 	themePreference: ThemePreference;
+	languagePreference: LanguagePreference;
 	timelineTimeZone: string;
 	timelineTimeZoneMode: TimelineTimeZoneMode;
 };
@@ -53,6 +60,9 @@ export async function loadStoredPreferences(): Promise<StoredPreferences> {
 			themePreference: isThemePreference(parsed.themePreference)
 				? parsed.themePreference
 				: DEFAULT_THEME_PREFERENCE,
+			languagePreference: isLanguagePreference(parsed.languagePreference)
+				? parsed.languagePreference
+				: DEFAULT_LANGUAGE,
 			timelineTimeZone: normalizeTimeZone(parsed.timelineTimeZone),
 			timelineTimeZoneMode: isTimelineTimeZoneMode(parsed.timelineTimeZoneMode)
 				? parsed.timelineTimeZoneMode
@@ -75,6 +85,7 @@ function getDefaultPreferences(): StoredPreferences {
 		preferredLengthUnit: DEFAULT_LENGTH_UNIT,
 		preferredWeightUnit: DEFAULT_WEIGHT_UNIT,
 		themePreference: DEFAULT_THEME_PREFERENCE,
+		languagePreference: DEFAULT_LANGUAGE,
 		timelineTimeZone: getDeviceTimeZone(),
 		timelineTimeZoneMode: DEFAULT_TIMELINE_TIME_ZONE_MODE,
 	};

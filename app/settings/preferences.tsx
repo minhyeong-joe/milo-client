@@ -1,3 +1,4 @@
+import { LanguageSelector } from "@/components/settings/LanguageSelector";
 import { SettingsHeader } from "@/components/settings/SettingsRows";
 import { TimeZoneSelector } from "@/components/settings/TimeZoneSelector";
 import { useAppPreferences } from "@/context/AppPreferencesContext";
@@ -21,10 +22,12 @@ export default function AppPreferencesScreen() {
 		setPreferredVolumeUnit,
 		setPreferredWeightUnit,
 		setThemePreference,
+		setLanguagePreference,
 		setTimelineTimeZone,
 		setTimelineTimeZoneMode,
 		themeColors,
 		themePreference,
+		languagePreference,
 		timelineTimeZone,
 		timelineTimeZoneMode,
 	} = useAppPreferences();
@@ -83,7 +86,7 @@ export default function AppPreferencesScreen() {
 				<View style={globalStyles.card}>
 					<Text style={styles.sectionTitle}>App Preference</Text>
 					<PreferenceRow
-						helper="Follow the device, or pin Milo to one theme."
+						helper="Choose app appearance"
 						label="Theme"
 						styles={styles}
 					>
@@ -106,10 +109,11 @@ export default function AppPreferencesScreen() {
 							styles={styles}
 						/>
 					</PreferenceRow>
-					<PreferenceRow helper="Coming Soon" label="Language" styles={styles}>
-						<DisabledPill label="English" styles={styles} />
-						<DisabledPill label="Korean" styles={styles} />
-					</PreferenceRow>
+					<LanguageSelector
+						label="Language"
+						language={languagePreference}
+						onChange={(language) => void setLanguagePreference(language)}
+					/>
 					<PreferenceRow
 						helper={
 							timelineTimeZoneMode === "baby"
@@ -190,28 +194,12 @@ function SegmentButton({
 	);
 }
 
-function DisabledPill({ label, styles }: { label: string; styles: PreferencesStyles }) {
-	return (
-		<View style={[styles.segmentButton, styles.disabledPill]}>
-			<Text style={styles.disabledPillText}>{label}</Text>
-		</View>
-	);
-}
-
 function createStyles(themeColors: ThemeColors) {
 	return StyleSheet.create({
 		content: {
 			gap: spacing.md,
 			padding: spacing.md,
 			paddingBottom: spacing.xl,
-		},
-		disabledPill: {
-			opacity: 0.55,
-		},
-		disabledPillText: {
-			...typography.caption,
-			color: themeColors.textSecondary,
-			fontWeight: "800",
 		},
 		helper: {
 			...typography.caption,

@@ -8,6 +8,7 @@ import {
 	type PreferredWeightUnit,
 	type StoredPreferences,
 	type ThemePreference,
+	type LanguagePreference,
 } from "@/services/preferences/preferencesStorage";
 import {
 	createGlobalStyles,
@@ -37,6 +38,7 @@ type AppPreferencesContextValue = StoredPreferences & {
 	setPreferredVolumeUnit: (unit: PreferredVolumeUnit) => Promise<void>;
 	setPreferredWeightUnit: (unit: PreferredWeightUnit) => Promise<void>;
 	setThemePreference: (preference: ThemePreference) => Promise<void>;
+	setLanguagePreference: (prefernce: LanguagePreference) => Promise<void>;
 	setTimelineTimeZone: (timeZone: string) => Promise<void>;
 	setTimelineTimeZoneMode: (mode: TimelineTimeZoneMode) => Promise<void>;
 	themeColors: ThemeColors;
@@ -60,6 +62,8 @@ export function AppPreferencesProvider({ children }: { children: ReactNode }) {
 		useState<TimelineTimeZoneMode>("baby");
 	const [themePreference, setThemePreferenceState] =
 		useState<ThemePreference>("system");
+	const [languagePreference, setLanguagePreferenceState] =
+		useState<LanguagePreference>("en-US");
 	const [isReady, setIsReady] = useState(false);
 	const resolvedTheme: ResolvedTheme =
 		themePreference === "system"
@@ -87,6 +91,7 @@ export function AppPreferencesProvider({ children }: { children: ReactNode }) {
 			setPreferredLengthUnitState(storedPreferences.preferredLengthUnit);
 			setPreferredWeightUnitState(storedPreferences.preferredWeightUnit);
 			setThemePreferenceState(storedPreferences.themePreference);
+			setLanguagePreferenceState(storedPreferences.languagePreference);
 			setTimelineTimeZoneState(storedPreferences.timelineTimeZone);
 			setTimelineTimeZoneModeState(storedPreferences.timelineTimeZoneMode);
 			setIsReady(true);
@@ -107,10 +112,11 @@ export function AppPreferencesProvider({ children }: { children: ReactNode }) {
 			preferredVolumeUnit: unit,
 			preferredWeightUnit,
 			themePreference,
+			languagePreference,
 			timelineTimeZone,
 			timelineTimeZoneMode,
 		});
-	}, [preferredLengthUnit, preferredSolidFoodUnit, preferredWeightUnit, themePreference, timelineTimeZone, timelineTimeZoneMode]);
+	}, [preferredLengthUnit, preferredSolidFoodUnit, preferredWeightUnit, themePreference, languagePreference, timelineTimeZone, timelineTimeZoneMode]);
 
 	const setPreferredSolidFoodUnit = useCallback(async (unit: PreferredSolidFoodUnit) => {
 		setPreferredSolidFoodUnitState(unit);
@@ -120,10 +126,11 @@ export function AppPreferencesProvider({ children }: { children: ReactNode }) {
 			preferredVolumeUnit,
 			preferredWeightUnit,
 			themePreference,
+			languagePreference,
 			timelineTimeZone,
 			timelineTimeZoneMode,
 		});
-	}, [preferredLengthUnit, preferredVolumeUnit, preferredWeightUnit, themePreference, timelineTimeZone, timelineTimeZoneMode]);
+	}, [preferredLengthUnit, preferredVolumeUnit, preferredWeightUnit, themePreference, languagePreference, timelineTimeZone, timelineTimeZoneMode]);
 
 	const setPreferredLengthUnit = useCallback(async (unit: PreferredLengthUnit) => {
 		setPreferredLengthUnitState(unit);
@@ -133,10 +140,11 @@ export function AppPreferencesProvider({ children }: { children: ReactNode }) {
 			preferredVolumeUnit,
 			preferredWeightUnit,
 			themePreference,
+			languagePreference,
 			timelineTimeZone,
 			timelineTimeZoneMode,
 		});
-	}, [preferredSolidFoodUnit, preferredVolumeUnit, preferredWeightUnit, themePreference, timelineTimeZone, timelineTimeZoneMode]);
+	}, [preferredSolidFoodUnit, preferredVolumeUnit, preferredWeightUnit, themePreference, languagePreference, timelineTimeZone, timelineTimeZoneMode]);
 
 	const setPreferredWeightUnit = useCallback(async (unit: PreferredWeightUnit) => {
 		setPreferredWeightUnitState(unit);
@@ -146,10 +154,11 @@ export function AppPreferencesProvider({ children }: { children: ReactNode }) {
 			preferredVolumeUnit,
 			preferredWeightUnit: unit,
 			themePreference,
+			languagePreference,
 			timelineTimeZone,
 			timelineTimeZoneMode,
 		});
-	}, [preferredLengthUnit, preferredSolidFoodUnit, preferredVolumeUnit, themePreference, timelineTimeZone, timelineTimeZoneMode]);
+	}, [preferredLengthUnit, preferredSolidFoodUnit, preferredVolumeUnit, themePreference, languagePreference, timelineTimeZone, timelineTimeZoneMode]);
 
 	const setThemePreference = useCallback(async (preference: ThemePreference) => {
 		setThemePreferenceState(preference);
@@ -159,10 +168,25 @@ export function AppPreferencesProvider({ children }: { children: ReactNode }) {
 			preferredVolumeUnit,
 			preferredWeightUnit,
 			themePreference: preference,
+			languagePreference,
 			timelineTimeZone,
 			timelineTimeZoneMode,
 		});
-	}, [preferredLengthUnit, preferredSolidFoodUnit, preferredVolumeUnit, preferredWeightUnit, timelineTimeZone, timelineTimeZoneMode]);
+	}, [preferredLengthUnit, preferredSolidFoodUnit, preferredVolumeUnit, preferredWeightUnit, languagePreference, timelineTimeZone, timelineTimeZoneMode]);
+
+	const setLanguagePreference = useCallback(async (preference: LanguagePreference) => {
+		setLanguagePreferenceState(preference);
+		await saveStoredPreferences({
+			preferredLengthUnit,
+			preferredSolidFoodUnit,
+			preferredVolumeUnit,
+			preferredWeightUnit,
+			themePreference,
+			languagePreference: preference,
+			timelineTimeZone,
+			timelineTimeZoneMode,
+		});
+	}, [preferredLengthUnit, preferredSolidFoodUnit, preferredVolumeUnit, preferredWeightUnit, themePreference, timelineTimeZone, timelineTimeZoneMode]);
 
 	const setTimelineTimeZone = useCallback(async (timeZone: string) => {
 		const normalizedTimeZone = normalizeTimeZone(timeZone);
@@ -173,10 +197,11 @@ export function AppPreferencesProvider({ children }: { children: ReactNode }) {
 			preferredVolumeUnit,
 			preferredWeightUnit,
 			themePreference,
+			languagePreference, 
 			timelineTimeZone: normalizedTimeZone,
 			timelineTimeZoneMode,
 		});
-	}, [preferredLengthUnit, preferredSolidFoodUnit, preferredVolumeUnit, preferredWeightUnit, themePreference, timelineTimeZoneMode]);
+	}, [preferredLengthUnit, preferredSolidFoodUnit, preferredVolumeUnit, preferredWeightUnit, themePreference, languagePreference, timelineTimeZoneMode]);
 
 	const setTimelineTimeZoneMode = useCallback(async (mode: TimelineTimeZoneMode) => {
 		setTimelineTimeZoneModeState(mode);
@@ -186,10 +211,11 @@ export function AppPreferencesProvider({ children }: { children: ReactNode }) {
 			preferredVolumeUnit,
 			preferredWeightUnit,
 			themePreference,
+			languagePreference, 
 			timelineTimeZone,
 			timelineTimeZoneMode: mode,
 		});
-	}, [preferredLengthUnit, preferredSolidFoodUnit, preferredVolumeUnit, preferredWeightUnit, themePreference, timelineTimeZone]);
+	}, [preferredLengthUnit, preferredSolidFoodUnit, preferredVolumeUnit, preferredWeightUnit, themePreference, languagePreference, timelineTimeZone]);
 
 	const value = useMemo(
 		() => ({
@@ -201,10 +227,12 @@ export function AppPreferencesProvider({ children }: { children: ReactNode }) {
 			preferredWeightUnit,
 			resolvedTheme,
 			setThemePreference,
+			setLanguagePreference,
 			setTimelineTimeZone,
 			setTimelineTimeZoneMode,
 			themeColors,
 			themePreference,
+			languagePreference,
 			timelineTimeZone,
 			timelineTimeZoneMode,
 			setPreferredLengthUnit,
@@ -221,10 +249,12 @@ export function AppPreferencesProvider({ children }: { children: ReactNode }) {
 			preferredWeightUnit,
 			resolvedTheme,
 			setThemePreference,
+			setLanguagePreference,
 			setTimelineTimeZone,
 			setTimelineTimeZoneMode,
 			themeColors,
 			themePreference,
+			languagePreference,
 			setPreferredLengthUnit,
 			setPreferredSolidFoodUnit,
 			setPreferredVolumeUnit,

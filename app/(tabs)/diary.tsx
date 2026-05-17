@@ -2,7 +2,7 @@ import { DiaryEntryCard } from "@/components/diary/DiaryEntryCard";
 import { DiaryActionsModal } from "@/components/diary/DiaryActionsModal";
 import { DiaryTagPill } from "@/components/diary/DiaryTagPill";
 import { ConfirmDeleteModal } from "@/components/routine/ConfirmDeleteModal";
-import { useTimelineTimeZone , useAppTheme } from "@/context/AppPreferencesContext";
+import { useAppPreferences, useTimelineTimeZone , useAppTheme } from "@/context/AppPreferencesContext";
 import { useBabySelection } from "@/context/BabySelectionContext";
 import { useDiaryCache } from "@/context/DiaryCacheContext";
 import { useSync } from "@/context/SyncContext";
@@ -71,6 +71,7 @@ function useThemeStyles() {
 export default function DiaryScreen() {
 	const router = useRouter();
 	const { globalStyles, themeColors, styles } = useThemeStyles();
+	const { languagePreference } = useAppPreferences();
 	const { selectedBaby } = useBabySelection();
 	const timelineTimeZone = useTimelineTimeZone(selectedBaby);
 	const { connectionStatus, markOffline, markOnline } = useSync();
@@ -427,6 +428,7 @@ export default function DiaryScreen() {
 					{hasActiveFilters ? (
 						<ActiveFilterChips
 							filters={activeDiaryFilters}
+							locale={languagePreference}
 							onClearAll={() => {
 								setDebouncedSearchText("");
 								setFilters(emptyFilters);
@@ -500,6 +502,7 @@ export default function DiaryScreen() {
 						renderItem={({ item }) => (
 							<DiaryEntryCard
 								entry={item}
+								locale={languagePreference}
 								onMorePress={setActionEntry}
 								onPress={openEntry}
 								timeZone={timelineTimeZone}
@@ -545,6 +548,7 @@ export default function DiaryScreen() {
 				}}
 				onDraftChange={setDraftFilters}
 				onOpenDatePicker={setDatePickerTarget}
+				locale={languagePreference}
 				timeZone={timelineTimeZone}
 				visible={isFilterVisible}
 			/>
@@ -563,19 +567,21 @@ const DIARY_DELETE_OFFLINE_MESSAGE =
 
 function ActiveFilterChips({
 	filters,
+	locale,
 	onClearAll,
 	onRemove,
 	timeZone,
 	tags,
 }: {
 	filters: DiaryListFilters;
+	locale: string;
 	onClearAll: () => void;
 	onRemove: (key: ActiveFilterKey, value?: string) => void;
 	timeZone?: string;
 	tags: DiaryTag[];
 }) {
 	const { themeColors, styles } = useThemeStyles();
-	const chips = getActiveFilterChips(filters, tags, timeZone);
+	const chips = getActiveFilterChips(filters, tags, timeZone, locale);
 
 	if (chips.length === 0) {
 		return null;
@@ -616,6 +622,7 @@ function DiaryFilterModal({
 	onClose,
 	onDraftChange,
 	onOpenDatePicker,
+	locale,
 	timeZone,
 	visible,
 }: {
@@ -629,6 +636,7 @@ function DiaryFilterModal({
 	onClose: () => void;
 	onDraftChange: (filters: DiaryFilterState) => void;
 	onOpenDatePicker: (target: "start" | "end") => void;
+	locale: string;
 	timeZone?: string;
 	visible: boolean;
 }) {
@@ -659,12 +667,14 @@ function DiaryFilterModal({
 						<View style={styles.dateFilterRow}>
 							<DateFilterButton
 								label="From"
+								locale={locale}
 								onPress={() => onOpenDatePicker("start")}
 								timeZone={timeZone}
 								value={draftFilters.startDate}
 							/>
 							<DateFilterButton
 								label="To"
+								locale={locale}
 								onPress={() => onOpenDatePicker("end")}
 								timeZone={timeZone}
 								value={draftFilters.endDate}
@@ -794,11 +804,13 @@ function DiaryFilterModal({
 
 function DateFilterButton({
 	label,
+	locale,
 	onPress,
 	timeZone,
 	value,
 }: {
 	label: string;
+	locale: string;
 	onPress: () => void;
 	timeZone?: string;
 	value: string | null;
@@ -807,7 +819,9 @@ function DateFilterButton({
 	return (
 		<Pressable accessibilityRole="button" onPress={onPress} style={styles.dateFilterButton}>
 			<Text style={styles.helperText}>{label}</Text>
-			<Text style={styles.dateFilterText}>{value ? formatShortDate(value, timeZone) : "Any"}</Text>
+			<Text style={styles.dateFilterText}>
+				{value ? formatShortDate(value, timeZone, locale) : "Any"}
+			</Text>
 		</Pressable>
 	);
 }
@@ -977,16 +991,21 @@ function removeFilterValue(
 	return filters;
 }
 
-function getActiveFilterChips(filters: DiaryListFilters, tags: DiaryTag[], timeZone?: string) {
+function getActiveFilterChips(
+	filters: DiaryListFilters,
+	tags: DiaryTag[],
+	timeZone?: string,
+	locale = "en-US",
+) {
 	const tagById = new Map(tags.map((tag) => [tag.id, tag]));
 	const chips: { key: ActiveFilterKey; label: string; value?: string }[] = [];
 
 	if (filters.startDate) {
-		chips.push({ key: "startDate", label: `From ${formatShortDate(filters.startDate, timeZone)}` });
+		chips.push({ key: "startDate", label: `From ${formatShortDate(filters.startDate, timeZone, locale)}` });
 	}
 
 	if (filters.endDate) {
-		chips.push({ key: "endDate", label: `To ${formatShortDate(filters.endDate, timeZone)}` });
+		chips.push({ key: "endDate", label: `To ${formatShortDate(filters.endDate, timeZone, locale)}` });
 	}
 
 	if (filters.includeMedia === true) {
@@ -1041,14 +1060,14 @@ function toDateKey(date: Date) {
 	return `${year}-${month}-${day}`;
 }
 
-function formatShortDate(dateKey: string, timeZone?: string) {
+function formatShortDate(dateKey: string, timeZone?: string, locale = "en-US") {
 	const date = dateFromKey(dateKey);
 
 	if (!date) {
 		return dateKey;
 	}
 
-	return new Intl.DateTimeFormat("en-US", {
+	return new Intl.DateTimeFormat(locale, {
 		day: "numeric",
 		month: "short",
 		timeZone,

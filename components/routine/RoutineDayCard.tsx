@@ -1,6 +1,6 @@
 import type { RoutineConfig, RoutineDay } from "@/data/homeData";
 import { type ThemeColors } from "@/styles/globalStyles";
-import { useAppTheme } from "@/context/AppPreferencesContext";
+import { useAppPreferences, useAppTheme } from "@/context/AppPreferencesContext";
 import { formatDayLabel } from "@/utils/routineDisplay";
 import { Ionicons } from "@expo/vector-icons";
 import { useState, useMemo } from "react";
@@ -32,10 +32,11 @@ export function RoutineDayCard({
 	defaultView: RoutineDayCardView;
 	timeZone?: string;
 }) {
+	const { languagePreference } = useAppPreferences(); 
 	const { globalStyles, themeColors, styles } = useThemeStyles(); 
 	const [view, setView] = useState<RoutineDayCardView>(defaultView);
 	const isTimeline = view === "timeline";
-	const dayLabel = formatDayLabel(day.date, currentTime, timeZone);
+	const dayLabel = formatDayLabel(day.date, currentTime, timeZone, languagePreference);
 	const isToday = dayLabel.label === "Today";
 
 	const toggleView = () => {

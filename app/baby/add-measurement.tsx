@@ -40,7 +40,7 @@ export default function AddMeasurementScreen() {
 		getGrowthRecord,
 		updateGrowthRecord,
 	} = useGrowthData();
-	const { preferredLengthUnit, preferredWeightUnit } = useAppPreferences();
+	const { languagePreference, preferredLengthUnit, preferredWeightUnit } = useAppPreferences();
 	const existingRecord = useMemo(
 		() => (growthId ? getGrowthRecord(growthId) : undefined),
 		[getGrowthRecord, growthId],
@@ -176,7 +176,9 @@ export default function AddMeasurementScreen() {
 							style={styles.dateField}
 						>
 							<Ionicons color={themeColors.textSecondary} name="calendar-outline" size={20} />
-							<Text style={styles.dateText}>{formatDate(measuredDate, timelineTimeZone)}</Text>
+							<Text style={styles.dateText}>
+								{formatDate(measuredDate, timelineTimeZone, languagePreference)}
+							</Text>
 						</Pressable>
 						{isPickerOpen ? (
 							<DateTimePicker
@@ -287,8 +289,8 @@ function getDateKey(value: Date) {
 	return `${year}-${month}-${day}`;
 }
 
-function formatDate(value: Date, timeZone?: string) {
-	return new Intl.DateTimeFormat("en-US", {
+function formatDate(value: Date, timeZone?: string, locale = "en-US") {
+	return new Intl.DateTimeFormat(locale, {
 		day: "numeric",
 		month: "short",
 		timeZone,

@@ -93,21 +93,21 @@ export function formatOzInput(amountOz: number) {
 	return amountOz.toFixed(1);
 }
 
-export function formatClockTime(value: string, timeZone?: string) {
-	return new Intl.DateTimeFormat("en-US", {
+export function formatClockTime(value: string, timeZone?: string, locale: string = "en-US") {
+	return new Intl.DateTimeFormat(locale, {
 		hour: "numeric",
 		minute: "2-digit",
 		timeZone,
 	}).format(new Date(value));
 }
 
-export function formatDayLabel(value: string, currentTime?: string, timeZone?: string) {
+export function formatDayLabel(value: string, currentTime?: string, timeZone?: string, locale: string = "en-US") {
 	const date = parseDateKey(value);
 	const current = currentTime ? new Date(currentTime) : new Date();
 	const todayDateKey = getLocalDateKey(current, timeZone);
 	const target = parseDateKey(value);
 	const diffDays = Math.round((parseDateKey(todayDateKey).getTime() - target.getTime()) / MS_PER_DAY);
-	const formatted = new Intl.DateTimeFormat("en-US", {
+	const formatted = new Intl.DateTimeFormat(locale, {
 		day: "numeric",
 		month: "short",
 		timeZone: "UTC",
@@ -123,7 +123,7 @@ export function formatDayLabel(value: string, currentTime?: string, timeZone?: s
 
 	return {
 		date: formatted,
-		label: new Intl.DateTimeFormat("en-US", { timeZone: "UTC", weekday: "long" }).format(date),
+		label: new Intl.DateTimeFormat(locale, { timeZone: "UTC", weekday: "long" }).format(date),
 	};
 }
 
