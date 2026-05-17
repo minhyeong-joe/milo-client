@@ -430,6 +430,7 @@ export default function DiaryScreen() {
 							filters={activeDiaryFilters}
 							locale={languagePreference}
 							onClearAll={() => {
+								setSearchText("");
 								setDebouncedSearchText("");
 								setFilters(emptyFilters);
 							}}
@@ -478,7 +479,11 @@ export default function DiaryScreen() {
 									<ActivityIndicator color={themeColors.primary} />
 								</View>
 							) : (
-								<DiaryEmptyState error={error} onRetry={() => loadFirstPage()} />
+								<DiaryEmptyState
+									error={error}
+									hasActiveFilters={hasActiveFilters}
+									onRetry={() => loadFirstPage()}
+								/>
 							)
 						}
 						ListFooterComponent={
@@ -869,19 +874,24 @@ function HeaderIconButton({
 
 function DiaryEmptyState({
 	error,
+	hasActiveFilters,
 	onRetry,
 }: {
 	error: string | null;
+	hasActiveFilters: boolean;
 	onRetry: () => void;
 }) {
 	const { themeColors, styles } = useThemeStyles();
+	const emptyTitle = hasActiveFilters ? "No results" : "No diary entries yet";
+	const emptyMessage = hasActiveFilters
+		? "Try adjusting your search or filters."
+		: "Capture a small moment, milestone, or memory when you are ready.";
+
 	return (
 		<View style={styles.centerState}>
 			<Ionicons color={themeColors.textSecondary} name="journal-outline" size={32} />
-			<Text style={styles.emptyTitle}>{error ? "Diary unavailable" : "No diary entries yet"}</Text>
-			<Text style={styles.emptyText}>
-				{error ?? "Capture a small moment, milestone, or memory when you are ready."}
-			</Text>
+			<Text style={styles.emptyTitle}>{error ? "Diary unavailable" : emptyTitle}</Text>
+			<Text style={styles.emptyText}>{error ?? emptyMessage}</Text>
 			{error ? (
 				<Pressable onPress={onRetry} style={styles.retryButton}>
 					<Text style={styles.retryText}>Try Again</Text>

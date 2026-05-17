@@ -198,7 +198,7 @@ export function DiaryCacheProvider({ children }: { children: ReactNode }) {
 		(babyId: string, cacheKey = DEFAULT_CACHE_KEY) => {
 			const cache = cacheByBabyId[getScopedCacheKey(babyId, cacheKey)];
 
-			if (!cache?.loadedAt || cache.isDirty || cache.entries.length === 0) {
+			if (!cache?.loadedAt || cache.isDirty) {
 				return true;
 			}
 
