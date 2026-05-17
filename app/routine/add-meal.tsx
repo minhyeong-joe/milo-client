@@ -34,6 +34,14 @@ const DEFAULT_SERVINGS = 0.5;
 const DEFAULT_SOLID_GRAMS = 30;
 
 const mealTypes: MealType[] = ["breastfeed", "breastMilk", "formula", "solid"];
+type MealDraftsByType = Partial<Record<MealType, {
+	amountGramsText?: string;
+	amountServingsText?: string;
+	bottleAmountMl?: number;
+	breastSide?: "left" | "right";
+	durationMinutesText?: string;
+	solidInputMode?: "servings" | "grams";
+}>>;
 
 function isBottleMeal(type: MealType) {
 	return type === "breastMilk" || type === "formula";
@@ -60,42 +68,98 @@ export default function AddMealScreen() {
 	const { globalStyles, themeColors, styles } = useThemeStyles();
 	const { mealId } = useLocalSearchParams<{ mealId?: string }>();
 	const { selectedBaby } = useBabySelection();
-	const { addMeal, dailyLogs, getLatestMeal, updateMeal, removeMeal } = useRoutineData();
+	const { addMeal, dailyLogs, updateMeal, removeMeal } = useRoutineData();
 	const {
 		preferredSolidFoodUnit,
 		preferredVolumeUnit,
 		setPreferredSolidFoodUnit,
 	} = useAppPreferences();
 	const timelineTimeZone = useTimelineTimeZone(selectedBaby);
+	const mealEventsDescending = useMemo(
+		() =>
+			dailyLogs
+				.flatMap((day) => day.timeline)
+				.filter((event): event is MealEvent => event.kind === "meal")
+				.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime()),
+		[dailyLogs],
+	);
+	const latestMealsByType = useMemo(() => {
+		const mealsByType: Partial<Record<MealType, MealEvent>> = {};
+
+		mealEventsDescending.forEach((meal) => {
+			if (!mealsByType[meal.type]) {
+				mealsByType[meal.type] = meal;
+			}
+		});
+
+		return mealsByType;
+	}, [mealEventsDescending]);
 	const mealToEdit = dailyLogs
 	.flatMap((day) => day.timeline)
 	.find(
 		(event): event is MealEvent =>
 			event.kind === "meal" && event.id === mealId,
 	);
-	const latestMeal = getLatestMeal();
+	const latestMeal = mealEventsDescending[0];
+	const getMealDefaults = (type: MealType) =>
+		mealToEdit?.type === type ? mealToEdit : latestMealsByType[type];
+	const getDefaultBottleAmountMl = (type: MealType) =>
+		isBottleMeal(type)
+			? getMealDefaults(type)?.amountMl ?? DEFAULT_BOTTLE_ML
+			: DEFAULT_BOTTLE_ML;
+	const getDefaultBreastSide = () => {
+		if (mealToEdit?.type === "breastfeed" && mealToEdit.breastSide) {
+			return mealToEdit.breastSide;
+		}
+
+		return latestMealsByType.breastfeed?.breastSide === "left" ? "right" : "left";
+	};
+	const getDefaultDurationMinutes = () =>
+		mealToEdit?.type === "breastfeed"
+			? mealToEdit.durationMinutes ?? 15
+			: latestMealsByType.breastfeed?.durationMinutes ?? 15;
+	const getDefaultSolidInputMode = () => {
+		const solidDefaults = getMealDefaults("solid");
+
+		if (solidDefaults?.amountGrams) {
+			return "grams";
+		}
+
+		if (solidDefaults?.amountServings) {
+			return "servings";
+		}
+
+		return preferredSolidFoodUnit;
+	};
+	const getDefaultSolidServings = () =>
+		getMealDefaults("solid")?.amountServings ?? DEFAULT_SERVINGS;
+	const getDefaultSolidGrams = () =>
+		getMealDefaults("solid")?.amountGrams ?? DEFAULT_SOLID_GRAMS;
 	const [mealTime, setMealTime] = useState(() => new Date(mealToEdit?.time ?? Date.now()));
 	const [activePicker, setActivePicker] = useState<"date" | "time" | null>(null);
 	const [mealType, setMealType] = useState<MealType>(mealToEdit?.type?? latestMeal?.type ?? "formula");
-	const initialBottleAmountMlRef = useRef(
-		mealToEdit?.amountMl ?? latestMeal?.amountMl ?? DEFAULT_BOTTLE_ML,
-	);
+	const mealDraftsRef = useRef<MealDraftsByType>({});
 	const previousVolumeUnitRef = useRef(preferredVolumeUnit);
 	const [bottleAmountText, setBottleAmountText] = useState(() =>
-		formatBottleAmountInput(initialBottleAmountMlRef.current, preferredVolumeUnit),
+		formatBottleAmountInput(
+			getDefaultBottleAmountMl(mealToEdit?.type ?? latestMeal?.type ?? "formula"),
+			preferredVolumeUnit,
+		),
 	);
-	const [breastSide, setBreastSide] = useState<"left" | "right" | undefined>(mealToEdit?.breastSide ?? (mealType === "breastfeed" ? (latestMeal?.breastSide === "left"? "right" : "left") : undefined));
+	const [breastSide, setBreastSide] = useState<"left" | "right" | undefined>(
+		mealType === "breastfeed" ? getDefaultBreastSide() : undefined,
+	);
 	const [durationMinutesText, setDurationMinutesText] = useState(() =>
-		String(mealToEdit?.durationMinutes ?? latestMeal?.durationMinutes ?? 15),
+		String(getDefaultDurationMinutes()),
 	);
 	const [amountServingsText, setAmountServingsText] = useState(() =>
-		formatServingInput(mealToEdit?.amountServings ?? latestMeal?.amountServings ?? DEFAULT_SERVINGS),
+		formatServingInput(getDefaultSolidServings()),
 	);
 	const [solidInputMode, setSolidInputMode] = useState<"servings" | "grams">(() =>
-		mealToEdit?.amountGrams ? "grams" : mealToEdit?.amountServings ? "servings" : preferredSolidFoodUnit,
+		getDefaultSolidInputMode(),
 	);
 	const [amountGramsText, setAmountGramsText] = useState(() =>
-		String(mealToEdit?.amountGrams ?? latestMeal?.amountGrams ?? DEFAULT_SOLID_GRAMS),
+		String(getDefaultSolidGrams()),
 	);
 	const [notes, setNotes] = useState(mealToEdit?.notes ?? "");
 	const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
@@ -159,6 +223,47 @@ export default function AddMealScreen() {
 	const selectSolidInputMode = (mode: "servings" | "grams") => {
 		setSolidInputMode(mode);
 		void setPreferredSolidFoodUnit(mode);
+	};
+
+	const selectMealType = (type: MealType) => {
+		if (type === mealType) {
+			return;
+		}
+
+		mealDraftsRef.current[mealType] = {
+			amountGramsText,
+			amountServingsText,
+			bottleAmountMl: isBottleMeal(mealType)
+				? normalizeBottleAmountToMl(bottleAmountText, preferredVolumeUnit)
+				: undefined,
+			breastSide,
+			durationMinutesText,
+			solidInputMode,
+		};
+
+		const draft = mealDraftsRef.current[type];
+
+		if (isBottleMeal(type)) {
+			setBottleAmountText(
+				formatBottleAmountInput(
+					draft?.bottleAmountMl ?? getDefaultBottleAmountMl(type),
+					preferredVolumeUnit,
+				),
+			);
+		}
+
+		if (type === "breastfeed") {
+			setBreastSide(draft?.breastSide ?? getDefaultBreastSide());
+			setDurationMinutesText(draft?.durationMinutesText ?? String(getDefaultDurationMinutes()));
+		}
+
+		if (type === "solid") {
+			setSolidInputMode(draft?.solidInputMode ?? getDefaultSolidInputMode());
+			setAmountServingsText(draft?.amountServingsText ?? formatServingInput(getDefaultSolidServings()));
+			setAmountGramsText(draft?.amountGramsText ?? String(getDefaultSolidGrams()));
+		}
+
+		setMealType(type);
 	};
 
 	const handlePickerChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
@@ -313,7 +418,7 @@ export default function AddMealScreen() {
 									<Pressable
 										accessibilityRole="button"
 										key={type}
-										onPress={() => setMealType(type)}
+										onPress={() => selectMealType(type)}
 										style={[styles.segmentButton, isSelected && styles.segmentButtonSelected]}
 									>
 										<Text style={[styles.segmentText, isSelected && styles.segmentTextSelected]}>
