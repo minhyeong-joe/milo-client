@@ -75,6 +75,9 @@ export default function HomeScreen() {
 	const currentDate = useCurrentMinute();
 	const currentTime = currentDate.toISOString();
 	const timelineTimeZone = useTimelineTimeZone(selectedBaby);
+	const selectedBabyId = selectedBaby?.id ?? null;
+	const selectedBabyTimeZone = selectedBaby?.timezone ?? null;
+	const sessionUserId = session?.user.id ?? null;
 	const [isInitialRoutineLoading, setIsInitialRoutineLoading] = useState(false);
 	const [isOlderRoutineLoading, setIsOlderRoutineLoading] = useState(false);
 	const [routineError, setRoutineError] = useState<string | null>(null);
@@ -82,6 +85,7 @@ export default function HomeScreen() {
 	const [isRefreshing, setIsRefreshing] = useState(false);
 	const routineRequestIdRef = useRef(0);
 	const isOlderRoutineLoadingRef = useRef(false);
+	const lastInitialRoutineLoadKeyRef = useRef<string | null>(null);
 	const syncBannerMessage = syncProviderError ?? routineError ?? syncError;
 	const routineDisplayConfig = useMemo<RoutineConfig>(
 		() => ({
@@ -99,7 +103,7 @@ export default function HomeScreen() {
 		refreshBabyList = false,
 		trigger = "manual",
 	}: LoadLatestRoutineOptions = {}) => {
-		if (!selectedBaby) {
+		if (!selectedBabyId || !selectedBabyTimeZone) {
 			replaceDailyLogs([]);
 			setRoutineError(null);
 			setNextRoutineStartDate(null);
@@ -109,7 +113,7 @@ export default function HomeScreen() {
 
 		const requestId = routineRequestIdRef.current + 1;
 		routineRequestIdRef.current = requestId;
-		const startDate = getDateKeyInTimeZone(new Date(), selectedBaby.timezone);
+		const startDate = getDateKeyInTimeZone(new Date(), selectedBabyTimeZone);
 		const isManualSync = trigger === "manual";
 
 		setIsInitialRoutineLoading(true);
@@ -120,8 +124,8 @@ export default function HomeScreen() {
 		let didLoadCachedData = false;
 
 		try {
-			if (session) {
-				const cached = await loadCachedRoutineHome(session.user.id, selectedBaby.id);
+			if (sessionUserId) {
+				const cached = await loadCachedRoutineHome(sessionUserId, selectedBabyId);
 
 				if (routineRequestIdRef.current === requestId) {
 					didLoadCachedData = cached.dailyLogs.length > 0 || cached.lastLogged !== null;
@@ -155,7 +159,7 @@ export default function HomeScreen() {
 			}
 
 			const response = await withTimeout(getRoutineDays({
-				babyId: selectedBaby.id,
+				babyId: selectedBabyId,
 				count: ROUTINE_PAGE_DAYS,
 				includeLastLogged: true,
 				startDate,
@@ -165,15 +169,15 @@ export default function HomeScreen() {
 				return;
 			}
 
-			if (session) {
+			if (sessionUserId) {
 				await saveRoutineHomeCache({
-					babyId: selectedBaby.id,
+					babyId: selectedBabyId,
 					dailyLogs: response.dailyLogs,
 					lastLogged: response.lastLogged ?? null,
 					nextStartDate: response.nextStartDate,
-					userId: session.user.id,
+					userId: sessionUserId,
 				});
-				const reconciledCache = await loadCachedRoutineHome(session.user.id, selectedBaby.id);
+				const reconciledCache = await loadCachedRoutineHome(sessionUserId, selectedBabyId);
 
 				replaceDailyLogs(reconciledCache.dailyLogs);
 				setNextRoutineStartDate(reconciledCache.nextStartDate);
@@ -210,15 +214,37 @@ export default function HomeScreen() {
 		markOnline,
 		refreshBabies,
 		replaceDailyLogs,
-		selectedBaby,
-		session,
+		selectedBabyId,
+		selectedBabyTimeZone,
+		sessionUserId,
 		setLastLogged,
 		syncPendingMutations,
 	]);
 
+	const initialRoutineLoadKey = useMemo(() => {
+		if (!sessionUserId) {
+			return null;
+		}
+
+		if (!selectedBabyId || !selectedBabyTimeZone) {
+			return `${sessionUserId}:no-baby`;
+		}
+
+		return `${sessionUserId}:${selectedBabyId}:${selectedBabyTimeZone}`;
+	}, [selectedBabyId, selectedBabyTimeZone, sessionUserId]);
+
 	useEffect(() => {
+		if (!initialRoutineLoadKey) {
+			return;
+		}
+
+		if (lastInitialRoutineLoadKeyRef.current === initialRoutineLoadKey) {
+			return;
+		}
+
+		lastInitialRoutineLoadKeyRef.current = initialRoutineLoadKey;
 		void loadLatestRoutineLogs({ trigger: "initial" });
-	}, [loadLatestRoutineLogs]);
+	}, [initialRoutineLoadKey, loadLatestRoutineLogs]);
 
 	const refreshHome = useCallback(async () => {
 		setIsRefreshing(true);
@@ -232,7 +258,7 @@ export default function HomeScreen() {
 
 	const loadOlderRoutineLogs = useCallback(async () => {
 		if (
-			!selectedBaby ||
+			!selectedBabyId ||
 			isInitialRoutineLoading ||
 			isOlderRoutineLoadingRef.current ||
 			!nextRoutineStartDate
@@ -248,7 +274,7 @@ export default function HomeScreen() {
 
 		try {
 			const response = await getRoutineDays({
-				babyId: selectedBaby.id,
+				babyId: selectedBabyId,
 				count: ROUTINE_PAGE_DAYS,
 				startDate: nextRoutineStartDate,
 			});
@@ -257,15 +283,15 @@ export default function HomeScreen() {
 				return;
 			}
 
-			if (session) {
+			if (sessionUserId) {
 				await saveRoutineHomeCache({
-					babyId: selectedBaby.id,
+					babyId: selectedBabyId,
 					dailyLogs: response.dailyLogs,
 					lastLogged,
 					nextStartDate: response.nextStartDate,
-					userId: session.user.id,
+					userId: sessionUserId,
 				});
-				const reconciledCache = await loadCachedRoutineHome(session.user.id, selectedBaby.id);
+				const reconciledCache = await loadCachedRoutineHome(sessionUserId, selectedBabyId);
 
 				replaceDailyLogs(reconciledCache.dailyLogs);
 				setNextRoutineStartDate(reconciledCache.nextStartDate);
@@ -296,8 +322,8 @@ export default function HomeScreen() {
 		nextRoutineStartDate,
 		prependOlderDailyLogs,
 		replaceDailyLogs,
-		selectedBaby,
-		session,
+		selectedBabyId,
+		sessionUserId,
 		syncPendingMutations,
 	]);
 

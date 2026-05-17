@@ -26,6 +26,7 @@ import {
 	useContext,
 	useEffect,
 	useMemo,
+	useRef,
 	useState,
 } from "react";
 
@@ -67,11 +68,17 @@ export function BabySelectionProvider({ children }: PropsWithChildren) {
 	const [selectedBabyId, setSelectedBabyId] = useState<string | null>(null);
 	const [isLoading, setIsLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const selectedBabyIdRef = useRef<string | null>(null);
+
+	useEffect(() => {
+		selectedBabyIdRef.current = selectedBabyId;
+	}, [selectedBabyId]);
 
 	const refreshBabies = useCallback(async () => {
 		if (!session) {
 			setBabies([]);
 			setSelectedBabyId(null);
+			selectedBabyIdRef.current = null;
 			setError(null);
 			return;
 		}
@@ -83,8 +90,9 @@ export function BabySelectionProvider({ children }: PropsWithChildren) {
 			const cachedSelection = await loadCachedBabySelection(session.user.id);
 
 			if (cachedSelection) {
+				const currentSelectedBabyId = selectedBabyIdRef.current;
 				const cachedSelectedBabyId =
-					getAccessibleBabyId(cachedSelection.babies, selectedBabyId) ??
+					getAccessibleBabyId(cachedSelection.babies, currentSelectedBabyId) ??
 					getAccessibleBabyId(cachedSelection.babies, cachedSelection.selectedBabyId) ??
 					cachedSelection.babies[0]?.id ??
 					null;
@@ -99,6 +107,7 @@ export function BabySelectionProvider({ children }: PropsWithChildren) {
 
 				setBabies(cachedBabiesWithPendingAvatars);
 				setSelectedBabyId(cachedSelectedBabyId);
+				selectedBabyIdRef.current = cachedSelectedBabyId;
 			}
 
 			const response = await getBabies();
@@ -111,14 +120,16 @@ export function BabySelectionProvider({ children }: PropsWithChildren) {
 				babiesWithPendingProfiles,
 			);
 			const storedBabyId = await loadStoredSelectedBabyId(session.user.id);
+			const currentSelectedBabyId = selectedBabyIdRef.current;
 			const nextSelectedBabyId =
-				getAccessibleBabyId(babiesWithPendingAvatars, selectedBabyId) ??
+				getAccessibleBabyId(babiesWithPendingAvatars, currentSelectedBabyId) ??
 				getAccessibleBabyId(babiesWithPendingAvatars, storedBabyId) ??
 				babiesWithPendingAvatars[0]?.id ??
 				null;
 
 			setBabies(babiesWithPendingAvatars);
 			setSelectedBabyId(nextSelectedBabyId);
+			selectedBabyIdRef.current = nextSelectedBabyId;
 			await saveCachedBabySelection(session.user.id, babiesWithPendingAvatars, nextSelectedBabyId);
 
 			if (nextSelectedBabyId) {
@@ -129,7 +140,7 @@ export function BabySelectionProvider({ children }: PropsWithChildren) {
 		} finally {
 			setIsLoading(false);
 		}
-	}, [selectedBabyId, session]);
+	}, [session]);
 
 	useEffect(() => {
 		if (!isReady) {
@@ -331,6 +342,7 @@ export function BabySelectionProvider({ children }: PropsWithChildren) {
 			saveSelectedBabyProfileDraft,
 			selectBaby: (babyId) => {
 				setSelectedBabyId(babyId);
+				selectedBabyIdRef.current = babyId;
 
 				if (session) {
 					void saveStoredSelectedBabyId(session.user.id, babyId);
