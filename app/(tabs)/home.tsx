@@ -1,10 +1,11 @@
 import { BabyHeader } from "@/components/routine/BabyHeader";
-import { QuickActionGrid } from "@/components/routine/QuickActionGrid";
+import { QuickActionGrid, type QuickActionItem } from "@/components/routine/QuickActionGrid";
 import { RoutineDayCard } from "@/components/routine/RoutineDayCard";
 import { SyncStatusCard } from "@/components/sync/SyncStatusCard";
 import { useAppPreferences, useTimelineTimeZone , useAppTheme } from "@/context/AppPreferencesContext";
 import { useAuthSession } from "@/context/AuthSessionContext";
 import { useBabySelection } from "@/context/BabySelectionContext";
+import { useGrowthData } from "@/context/GrowthDataContext";
 import { useRoutineData } from "@/context/RoutineDataContext";
 import {
 	AUTH_REQUIRED_SYNC_MESSAGE,
@@ -53,7 +54,8 @@ export default function HomeScreen() {
 	const router = useRouter();
 	const { globalStyles, themeColors, styles } = useThemeStyles();
 	const { authStatus, session } = useAuthSession();
-	const { preferredVolumeUnit } = useAppPreferences();
+	const { languagePreference, preferredVolumeUnit } = useAppPreferences();
+	const { growthRecords } = useGrowthData();
 
 	const {
 		babies,
@@ -103,10 +105,30 @@ export default function HomeScreen() {
 		}),
 		[preferredVolumeUnit],
 	);
-	const quickActions = (["meal", "diaper", "sleep"] as const).map((id) => ({
-		id,
-		lastActionLabel: getLastLoggedActionLabel(lastLogged, id, currentTime),
-	}));
+	const growthLastLoggedLabel = useMemo(
+		() => getLastGrowthLoggedLabel(growthRecords, languagePreference),
+		[growthRecords, languagePreference],
+	);
+	const quickActions = useMemo<QuickActionItem[]>(
+		() => [
+			...(["meal", "diaper", "sleep"] as const).map((id) => ({
+				id,
+				kind: "routine" as const,
+				lastActionLabel: getLastLoggedActionLabel(lastLogged, id, currentTime),
+			})),
+			{
+				accentColor: "#D84D8B",
+				backgroundColor: "#FFEAF4",
+				detailLabel: growthLastLoggedLabel,
+				icon: "scale-outline",
+				id: "growth",
+				kind: "navigation",
+				label: "Growth",
+				onPress: () => router.push("/baby/growth"),
+			},
+		],
+		[currentTime, growthLastLoggedLabel, lastLogged, router],
+	);
 
 	const loadLatestRoutineLogs = useCallback(async ({
 		refreshBabyList = false,
@@ -669,4 +691,38 @@ function formatLastLoggedLabel(loggedAt: string, currentTime: string) {
 
 	const days = Math.floor(hours / 24);
 	return days === 1 ? "Last: yesterday" : `Last: ${days}d ago`;
+}
+
+function getLastGrowthLoggedLabel(
+	records: { measuredDate: string }[],
+	locale: string,
+) {
+	const latestDate = records.reduce<string | null>((latest, record) => {
+		if (!record.measuredDate) {
+			return latest;
+		}
+
+		return !latest || record.measuredDate > latest ? record.measuredDate : latest;
+	}, null);
+
+	if (!latestDate) {
+		return "No entries yet";
+	}
+
+	return `Last: ${formatGrowthDate(latestDate, locale)}`;
+}
+
+function formatGrowthDate(dateKey: string, locale: string) {
+	const [year, month, day] = dateKey.split("-").map(Number);
+	const date = new Date(year, month - 1, day);
+
+	if (Number.isNaN(date.getTime())) {
+		return dateKey;
+	}
+
+	return new Intl.DateTimeFormat(locale, {
+		day: "numeric",
+		month: "short",
+		year: "numeric"
+	}).format(date);
 }

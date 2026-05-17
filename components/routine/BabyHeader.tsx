@@ -64,18 +64,6 @@ export function BabyHeader({
 					</Pressable>
 				</View>
 			</View>
-			<View style={[globalStyles.rowCenter, styles.headerActions]}>
-				<Ionicons
-					color={themeColors.textPrimary}
-					name="notifications-outline"
-					size={25}
-				/>
-				<Ionicons
-					color={themeColors.textPrimary}
-					name="calendar-outline"
-					size={25}
-				/>
-			</View>
 			<BabySelectorModal
 				babies={babies}
 				onClose={() => setIsSelectorOpen(false)}
@@ -102,9 +90,6 @@ function createStyles(themeColors: ThemeColors) {
 	},
 	header: {
 		marginBottom: spacing.md,
-	},
-	headerActions: {
-		gap: spacing.lg,
 	},
 	nameRow: {
 		gap: spacing.xs,

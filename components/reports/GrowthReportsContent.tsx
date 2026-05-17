@@ -5,8 +5,6 @@ import { useAppTheme } from "@/context/AppPreferencesContext";
 import { useBabySelection } from "@/context/BabySelectionContext";
 import { type GrowthRecord } from "@/services/api/growth";
 import GrowthChartCard from "./GrowthChartCard";
-import { useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
 
 function useThemeStyles() {
 	const { globalStyles, themeColors } = useAppTheme();
@@ -32,7 +30,6 @@ export default function GrowthReportsContent({
     selectedBaby: ReturnType<typeof useBabySelection>["selectedBaby"];
     weightUnit: "kg" | "lb";
 }) {
-    const router = useRouter();
     const { globalStyles, themeColors, styles } = useThemeStyles();
 
     if (!selectedBaby) {
@@ -57,7 +54,7 @@ export default function GrowthReportsContent({
 
     return (
         <ScrollView
-            contentContainerStyle={globalStyles.scrollContent}
+            contentContainerStyle={{...globalStyles.scrollContent, marginTop: spacing.md}}
             refreshControl={
                 <RefreshControl
                     refreshing={isRefreshing}
@@ -67,18 +64,6 @@ export default function GrowthReportsContent({
             }
             showsVerticalScrollIndicator={false}
         >
-            <Pressable
-                accessibilityRole="button"
-                onPress={() => {
-                    router.push("/baby/growth");
-                }}
-                style={styles.profileActionButton}
-            >
-                <Text style={styles.profileActionText}>
-                    <Ionicons name="analytics-outline" size={20} />
-                    {" "} Growth Measurements
-                </Text>
-            </Pressable>
             <GrowthChartCard
                 birthdate={selectedBaby.birthdate}
                 lengthUnit={lengthUnit}
@@ -115,18 +100,5 @@ function createStyles(themeColors: ThemeColors) {
         gap: spacing.md,
         justifyContent: "center",
     },
-	profileActionButton: {
-		alignItems: "center",
-		backgroundColor: themeColors.primary,
-		borderRadius: 12,
-		paddingVertical: 14,
-		width: "100%",
-        marginTop: spacing.md,
-	},
-	profileActionText: {
-		color: themeColors.surface,
-		fontSize: 15,
-		fontWeight: "800",
-	},
 });
 }
