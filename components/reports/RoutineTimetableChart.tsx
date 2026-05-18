@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { LayoutChangeEvent, StyleSheet, Text, View } from "react-native";
+import { LayoutChangeEvent, Pressable, StyleSheet, Text, View } from "react-native";
 import { BarChart, type stackDataItem } from "react-native-gifted-charts";
 import type {
 	RoutinePatternLog,
@@ -7,6 +7,12 @@ import type {
 } from "@/services/api/routine";
 import { spacing, typography, type ThemeColors } from "@/styles/globalStyles";
 import { useAppTheme } from "@/context/AppPreferencesContext";
+import { RoutineIcon } from "@/components/routine/RoutineIcon";
+import type { RoutineKind } from "@/data/homeData";
+import {
+	buildRoutinePatternInsights,
+	type RoutinePatternInsight,
+} from "@/utils/routinePatternInsights";
 
 const DAY_MINUTES = 1440;
 const POINT_EVENT_MINUTES = 20;
@@ -16,6 +22,7 @@ const Y_AXIS_LABEL_WIDTH = 42;
 const CHART_RIGHT_GUTTER = 8;
 const WEEK_DAY_COUNT = 7;
 const MONTH_DAY_COUNT = 30;
+const DEFAULT_INSIGHT_LIMIT = 4;
 const KIND_COLORS = {
 	diaper: "#2FB86E",
 	meal: "#7C4DFF",
@@ -54,6 +61,11 @@ export default function RoutineTimetableChart({
 }) {
 	const { globalStyles, styles } = useThemeStyles();
 	const [chartWidth, setChartWidth] = useState(DEFAULT_CHART_WIDTH);
+	const [expandedInsights, setExpandedInsights] = useState<Record<RoutineKind, boolean>>({
+		diaper: false,
+		meal: false,
+		sleep: false,
+	});
 	const visibleKinds = useMemo(
 		() => ({
 			diaper: showDiaper,
@@ -90,6 +102,10 @@ export default function RoutineTimetableChart({
 				showYear: index === 0 || day.date.slice(0, 4) !== days[index - 1]?.date.slice(0, 4),
 			})),
 		[days, now, timeZone],
+	);
+	const insights = useMemo(
+		() => buildRoutinePatternInsights(days, timeZone),
+		[days, timeZone],
 	);
 	const isScrollable = days.length > WEEK_DAY_COUNT;
 	const initialSpacing = 4;
@@ -174,8 +190,124 @@ export default function RoutineTimetableChart({
 					yAxisTextStyle={styles.axisLabel}
 				/>
 			</View>
+			<Text style={globalStyles.sectionTitleText}>Typical Day</Text>
+			<PatternInsightsList
+				expandedInsights={expandedInsights}
+				insights={insights}
+				onToggleExpanded={(kind) =>
+					setExpandedInsights((current) => ({
+						...current,
+						[kind]: !current[kind],
+					}))
+				}
+				visibleKinds={visibleKinds}
+			/>
 		</View>
 	);
+}
+
+function PatternInsightsList({
+	expandedInsights,
+	insights,
+	onToggleExpanded,
+	visibleKinds,
+}: {
+	expandedInsights: Record<RoutineKind, boolean>;
+	insights: Record<RoutineKind, RoutinePatternInsight[]>;
+	onToggleExpanded: (kind: RoutineKind) => void;
+	visibleKinds: Record<RoutineKind, boolean>;
+}) {
+	const { styles } = useThemeStyles();
+	const sections = (["meal", "diaper", "sleep"] satisfies RoutineKind[])
+		.filter((kind) => visibleKinds[kind]);
+
+	if (sections.length === 0) {
+		return null;
+	}
+
+	return (
+		<View style={styles.insightsContainer}>
+			{sections.map((kind) => (
+				<PatternInsightSection
+					insights={insights[kind]}
+					isExpanded={expandedInsights[kind]}
+					key={kind}
+					kind={kind}
+					onToggleExpanded={() => onToggleExpanded(kind)}
+				/>
+			))}
+		</View>
+	);
+}
+
+function PatternInsightSection({
+	insights,
+	isExpanded,
+	kind,
+	onToggleExpanded,
+}: {
+	insights: RoutinePatternInsight[];
+	isExpanded: boolean;
+	kind: RoutineKind;
+	onToggleExpanded: () => void;
+}) {
+	const { styles, themeColors } = useThemeStyles();
+	const visibleInsights = getVisibleInsights(insights, isExpanded);
+	const hasMore = insights.length > DEFAULT_INSIGHT_LIMIT;
+
+	return (
+		<View style={styles.insightSection}>
+			<View style={styles.insightSectionHeader}>
+				<View style={styles.insightTitleRow}>
+					<RoutineIcon kind={kind} size={28} />
+					<Text style={styles.insightTitle}>{getInsightTitle(kind)}</Text>
+				</View>
+				{hasMore ? (
+					<Pressable
+						accessibilityRole="button"
+						hitSlop={8}
+						onPress={onToggleExpanded}
+					>
+						<Text style={[styles.showAllText, { color: themeColors.primary }]}>
+							{isExpanded ? "Show less" : "Show all"}
+						</Text>
+					</Pressable>
+				) : null}
+			</View>
+			{visibleInsights.length > 0 ? (
+				<View style={styles.insightRows}>
+					{visibleInsights.map((insight) => (
+						<View key={insight.id} style={styles.insightRow}>
+							<Text style={styles.insightTime}>{insight.timeLabel}</Text>
+							<Text style={styles.insightDot}>·</Text>
+							<Text style={styles.insightLabel}>{insight.label}</Text>
+						</View>
+					))}
+				</View>
+			) : (
+				<Text style={styles.emptyInsightText}>
+					Not enough repeated entries in this range yet.
+				</Text>
+			)}
+		</View>
+	);
+}
+
+function getVisibleInsights(insights: RoutinePatternInsight[], isExpanded: boolean) {
+	const displayInsights = isExpanded
+		? insights
+		: insights.slice(0, DEFAULT_INSIGHT_LIMIT);
+
+	return [...displayInsights].sort(sortInsightsByTime);
+}
+
+function sortInsightsByTime(
+	left: RoutinePatternInsight,
+	right: RoutinePatternInsight,
+) {
+	return left.sortMinute - right.sortMinute ||
+		left.label.localeCompare(right.label) ||
+		right.supportCount - left.supportCount;
 }
 
 function buildBlocksForDay(day: RoutineStatsDay, timeZone: string | undefined, now: Date) {
@@ -484,6 +616,12 @@ function LegendDot({
 	);
 }
 
+function getInsightTitle(kind: RoutineKind) {
+	if (kind === "meal") return "Meals";
+	if (kind === "diaper") return "Diapers";
+	return "Sleep";
+}
+
 function createStyles(themeColors: ThemeColors) {
 	return StyleSheet.create({
 	axisDateLabel: {
@@ -510,6 +648,65 @@ function createStyles(themeColors: ThemeColors) {
 	chartWrapper: {
 		overflow: "hidden",
 	},
+	emptyInsightText: {
+		...typography.caption,
+		color: themeColors.textSecondary,
+		marginTop: spacing.xs,
+	},
+	insightDot: {
+		color: themeColors.textSecondary,
+		fontSize: 13,
+		fontWeight: "800",
+		lineHeight: 18,
+	},
+	insightLabel: {
+		color: themeColors.textPrimary,
+		flexShrink: 1,
+		fontSize: 13,
+		fontWeight: "700",
+		lineHeight: 18,
+	},
+	insightRow: {
+		alignItems: "center",
+		flexDirection: "row",
+		gap: spacing.xs,
+		minHeight: 22,
+	},
+	insightRows: {
+		gap: 2,
+		marginTop: spacing.xs,
+	},
+	insightSection: {
+		borderTopColor: themeColors.border,
+		borderTopWidth: 1,
+		paddingTop: spacing.sm,
+	},
+	insightSectionHeader: {
+		alignItems: "center",
+		flexDirection: "row",
+		justifyContent: "space-between",
+	},
+	insightsContainer: {
+		gap: spacing.sm,
+		marginTop: spacing.sm,
+	},
+	insightTime: {
+		color: themeColors.textPrimary,
+		fontSize: 13,
+		fontWeight: "800",
+		lineHeight: 18,
+		minWidth: 72,
+	},
+	insightTitle: {
+		...typography.label,
+		color: themeColors.textPrimary,
+		fontSize: 14,
+	},
+	insightTitleRow: {
+		alignItems: "center",
+		flexDirection: "row",
+		gap: spacing.xs,
+	},
 	legendDot: {
 		borderRadius: 999,
 		height: 8,
@@ -531,6 +728,10 @@ function createStyles(themeColors: ThemeColors) {
 		...typography.caption,
 		color: themeColors.textSecondary,
 		fontSize: 10,
+	},
+	showAllText: {
+		fontSize: 12,
+		fontWeight: "800",
 	},
 	subtitle: {
 		...typography.caption,
