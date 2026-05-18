@@ -132,9 +132,8 @@ function createStyles(themeColors: ThemeColors) {
 		marginTop: spacing.md
 	},
 	fieldLabel: {
-		...typography.caption,
-		color: themeColors.textSecondary,
-		textTransform: "uppercase",
+		...typography.label,
+		color: themeColors.textPrimary,
 	},
 	modalBackdrop: {
 		alignItems: "center",

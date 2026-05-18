@@ -2,8 +2,9 @@ import { LanguageSelector } from "@/components/settings/LanguageSelector";
 import { SettingsHeader } from "@/components/settings/SettingsRows";
 import { TimeZoneSelector } from "@/components/settings/TimeZoneSelector";
 import { useAppPreferences } from "@/context/AppPreferencesContext";
+import { useBabySelection } from "@/context/BabySelectionContext";
 import { spacing, type ThemeColors, typography } from "@/styles/globalStyles";
-import { getTimeZoneDisplayLabel } from "@/utils/timeZones";
+import { getDeviceTimeZone } from "@/utils/timeZones";
 import { useRouter } from "expo-router";
 import { useMemo, type ReactNode } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -23,15 +24,26 @@ export default function AppPreferencesScreen() {
 		setPreferredWeightUnit,
 		setThemePreference,
 		setLanguagePreference,
-		setTimelineTimeZone,
-		setTimelineTimeZoneMode,
 		themeColors,
 		themePreference,
 		languagePreference,
-		timelineTimeZone,
-		timelineTimeZoneMode,
 	} = useAppPreferences();
+	const { selectedBaby, updateSelectedBabyProfile } = useBabySelection();
 	const styles = useMemo(() => createStyles(themeColors), [themeColors]);
+	const selectedBabyTimeZone = selectedBaby?.timezone ?? getDeviceTimeZone();
+
+	const handleBabyTimeZoneChange = async (timeZone: string) => {
+		if (!selectedBaby) {
+			return;
+		}
+
+		await updateSelectedBabyProfile({
+			birthdate: selectedBaby.birthdate,
+			name: selectedBaby.name,
+			sex: selectedBaby.sex,
+			timezone: timeZone,
+		});
+	};
 
 	return (
 		<SafeAreaView style={globalStyles.screen}>
@@ -114,35 +126,17 @@ export default function AppPreferencesScreen() {
 						language={languagePreference}
 						onChange={(language) => void setLanguagePreference(language)}
 					/>
-					<PreferenceRow
-						helper={
-							timelineTimeZoneMode === "baby"
-								? `Show routine and diary times in the default timezone.\n${getTimeZoneDisplayLabel(timelineTimeZone)}`
-								: `Show times in ${getTimeZoneDisplayLabel(timelineTimeZone)}.`
-						}
-						label="Timeline timezone"
-						styles={styles}
-					>
-						<SegmentButton
-							active={timelineTimeZoneMode === "baby"}
-							label="Default"
-							onPress={() => void setTimelineTimeZoneMode("baby")}
-							styles={styles}
-						/>
-						<SegmentButton
-							active={timelineTimeZoneMode === "device"}
-							label="Custom"
-							onPress={() => void setTimelineTimeZoneMode("device")}
-							styles={styles}
-						/>
-					</PreferenceRow>
-					{timelineTimeZoneMode === "device" ? (
-						<TimeZoneSelector
-							label="Display timezone"
-							onChange={(timeZone) => void setTimelineTimeZone(timeZone)}
-							timeZone={timelineTimeZone}
-						/>
-					) : null}
+					<TimeZoneSelector
+						disabled={!selectedBaby}
+						label="Timezone"
+						onChange={(timeZone) => void handleBabyTimeZoneChange(timeZone)}
+						timeZone={selectedBabyTimeZone}
+					/>
+					<Text style={styles.timeZoneHelper}>
+						{selectedBaby
+							? "Used for routine, diary, and reports for this baby."
+							: "Select a baby before changing timezone."}
+					</Text>
 				</View>
 			</ScrollView>
 		</SafeAreaView>
@@ -222,6 +216,11 @@ function createStyles(themeColors: ThemeColors) {
 		sectionTitle: {
 			...typography.sectionTitle,
 			color: themeColors.textPrimary,
+		},
+		timeZoneHelper: {
+			...typography.caption,
+			color: themeColors.textSecondary,
+			marginTop: spacing.md,
 		},
 		segmentButton: {
 			alignItems: "center",

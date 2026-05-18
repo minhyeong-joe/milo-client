@@ -134,8 +134,12 @@ export default function ReportsScreen() {
 		[dailyLogs, patternEndDateKey, patternStartDate, timelineTimeZone],
 	);
 	const localPatternDateSet = useMemo(
-		() => new Set(dailyLogs.map((day) => day.date)),
-		[dailyLogs],
+		() => new Set(
+			localPatternStats.days
+				.filter((day) => day.logs.length > 0)
+				.map((day) => day.date),
+		),
+		[localPatternStats],
 	);
 	const displayedPatternStats = useMemo(
 		() => mergeRoutineStatsForDisplay(localPatternStats, patternStats, localPatternDateSet),
@@ -171,6 +175,7 @@ export default function ReportsScreen() {
 					babyId: selectedBaby.id,
 					endDate: patternEndDateKey,
 					startDate: patternStartDate,
+					timeZone: timelineTimeZone,
 					userId: session.user.id,
 				});
 
@@ -193,6 +198,7 @@ export default function ReportsScreen() {
 				await saveRoutineStatsCache({
 					babyId: selectedBaby.id,
 					stats: response,
+					timeZone: timelineTimeZone,
 					userId: session.user.id,
 				});
 			}
@@ -338,6 +344,7 @@ export default function ReportsScreen() {
 			babyId: selectedBaby.id,
 			endDate: patternEndDateKey,
 			startDate: patternStartDate,
+			timeZone: timelineTimeZone,
 			userId: session.user.id,
 		}).then((cachedStats) => {
 			if (isMounted && cachedStats) {
@@ -354,6 +361,7 @@ export default function ReportsScreen() {
 		patternStartDate,
 		selectedBaby,
 		session,
+		timelineTimeZone,
 	]);
 
 	const sortedGrowthRecords = useMemo(
@@ -439,10 +447,10 @@ function buildRoutineStatsFromLocalLogs(
 	const daysByDate = new Map(stats.days.map((day) => [day.date, day]));
 
 	for (const day of dailyLogs) {
-		const statsDay = daysByDate.get(day.date);
-
 		for (const event of day.timeline) {
 			if (event.kind === "meal") {
+				const statsDay = daysByDate.get(getDateKeyForInstant(new Date(event.time), timeZone));
+
 				if (!statsDay) {
 					continue;
 				}
@@ -461,6 +469,8 @@ function buildRoutineStatsFromLocalLogs(
 			}
 
 			if (event.kind === "diaper") {
+				const statsDay = daysByDate.get(getDateKeyForInstant(new Date(event.time), timeZone));
+
 				if (!statsDay) {
 					continue;
 				}

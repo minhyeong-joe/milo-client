@@ -1,5 +1,3 @@
-export type TimelineTimeZoneMode = "baby" | "device";
-
 export type TimeZoneOption = {
 	abbreviation: string;
 	label: string;

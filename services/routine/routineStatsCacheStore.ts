@@ -9,11 +9,13 @@ export async function loadCachedRoutineStats({
 	babyId,
 	endDate,
 	startDate,
+	timeZone,
 	userId,
 }: {
 	babyId: string;
 	endDate: string;
 	startDate: string;
+	timeZone?: string;
 	userId: string;
 }) {
 	const db = await getLocalDb();
@@ -31,7 +33,15 @@ export async function loadCachedRoutineStats({
 	}
 
 	try {
-		return JSON.parse(row.stats_json) as RoutineStatsResponse;
+		const parsed = JSON.parse(row.stats_json) as
+			| RoutineStatsResponse
+			| { stats?: RoutineStatsResponse; timeZone?: string };
+
+		if ("stats" in parsed) {
+			return !timeZone || parsed.timeZone === timeZone ? parsed.stats ?? null : null;
+		}
+
+		return timeZone ? null : parsed;
 	} catch {
 		return null;
 	}
@@ -40,10 +50,12 @@ export async function loadCachedRoutineStats({
 export async function saveRoutineStatsCache({
 	babyId,
 	stats,
+	timeZone,
 	userId,
 }: {
 	babyId: string;
 	stats: RoutineStatsResponse;
+	timeZone?: string;
 	userId: string;
 }) {
 	await runLocalDbWrite(async () => {
@@ -63,7 +75,7 @@ export async function saveRoutineStatsCache({
 				babyId,
 				stats.startDate,
 				stats.endDate,
-				JSON.stringify(stats),
+				JSON.stringify({ stats, timeZone }),
 				new Date().toISOString(),
 			],
 		);

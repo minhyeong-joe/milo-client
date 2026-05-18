@@ -145,6 +145,15 @@ export default function RoutineTimetableChart({
 			})),
 		[barWidth, chartDays, isScrollable, labelWidth, visibleKinds],
 	);
+	const chartKey = useMemo(
+		() =>
+			[
+				isScrollable ? "routine-timetable-scrollable" : "routine-timetable-static",
+				timeZone ?? "local",
+				days.map((day) => `${day.date}:${day.logs.length}`).join("|"),
+			].join(":"),
+		[days, isScrollable, timeZone],
+	);
 
 	return (
 		<View>
@@ -177,7 +186,7 @@ export default function RoutineTimetableChart({
 					showScrollIndicator={isScrollable}
 					spacing={spacingValue}
 					stackData={stackData}
-					key={isScrollable ? "routine-timetable-scrollable" : "routine-timetable-static"}
+					key={chartKey}
 					width={plotWidth}
 					xAxisColor="#D9DEE8"
 					xAxisLabelsHeight={44}
