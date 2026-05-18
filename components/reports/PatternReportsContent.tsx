@@ -208,12 +208,13 @@ export default function PatternReportsContent({
 				<RoutineDailyStackedChart
 					days={stats.days}
 					kind={selectedRoutineKind}
+					timeZone={timeZone}
 				/>
 			</View>
 
 			<View style={globalStyles.card}>
 				<Text style={globalStyles.sectionTitleText}>
-					Typical Logged Day
+					Daily Averages
 				</Text>
 				<Text style={styles.summarySubtitle}>
 					Averages based on days with entries
