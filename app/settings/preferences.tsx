@@ -5,6 +5,7 @@ import { useAppPreferences } from "@/context/AppPreferencesContext";
 import { useBabySelection } from "@/context/BabySelectionContext";
 import { spacing, type ThemeColors, typography } from "@/styles/globalStyles";
 import { getDeviceTimeZone } from "@/utils/timeZones";
+import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useMemo, type ReactNode } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -136,6 +137,10 @@ export default function AppPreferencesScreen() {
 						{selectedBaby
 							? "Used for routine, diary, and reports for this baby."
 							: "Select a baby before changing timezone."}
+					</Text>
+					<Text style={{...styles.timeZoneHelper, color: themeColors.error}}>
+						<Ionicons name="warning-outline" size={12} />
+						This changes timezone for all caregivers for this baby
 					</Text>
 				</View>
 			</ScrollView>

@@ -5,6 +5,11 @@ type RoutineStatsCacheRow = {
 	stats_json: string;
 };
 
+type RoutineStatsCacheEnvelope = {
+	stats?: RoutineStatsResponse;
+	timeZone?: string;
+};
+
 export async function loadCachedRoutineStats({
 	babyId,
 	endDate,
@@ -17,7 +22,7 @@ export async function loadCachedRoutineStats({
 	startDate: string;
 	timeZone?: string;
 	userId: string;
-}) {
+}): Promise<RoutineStatsResponse | null> {
 	const db = await getLocalDb();
 	const row = await db.getFirstAsync<RoutineStatsCacheRow>(
 		`
@@ -33,15 +38,13 @@ export async function loadCachedRoutineStats({
 	}
 
 	try {
-		const parsed = JSON.parse(row.stats_json) as
-			| RoutineStatsResponse
-			| { stats?: RoutineStatsResponse; timeZone?: string };
+		const parsed = JSON.parse(row.stats_json) as RoutineStatsResponse | RoutineStatsCacheEnvelope;
 
 		if ("stats" in parsed) {
 			return !timeZone || parsed.timeZone === timeZone ? parsed.stats ?? null : null;
 		}
 
-		return timeZone ? null : parsed;
+		return timeZone ? null : parsed as RoutineStatsResponse;
 	} catch {
 		return null;
 	}

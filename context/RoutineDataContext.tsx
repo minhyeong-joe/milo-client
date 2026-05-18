@@ -9,6 +9,7 @@ import type {
 	SleepEvent,
 	SleepType,
 } from "@/data/homeData";
+import { useTimelineTimeZone } from "@/context/AppPreferencesContext";
 import { useAuthSession } from "@/context/AuthSessionContext";
 import { useBabySelection } from "@/context/BabySelectionContext";
 import {
@@ -114,8 +115,16 @@ type RoutineDataContextValue = {
 const RoutineDataContext = createContext<RoutineDataContextValue | undefined>(undefined);
 const OFFLINE_SYNC_MESSAGE = "Offline mode. Sync will be re-enabled once online.";
 
-function getEventDate(event: RoutineEvent) {
-	return getLocalDateKey(getRoutineEventTime(event));
+function getHomeTimelineDate(event: RoutineEvent, timeZone?: string) {
+	if (event.kind === "sleep") {
+		if (event.type === "nighttime" && event.endTime) {
+			return getLocalDateKey(event.endTime, timeZone);
+		}
+
+		return getLocalDateKey(event.startTime, timeZone);
+	}
+
+	return getLocalDateKey(getRoutineEventTime(event), timeZone);
 }
 
 function getEmptyMealsByType(): RoutineDay["summary"]["meals"]["byType"] {
@@ -399,7 +408,7 @@ function getLastLoggedFromLogs(logs: RoutineDay[]): RoutineLastLogged {
 	};
 }
 
-function updateMealInLogs(logs: RoutineDay[], input: UpdateMealInput) {
+function updateMealInLogs(logs: RoutineDay[], input: UpdateMealInput, timeZone?: string) {
 	const existingMeal = logs
 		.flatMap((day) => day.timeline)
 		.find((event): event is MealEvent => event.kind === "meal" && event.id === input.id);
@@ -419,10 +428,10 @@ function updateMealInLogs(logs: RoutineDay[], input: UpdateMealInput) {
 		type: input.type,
 	};
 
-	return replaceEventInLogs(logs, existingMeal, updatedMeal);
+	return replaceEventInLogs(logs, existingMeal, updatedMeal, timeZone);
 }
 
-function updateDiaperInLogs(logs: RoutineDay[], input: UpdateDiaperInput) {
+function updateDiaperInLogs(logs: RoutineDay[], input: UpdateDiaperInput, timeZone?: string) {
 	const existingDiaper = logs
 		.flatMap((day) => day.timeline)
 		.find((event): event is DiaperEvent => event.kind === "diaper" && event.id === input.id);
@@ -438,10 +447,10 @@ function updateDiaperInLogs(logs: RoutineDay[], input: UpdateDiaperInput) {
 		type: input.type,
 	};
 
-	return replaceEventInLogs(logs, existingDiaper, updatedDiaper);
+	return replaceEventInLogs(logs, existingDiaper, updatedDiaper, timeZone);
 }
 
-function updateSleepInLogs(logs: RoutineDay[], input: UpdateSleepInput) {
+function updateSleepInLogs(logs: RoutineDay[], input: UpdateSleepInput, timeZone?: string) {
 	const existingSleep = logs
 		.flatMap((day) => day.timeline)
 		.find((event): event is SleepEvent => event.kind === "sleep" && event.id === input.id);
@@ -457,12 +466,17 @@ function updateSleepInLogs(logs: RoutineDay[], input: UpdateSleepInput) {
 		type: input.type,
 	};
 
-	return replaceEventInLogs(logs, existingSleep, updatedSleep);
+	return replaceEventInLogs(logs, existingSleep, updatedSleep, timeZone);
 }
 
-function replaceEventInLogs(logs: RoutineDay[], previous: RoutineEvent, next: RoutineEvent) {
-	const previousDate = getEventDate(previous);
-	const nextDate = getEventDate(next);
+function replaceEventInLogs(
+	logs: RoutineDay[],
+	previous: RoutineEvent,
+	next: RoutineEvent,
+	timeZone?: string,
+) {
+	const previousDate = getHomeTimelineDate(previous, timeZone);
+	const nextDate = getHomeTimelineDate(next, timeZone);
 	const hasNextDay = logs.some((day) => day.date === nextDate);
 	const nextLogs = hasNextDay ? logs : [createEmptyRoutineDay(nextDate), ...logs];
 
@@ -507,6 +521,7 @@ function applyEventToDaySummary(day: RoutineDay, event: RoutineEvent) {
 export function RoutineDataProvider({ children }: PropsWithChildren) {
 	const { authStatus, session } = useAuthSession();
 	const { selectedBaby } = useBabySelection();
+	const timelineTimeZone = useTimelineTimeZone(selectedBaby);
 	const [dailyLogs, setDailyLogs] = useState<RoutineDay[]>([]);
 	const [lastLogged, setLastLogged] = useState<RoutineLastLogged | null>(null);
 	const [syncError, setSyncError] = useState<string | null>(null);
@@ -653,7 +668,7 @@ export function RoutineDataProvider({ children }: PropsWithChildren) {
 				time: input.time,
 				type: input.type,
 			};
-			const mealDate = getEventDate(meal);
+			const mealDate = getHomeTimelineDate(meal, timelineTimeZone);
 
 			setDailyLogs((currentLogs) => {
 				const hasDay = currentLogs.some((day) => day.date === mealDate);
@@ -706,7 +721,7 @@ export function RoutineDataProvider({ children }: PropsWithChildren) {
 				syncStatus: "pending",
 				type: input.type,
 			};
-			const sleepDate = getEventDate(sleep);
+			const sleepDate = getHomeTimelineDate(sleep, timelineTimeZone);
 
 			setDailyLogs((currentLogs) => {
 				const hasDay = currentLogs.some((day) => day.date === sleepDate);
@@ -759,7 +774,7 @@ export function RoutineDataProvider({ children }: PropsWithChildren) {
 				time: input.time,
 				type: input.type,
 			};
-			const diaperDate = getEventDate(diaper);
+			const diaperDate = getHomeTimelineDate(diaper, timelineTimeZone);
 
 			setDailyLogs((currentLogs) => {
 				const hasDay = currentLogs.some((day) => day.date === diaperDate);
@@ -799,7 +814,7 @@ export function RoutineDataProvider({ children }: PropsWithChildren) {
 			const existingMeal = findEventById(dailyLogs, id);
 			const clientMutationId = existingMeal?.clientMutationId ?? createUuid();
 			setDailyLogs((currentLogs) => {
-				const nextLogs = updateMealInLogs(currentLogs, input);
+				const nextLogs = updateMealInLogs(currentLogs, input, timelineTimeZone);
 				setLastLogged(getLastLoggedFromLogs(nextLogs));
 				return nextLogs;
 			});
@@ -833,7 +848,7 @@ export function RoutineDataProvider({ children }: PropsWithChildren) {
 			const existingDiaper = findEventById(dailyLogs, id);
 			const clientMutationId = existingDiaper?.clientMutationId ?? createUuid();
 			setDailyLogs((currentLogs) => {
-				const nextLogs = updateDiaperInLogs(currentLogs, input);
+				const nextLogs = updateDiaperInLogs(currentLogs, input, timelineTimeZone);
 				setLastLogged(getLastLoggedFromLogs(nextLogs));
 				return nextLogs;
 			});
@@ -866,14 +881,14 @@ export function RoutineDataProvider({ children }: PropsWithChildren) {
 			const { id, ...payload } = input;
 			const existingSleep = findEventById(dailyLogs, id);
 			const clientMutationId = existingSleep?.clientMutationId ?? createUuid();
-			const previousDate = existingSleep ? getEventDate(existingSleep) : null;
+			const previousDate = existingSleep ? getHomeTimelineDate(existingSleep, timelineTimeZone) : null;
 			const updatedSleep = existingSleep && existingSleep.kind === "sleep"
 				? { ...existingSleep, ...payload }
 				: null;
-			const nextDate = updatedSleep ? getEventDate(updatedSleep) : null;
-			const predictedNextLogs = updateSleepInLogs(dailyLogs, input);
+			const nextDate = updatedSleep ? getHomeTimelineDate(updatedSleep, timelineTimeZone) : null;
+			const predictedNextLogs = updateSleepInLogs(dailyLogs, input, timelineTimeZone);
 			setDailyLogs((currentLogs) => {
-				const nextLogs = updateSleepInLogs(currentLogs, input);
+				const nextLogs = updateSleepInLogs(currentLogs, input, timelineTimeZone);
 				setLastLogged(getLastLoggedFromLogs(nextLogs));
 				return nextLogs;
 			});
@@ -1022,6 +1037,7 @@ export function RoutineDataProvider({ children }: PropsWithChildren) {
 		session,
 		syncError,
 		syncQueuedMutations,
+		timelineTimeZone,
 	]);
 
 	return <RoutineDataContext.Provider value={value}>{children}</RoutineDataContext.Provider>;
