@@ -66,6 +66,7 @@ export default function ReportsScreen() {
 	const [patternEndDate, setPatternEndDate] = useState<string | null>(null);
 	const [customPatternStartDate, setCustomPatternStartDate] = useState<string | null>(null);
 	const [customPatternEndDate, setCustomPatternEndDate] = useState<string | null>(null);
+	const [excludeTodayFromPatterns, setExcludeTodayFromPatterns] = useState(false);
 	const initialPatternEndDate = selectedBaby
 		? getDateKeyInTimeZone(new Date(), selectedBaby.timezone)
 		: getDateKey(new Date());
@@ -108,10 +109,13 @@ export default function ReportsScreen() {
 	const todayDateKey = selectedBaby
 		? getDateKeyInTimeZone(new Date(), selectedBaby.timezone)
 		: getDateKey(new Date());
+	const presetPatternMaxDate = excludeTodayFromPatterns
+		? addDays(todayDateKey, -1)
+		: todayDateKey;
 	const patternEndDateKey =
 		patternRangeMode === "custom"
 			? customPatternEndDate ?? todayDateKey
-			: patternEndDate ?? todayDateKey;
+			: getPresetPatternEndDate(patternEndDate, presetPatternMaxDate);
 	const patternDayCount =
 		patternRangeMode === "custom"
 			? getInclusiveDayCount(customPatternStartDate ?? patternEndDateKey, patternEndDateKey)
@@ -243,8 +247,8 @@ export default function ReportsScreen() {
 		}
 
 		setPatternRangeMode(mode);
-		setPatternEndDate(todayDateKey);
-	}, [todayDateKey]);
+		setPatternEndDate(presetPatternMaxDate);
+	}, [presetPatternMaxDate]);
 	const applyCustomPatternRange = useCallback((startDate: string, endDate: string) => {
 		const cappedEndDate = endDate > todayDateKey ? todayDateKey : endDate;
 		const cappedStartDate = startDate > cappedEndDate ? cappedEndDate : startDate;
@@ -258,12 +262,11 @@ export default function ReportsScreen() {
 			return;
 		}
 
-		const today = getDateKeyInTimeZone(new Date(), selectedBaby.timezone);
 		const shiftDays = patternDayCount * direction;
 
 		if (patternRangeMode === "custom") {
 			const shiftedEndDate = addDays(patternEndDateKey, shiftDays);
-			const nextEndDate = direction > 0 && shiftedEndDate > today ? today : shiftedEndDate;
+			const nextEndDate = direction > 0 && shiftedEndDate > todayDateKey ? todayDateKey : shiftedEndDate;
 			const nextStartDate = addDays(nextEndDate, -(patternDayCount - 1));
 
 			setCustomPatternStartDate(nextStartDate);
@@ -272,12 +275,29 @@ export default function ReportsScreen() {
 		}
 
 		setPatternEndDate((current) => {
-			const currentEndDate = current ?? today;
+			const currentEndDate = getPresetPatternEndDate(current, presetPatternMaxDate);
 			const shiftedEndDate = addDays(currentEndDate, shiftDays);
 
-			return direction > 0 && shiftedEndDate > today ? today : shiftedEndDate;
+			return direction > 0 && shiftedEndDate > presetPatternMaxDate
+				? presetPatternMaxDate
+				: shiftedEndDate;
 		});
-	}, [patternDayCount, patternEndDateKey, patternRangeMode, selectedBaby]);
+	}, [
+		patternDayCount,
+		patternEndDateKey,
+		patternRangeMode,
+		presetPatternMaxDate,
+		selectedBaby,
+		todayDateKey,
+	]);
+
+	const changeExcludeTodayFromPatterns = useCallback((excludeToday: boolean) => {
+		setExcludeTodayFromPatterns(excludeToday);
+
+		if (patternRangeMode !== "custom") {
+			setPatternEndDate(excludeToday ? addDays(todayDateKey, -1) : todayDateKey);
+		}
+	}, [patternRangeMode, todayDateKey]);
 
 	useEffect(() => {
 		if (!selectedBaby) {
@@ -291,6 +311,7 @@ export default function ReportsScreen() {
 		setCustomPatternStartDate(null);
 		setCustomPatternEndDate(null);
 		setPatternRangeMode("week");
+		setExcludeTodayFromPatterns(false);
 	}, [selectedBaby]);
 
 	useEffect(() => {
@@ -373,14 +394,16 @@ export default function ReportsScreen() {
 
 				{activeTab === "patterns" ? (
 					<PatternReportsContent
-						canShiftNext={patternEndDateKey < (selectedBaby
-							? getDateKeyInTimeZone(new Date(), selectedBaby.timezone)
-							: getDateKey(new Date()))}
+						canShiftNext={patternEndDateKey < (patternRangeMode === "custom"
+							? todayDateKey
+							: presetPatternMaxDate)}
 						endDate={patternEndDateKey}
+						excludeTodayFromPatterns={excludeTodayFromPatterns}
 						isLoading={false}
 						isRefreshing={isRefreshing}
 						maxDate={todayDateKey}
 						onCustomRangeApply={applyCustomPatternRange}
+						onExcludeTodayChange={changeExcludeTodayFromPatterns}
 						onRefresh={refreshLogStats}
 						onRangeModeChange={changePatternRangeMode}
 						onShiftRange={shiftPatternRange}
@@ -772,6 +795,14 @@ function TabButton({
 
 function getErrorMessage(_error: unknown) {
 	return OFFLINE_SYNC_MESSAGE;
+}
+
+function getPresetPatternEndDate(currentEndDate: string | null, presetMaxDate: string) {
+	if (!currentEndDate || currentEndDate > presetMaxDate) {
+		return presetMaxDate;
+	}
+
+	return currentEndDate;
 }
 
 function isAuthRequiredError(error: unknown) {

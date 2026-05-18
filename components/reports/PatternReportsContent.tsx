@@ -32,9 +32,11 @@ function useThemeStyles() {
 export default function PatternReportsContent({
 	canShiftNext,
 	endDate,
+	excludeTodayFromPatterns,
 	isRefreshing,
 	maxDate,
 	onCustomRangeApply,
+	onExcludeTodayChange,
 	onRefresh,
 	onRangeModeChange,
 	onShiftRange,
@@ -45,10 +47,12 @@ export default function PatternReportsContent({
 }: {
 	canShiftNext: boolean;
 	endDate: string;
+	excludeTodayFromPatterns: boolean;
 	isLoading: boolean;
 	isRefreshing: boolean;
 	maxDate: string;
 	onCustomRangeApply: (startDate: string, endDate: string) => void;
+	onExcludeTodayChange: (excludeToday: boolean) => void;
 	onRefresh: () => Promise<void>;
 	onRangeModeChange: (mode: PatternRangeMode) => void;
 	onShiftRange: (direction: -1 | 1) => void;
@@ -146,6 +150,22 @@ export default function PatternReportsContent({
 					/>
 				</View>
 			</View>
+			
+			{(rangeMode === "week" || rangeMode === "month") && (
+				<Pressable
+					accessibilityRole="checkbox"
+					accessibilityState={{ checked: excludeTodayFromPatterns }}
+					style={styles.excludeTodayRow}
+					onPress={() => onExcludeTodayChange(!excludeTodayFromPatterns)}
+				>
+					<Ionicons
+						color={excludeTodayFromPatterns ? themeColors.primary : themeColors.textSecondary}
+						name={excludeTodayFromPatterns ? "checkbox-outline" : "square-outline"}
+						size={16}
+					/>
+						<Text style={styles.excludeTodayLabel}>Exclude Today</Text>
+				</Pressable>
+			)}
 
 			<View style={globalStyles.card}>
 				<View style={[globalStyles.rowCenter, styles.routineToggleButtonGroup]}>
@@ -628,6 +648,19 @@ function createStyles(themeColors: ThemeColors) {
 	},
 	disabledIcon: {
 		opacity: 0.35,
+	},
+	excludeTodayLabel: {
+		...typography.caption,
+		color: themeColors.textSecondary,
+		fontSize: 11,
+	},
+	excludeTodayRow: {
+		alignItems: "center",
+		alignSelf: "flex-end",
+		flexDirection: "row",
+		gap: spacing.xs,
+		marginTop: -spacing.md,
+		paddingHorizontal: spacing.sm,
 	},
 	footnoteRow: {
 		alignItems: "center",
