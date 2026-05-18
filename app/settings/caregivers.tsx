@@ -26,7 +26,7 @@ export default function ManageCaregiversScreen() {
 			<SettingsHeader onBack={() => router.back()} title="Manage Caregivers" />
 			<ScrollView contentContainerStyle={styles.content}>
 				<View style={globalStyles.card}>
-					<Text style={styles.sectionTitle}>{selectedBaby?.name ?? "Baby"} Access</Text>
+					<Text style={styles.sectionTitle}>Access to {selectedBaby?.name ?? "Baby"}</Text>
 					<View style={styles.userRow}>
 						<View style={styles.initialCircle}>
 							<Text style={styles.initialText}>
@@ -35,10 +35,10 @@ export default function ManageCaregiversScreen() {
 						</View>
 						<View style={styles.userText}>
 							<Text style={styles.userName}>
-								{session?.user.displayName ?? session?.user.email ?? "Current user"}
+								{session?.user.displayName ?? session?.user.email ?? "Current user"}  • {formatRole(selectedBaby?.role)}
 							</Text>
 							<Text style={styles.userMeta}>
-								{session?.user.email ?? "Signed in user"} • {formatRole(selectedBaby?.role)}
+								{session?.user.email ?? "Signed in user"}
 							</Text>
 						</View>
 					</View>

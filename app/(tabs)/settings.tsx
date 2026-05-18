@@ -81,8 +81,8 @@ export default function SettingsScreen() {
 						iconBackground="#FFEAF4"
 						iconColor="#D84D8B"
 						onPress={() => router.push("/settings/tags")}
-						subtitle="Manage milestone tags"
-						title="Milestone Tags"
+						subtitle="View and manage diary tags"
+						title="Diary Tags"
 					/>
 				</SettingsGroup>
 

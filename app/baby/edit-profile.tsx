@@ -180,7 +180,7 @@ export default function EditBabyProfileScreen() {
 					<BabySexSelector onChange={setSex} value={sex} />
 					<TimeZoneSelector
 						disabled={isSaving}
-						label="Baby timezone"
+						label="Default Timezone"
 						onChange={setTimeZone}
 						timeZone={timeZone}
 					/>

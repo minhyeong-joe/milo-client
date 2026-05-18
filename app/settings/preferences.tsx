@@ -39,7 +39,7 @@ export default function AppPreferencesScreen() {
 			<ScrollView contentContainerStyle={styles.content}>
 				<View style={globalStyles.card}>
 					<Text style={styles.sectionTitle}>Unit Preference</Text>
-					<PreferenceRow label="Volume" styles={styles}>
+					<PreferenceRow label="Volume" styles={styles} helper="Bottle">
 						<SegmentButton
 							active={preferredVolumeUnit === "ml"}
 							label="mL"
@@ -53,7 +53,7 @@ export default function AppPreferencesScreen() {
 							styles={styles}
 						/>
 					</PreferenceRow>
-					<PreferenceRow label="Length" styles={styles}>
+					<PreferenceRow label="Length" styles={styles} helper="Height, Head size">
 						<SegmentButton
 							active={preferredLengthUnit === "cm"}
 							label="cm"
@@ -67,7 +67,7 @@ export default function AppPreferencesScreen() {
 							styles={styles}
 						/>
 					</PreferenceRow>
-					<PreferenceRow label="Weight" styles={styles}>
+					<PreferenceRow label="Weight" styles={styles} helper="Weight">
 						<SegmentButton
 							active={preferredWeightUnit === "kg"}
 							label="kg"
@@ -117,7 +117,7 @@ export default function AppPreferencesScreen() {
 					<PreferenceRow
 						helper={
 							timelineTimeZoneMode === "baby"
-								? "Show routine and diary times in the selected baby's timezone."
+								? `Show routine and diary times in the default timezone.\n${getTimeZoneDisplayLabel(timelineTimeZone)}`
 								: `Show times in ${getTimeZoneDisplayLabel(timelineTimeZone)}.`
 						}
 						label="Timeline timezone"
@@ -125,13 +125,13 @@ export default function AppPreferencesScreen() {
 					>
 						<SegmentButton
 							active={timelineTimeZoneMode === "baby"}
-							label="Baby"
+							label="Default"
 							onPress={() => void setTimelineTimeZoneMode("baby")}
 							styles={styles}
 						/>
 						<SegmentButton
 							active={timelineTimeZoneMode === "device"}
-							label="Device"
+							label="Custom"
 							onPress={() => void setTimelineTimeZoneMode("device")}
 							styles={styles}
 						/>
@@ -240,7 +240,7 @@ function createStyles(themeColors: ThemeColors) {
 			borderRadius: 13,
 			borderWidth: 1,
 			flexDirection: "row",
-			minWidth: 144,
+			minWidth: 180,
 			padding: 3,
 		},
 		segmentText: {

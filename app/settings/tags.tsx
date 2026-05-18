@@ -376,7 +376,7 @@ export default function MilestoneTagsScreen() {
 					>
 						<View>
 							<Text style={styles.sectionTitle}>Default Tags</Text>
-							<Text style={styles.helper}>Common tags provided for ease of access.</Text>
+							<Text style={styles.helper}>Helpful default tags for common moments and memories.</Text>
 						</View>
 						<Ionicons
 							color={themeColors.textSecondary}
