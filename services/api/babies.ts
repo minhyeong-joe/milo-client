@@ -55,7 +55,8 @@ export type UpdateBabyResponse = {
 };
 
 export type CreateBabyAvatarUploadRequest = {
-	contentType: "image/jpeg" | "image/png" | "image/webp";
+	contentType: "image/jpeg" | "image/png";
+	sizeBytes: number;
 };
 
 export type CreateBabyAvatarUploadResponse = {

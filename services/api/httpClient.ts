@@ -216,14 +216,60 @@ async function readResponseBody(response: Response) {
 
 function createApiError(response: Response, body: unknown) {
 	const apiError = isApiErrorBody(body) ? body.error : undefined;
+	const validationMessage =
+		apiError?.code === "VALIDATION_ERROR"
+			? getFirstValidationMessage(apiError.details)
+			: null;
 
 	return new ApiError({
 		status: response.status,
 		code: apiError?.code,
 		details: apiError?.details,
 		body,
-		message: apiError?.message ?? `Milo API request failed with status ${response.status}.`,
+		message: validationMessage ?? apiError?.message ?? `Milo API request failed with status ${response.status}.`,
 	});
+}
+
+function getFirstValidationMessage(value: unknown): string | null {
+	if (!value || typeof value !== "object") {
+		return null;
+	}
+
+	const errors = (value as { errors?: unknown }).errors;
+
+	if (Array.isArray(errors)) {
+		const firstError = errors.find((error) => typeof error === "string");
+
+		if (firstError) {
+			return firstError;
+		}
+	}
+
+	const properties = (value as { properties?: unknown }).properties;
+
+	if (properties && typeof properties === "object") {
+		for (const child of Object.values(properties)) {
+			const childMessage = getFirstValidationMessage(child);
+
+			if (childMessage) {
+				return childMessage;
+			}
+		}
+	}
+
+	const items = (value as { items?: unknown }).items;
+
+	if (items && typeof items === "object") {
+		for (const child of Object.values(items)) {
+			const childMessage = getFirstValidationMessage(child);
+
+			if (childMessage) {
+				return childMessage;
+			}
+		}
+	}
+
+	return null;
 }
 
 function createNetworkError(error: unknown, didTimeout: boolean) {

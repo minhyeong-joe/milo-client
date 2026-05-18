@@ -36,6 +36,10 @@ import {
 	isDiaryVideoContentType,
 	type DiaryMediaContentType,
 } from "@/services/diary/diaryMediaConfig";
+import {
+	DIARY_TAG_MAX_COUNT,
+	TAG_NAME_MAX_LENGTH,
+} from "@/services/validation/inputLimits";
 import { spacing, typography, type ThemeColors } from "@/styles/globalStyles";
 import { useAppPreferences, useAppTheme } from "@/context/AppPreferencesContext";
 
@@ -223,7 +227,10 @@ export function DiaryEntryForm({
 		);
 	}, [availableTags, selectedTags, trimmedTagInput]);
 
-	const canCreateTag = trimmedTagInput.length > 0 && !hasExactMatch;
+	const canCreateTag =
+		trimmedTagInput.length > 0 &&
+		trimmedTagInput.length <= TAG_NAME_MAX_LENGTH &&
+		!hasExactMatch;
 	const shouldCollapseTagPool = trimmedTagInput.length === 0 && !isTagPoolExpanded;
 	const canToggleTagPool = trimmedTagInput.length === 0 && visibleTags.length > 12;
 
@@ -251,6 +258,11 @@ export function DiaryEntryForm({
 
 		if (!canSubmit) {
 			setValidationError("Write a diary note before saving.");
+			return;
+		}
+
+		if (selectedTags.length > DIARY_TAG_MAX_COUNT) {
+			setValidationError(`Choose up to ${DIARY_TAG_MAX_COUNT} tags.`);
 			return;
 		}
 
@@ -285,6 +297,14 @@ export function DiaryEntryForm({
 	};
 
 	const selectTag = (tag: DiaryTag) => {
+		if (
+			selectedTags.length >= DIARY_TAG_MAX_COUNT &&
+			!selectedTags.some((selectedTag) => selectedTag.id === tag.id)
+		) {
+			setTagError(`Choose up to ${DIARY_TAG_MAX_COUNT} tags.`);
+			return;
+		}
+
 		setSelectedTags((currentTags) =>
 			currentTags.some((selectedTag) => selectedTag.id === tag.id)
 				? currentTags
@@ -297,10 +317,20 @@ export function DiaryEntryForm({
 
 	const removeTag = (tagId: string) => {
 		setSelectedTags((currentTags) => currentTags.filter((tag) => tag.id !== tagId));
+		setTagError(null);
 	};
 
 	const handleCreateTag = async () => {
 		if (!canCreateTag || isCreatingTag) {
+			if (trimmedTagInput.length > TAG_NAME_MAX_LENGTH) {
+				setTagError(`Tag names must be ${TAG_NAME_MAX_LENGTH} characters or fewer.`);
+			}
+
+			return;
+		}
+
+		if (selectedTags.length >= DIARY_TAG_MAX_COUNT) {
+			setTagError(`Choose up to ${DIARY_TAG_MAX_COUNT} tags.`);
 			return;
 		}
 
@@ -635,7 +665,11 @@ export function DiaryEntryForm({
 						<Ionicons color={themeColors.textSecondary} name="search-outline" size={18} />
 						<TextInput
 							autoCapitalize="words"
-							onChangeText={setTagInput}
+							maxLength={TAG_NAME_MAX_LENGTH}
+							onChangeText={(value) => {
+								setTagInput(value);
+								setTagError(null);
+							}}
 							onFocus={() => {
 								setIsTagInputFocused(true);
 								scrollTagsIntoViewAfterKeyboard();

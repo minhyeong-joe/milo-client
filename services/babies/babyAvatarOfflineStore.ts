@@ -5,6 +5,10 @@ import {
 	removeBabyAvatar,
 } from "@/services/api/babies";
 import { getLocalDb, runLocalDbWrite } from "@/services/local/sqlite";
+import {
+	BABY_AVATAR_MAX_SIZE_BYTES,
+	isBabyAvatarContentType,
+} from "@/services/validation/inputLimits";
 
 export type PendingBabyAvatarMutation = {
 	babyId: string;
@@ -164,11 +168,18 @@ export async function syncPendingBabyAvatarMutations(userId: string) {
 					throw new Error("Missing local avatar image.");
 				}
 
-				const upload = await createBabyAvatarUpload(mutation.babyId, {
-					contentType: mutation.contentType,
-				});
 				const imageResponse = await fetch(mutation.localUri);
 				const imageBlob = await imageResponse.blob();
+				const sizeBytes = imageBlob.size;
+
+				if (sizeBytes > BABY_AVATAR_MAX_SIZE_BYTES) {
+					throw new Error("Profile pictures must be JPG or PNG and 1 MB or smaller.");
+				}
+
+				const upload = await createBabyAvatarUpload(mutation.babyId, {
+					contentType: mutation.contentType,
+					sizeBytes,
+				});
 				const uploadResponse = await fetch(upload.uploadUrl, {
 					body: imageBlob,
 					headers: {
@@ -207,7 +218,7 @@ function rowToMutation(row: BabyAvatarMutationRow): PendingBabyAvatarMutation {
 function isAvatarContentType(
 	value: unknown,
 ): value is CreateBabyAvatarUploadRequest["contentType"] {
-	return value === "image/jpeg" || value === "image/png" || value === "image/webp";
+	return isBabyAvatarContentType(value);
 }
 
 function getErrorMessage(error: unknown) {

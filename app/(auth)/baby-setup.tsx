@@ -7,6 +7,7 @@ import {
 } from "@/components/baby/BabyProfileFields";
 import { useAuthSession } from "@/context/AuthSessionContext";
 import type { BabyRole, BabySex } from "@/services/api/babies";
+import { BABY_NAME_MAX_LENGTH } from "@/services/validation/inputLimits";
 import { spacing, typography, type ThemeColors } from "@/styles/globalStyles";
 import { useAppTheme } from "@/context/AppPreferencesContext";
 import type { DateTimePickerEvent } from "@react-native-community/datetimepicker";
@@ -46,23 +47,34 @@ export default function BabySetupScreen() {
 	const [sex, setSex] = useState<BabySex>("GIRL");
 	const [role, setRole] = useState<BabyRole>("MOTHER");
 	const [inviteCode, setInviteCode] = useState("");
+	const [setupError, setSetupError] = useState<string | null>(null);
 
 	const canContinue = useMemo(() => {
 		if (setupMode === "inviteCode") {
 			return false;
 		}
 
-		return babyName.trim().length > 0;
+		const trimmedName = babyName.trim();
+		return trimmedName.length > 0 && trimmedName.length <= BABY_NAME_MAX_LENGTH;
 	}, [babyName, setupMode]);
 
 	const continueToHome = async () => {
-		if (!canContinue) {
+		const trimmedName = babyName.trim();
+
+		if (!trimmedName) {
+			setSetupError("Baby name is required.");
 			return;
 		}
 
+		if (trimmedName.length > BABY_NAME_MAX_LENGTH) {
+			setSetupError(`Baby name must be ${BABY_NAME_MAX_LENGTH} characters or fewer.`);
+			return;
+		}
+
+		setSetupError(null);
 		const isComplete = await completeSignupWithBaby({
 			birthdate: formatBabyProfileDateKey(birthdate),
-			name: babyName,
+			name: trimmedName,
 			role,
 			sex,
 		});
@@ -112,6 +124,7 @@ export default function BabySetupScreen() {
 							label="Add Baby"
 							onPress={() => {
 								clearError();
+								setSetupError(null);
 								setSetupMode("addBaby");
 							}}
 						/>
@@ -121,6 +134,7 @@ export default function BabySetupScreen() {
 							label="Invite Code"
 							onPress={() => {
 								clearError();
+								setSetupError(null);
 								setSetupMode("inviteCode");
 							}}
 						/>
@@ -131,7 +145,11 @@ export default function BabySetupScreen() {
 							<>
 								<BabyAvatarField />
 								<BabyNameField
-									onChangeText={setBabyName}
+									maxLength={BABY_NAME_MAX_LENGTH}
+									onChangeText={(value) => {
+										setBabyName(value);
+										setSetupError(null);
+									}}
 									placeholder="Emma"
 									value={babyName}
 								/>
@@ -175,7 +193,7 @@ export default function BabySetupScreen() {
 							</Text>
 						</Pressable>
 
-						{error && <Text style={styles.errorText}>{error}</Text>}
+						{(setupError || error) && <Text style={styles.errorText}>{setupError ?? error}</Text>}
 					</View>
 				</ScrollView>
 			</KeyboardAvoidingView>

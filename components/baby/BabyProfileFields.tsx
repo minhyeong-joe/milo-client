@@ -9,10 +9,17 @@ import { Directory, File, Paths } from "expo-file-system";
 import type { ComponentProps } from "react";
 import { Alert, Image, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import type { BabySex, CreateBabyAvatarUploadRequest } from "@/services/api/babies";
+import {
+	BABY_AVATAR_MAX_SIZE_BYTES,
+	BABY_NAME_MAX_LENGTH,
+	formatValidationMegabytes,
+	isBabyAvatarContentType,
+	type BabyAvatarContentType,
+} from "@/services/validation/inputLimits";
 import { spacing, typography, type ThemeColors } from "@/styles/globalStyles";
 
 type IoniconName = ComponentProps<typeof Ionicons>["name"];
-type AvatarContentType = "image/jpeg" | "image/png" | "image/webp";
+type AvatarContentType = BabyAvatarContentType;
 
 const fallbackBabyAvatar = require("@/assets/images/baby.png");
 
@@ -73,6 +80,12 @@ export function BabyAvatarField({
 		try {
 			const asset = result.assets[0];
 			const contentType = getAvatarContentType(asset);
+			const sizeBytes = await getAvatarSizeBytes(asset);
+
+			if (sizeBytes > BABY_AVATAR_MAX_SIZE_BYTES) {
+				throw new Error(getAvatarValidationMessage());
+			}
+
 			const localUri = await copyAvatarToLocalCache(asset.uri, contentType, babyId);
 			await onAvatarSelected?.({ contentType, localUri });
 		} catch (error) {
@@ -126,11 +139,13 @@ export function BabyAvatarField({
 
 export function BabyNameField({
 	label = "Baby name",
+	maxLength = BABY_NAME_MAX_LENGTH,
 	onChangeText,
 	placeholder = "Elliot",
 	value,
 }: {
 	label?: string;
+	maxLength?: number;
 	onChangeText: (value: string) => void;
 	placeholder?: string;
 	value: string;
@@ -141,6 +156,7 @@ export function BabyNameField({
 			<Text style={styles.fieldLabel}>{label}</Text>
 			<TextInput
 				autoCapitalize="words"
+				maxLength={maxLength}
 				onChangeText={onChangeText}
 				placeholder={placeholder}
 				placeholderTextColor={themeColors.textSecondary}
@@ -280,12 +296,12 @@ export function formatBirthdate(date: Date, timeZone?: string, locale = "en-US")
 }
 
 function getAvatarContentType(asset: ImagePicker.ImagePickerAsset): AvatarContentType {
-	if (
-		asset.mimeType === "image/png" ||
-		asset.mimeType === "image/webp" ||
-		asset.mimeType === "image/jpeg"
-	) {
+	if (isBabyAvatarContentType(asset.mimeType)) {
 		return asset.mimeType;
+	}
+
+	if (asset.mimeType) {
+		throw new Error(getAvatarValidationMessage());
 	}
 
 	const extension = asset.uri.split("?")[0]?.split(".").pop()?.toLowerCase();
@@ -294,11 +310,21 @@ function getAvatarContentType(asset: ImagePicker.ImagePickerAsset): AvatarConten
 		return "image/png";
 	}
 
-	if (extension === "webp") {
-		return "image/webp";
+	if (extension === "jpg" || extension === "jpeg") {
+		return "image/jpeg";
 	}
 
-	return "image/jpeg";
+	throw new Error(getAvatarValidationMessage());
+}
+
+async function getAvatarSizeBytes(asset: ImagePicker.ImagePickerAsset) {
+	if (typeof asset.fileSize === "number" && asset.fileSize > 0) {
+		return asset.fileSize;
+	}
+
+	const response = await fetch(asset.uri);
+	const blob = await response.blob();
+	return blob.size;
 }
 
 async function copyAvatarToLocalCache(
@@ -306,11 +332,7 @@ async function copyAvatarToLocalCache(
 	contentType: AvatarContentType,
 	babyId: string,
 ) {
-	const extension = contentType === "image/png"
-		? "png"
-		: contentType === "image/webp"
-			? "webp"
-			: "jpg";
+	const extension = contentType === "image/png" ? "png" : "jpg";
 	const directory = new Directory(Paths.document, "milo", "avatar-cache");
 	const destination = new File(directory, `${babyId}-${Date.now()}.${extension}`);
 	const source = new File(uri);
@@ -319,6 +341,10 @@ async function copyAvatarToLocalCache(
 	source.copy(destination);
 
 	return destination.uri;
+}
+
+function getAvatarValidationMessage() {
+	return `Profile pictures must be JPG or PNG and ${formatValidationMegabytes(BABY_AVATAR_MAX_SIZE_BYTES)} or smaller.`;
 }
 
 function getAvatarErrorMessage(error: unknown) {

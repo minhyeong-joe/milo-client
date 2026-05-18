@@ -7,6 +7,7 @@ import {
 } from "@/components/baby/BabyProfileFields";
 import { useBabySelection } from "@/context/BabySelectionContext";
 import type { BabySex, CreateBabyAvatarUploadRequest } from "@/services/api/babies";
+import { BABY_NAME_MAX_LENGTH } from "@/services/validation/inputLimits";
 import { spacing, type ThemeColors } from "@/styles/globalStyles";
 import { useAppTheme } from "@/context/AppPreferencesContext";
 import type { DateTimePickerEvent } from "@react-native-community/datetimepicker";
@@ -99,6 +100,11 @@ export default function EditBabyProfileScreen() {
 			return;
 		}
 
+		if (trimmedName.length > BABY_NAME_MAX_LENGTH) {
+			setFormError(`Baby name must be ${BABY_NAME_MAX_LENGTH} characters or fewer.`);
+			return;
+		}
+
 		setIsSaving(true);
 		setFormError(null);
 
@@ -161,7 +167,11 @@ export default function EditBabyProfileScreen() {
 					/>
 					<BabyNameField
 						label="Name"
-						onChangeText={setName}
+						maxLength={BABY_NAME_MAX_LENGTH}
+						onChangeText={(value) => {
+							setName(value);
+							setFormError(null);
+						}}
 						placeholder="Baby name"
 						value={name}
 					/>

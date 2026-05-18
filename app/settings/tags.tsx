@@ -17,6 +17,7 @@ import {
 	updatePendingCreateTagMutation,
 	upsertPendingTag,
 } from "@/services/tags/tagOfflineStore";
+import { TAG_NAME_MAX_LENGTH } from "@/services/validation/inputLimits";
 import { spacing, typography, type ThemeColors } from "@/styles/globalStyles";
 import { useAppTheme } from "@/context/AppPreferencesContext";
 import { Ionicons } from "@expo/vector-icons";
@@ -196,6 +197,12 @@ export default function MilestoneTagsScreen() {
 			return;
 		}
 
+		if (trimmedName.length > TAG_NAME_MAX_LENGTH) {
+			setInfoMessage(null);
+			setError(`Tag names must be ${TAG_NAME_MAX_LENGTH} characters or fewer.`);
+			return;
+		}
+
 		setIsSaving(true);
 		setError(null);
 		setInfoMessage(null);
@@ -262,6 +269,12 @@ export default function MilestoneTagsScreen() {
 		if (!trimmedName) {
 			setInfoMessage(null);
 			setError("Tag name is required.");
+			return;
+		}
+
+		if (trimmedName.length > TAG_NAME_MAX_LENGTH) {
+			setInfoMessage(null);
+			setError(`Tag names must be ${TAG_NAME_MAX_LENGTH} characters or fewer.`);
 			return;
 		}
 
@@ -464,8 +477,12 @@ export default function MilestoneTagsScreen() {
 						<Text style={styles.label}>Name</Text>
 						<TextInput
 							autoCapitalize="words"
-							maxLength={40}
-							onChangeText={setName}
+							maxLength={TAG_NAME_MAX_LENGTH}
+							onChangeText={(value) => {
+								setName(value);
+								setError(null);
+								setInfoMessage(null);
+							}}
 							placeholder="Tag name"
 							placeholderTextColor={themeColors.textSecondary}
 							style={styles.input}
