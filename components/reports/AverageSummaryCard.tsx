@@ -53,7 +53,9 @@ export default function AverageSummaryCard({
                         details.map((detail) => (
                             <View key={detail.label} style={styles.detailChip}>
                                 <Text style={styles.detailLabel}>{detail.label}</Text>
-                                <Text style={styles.detailValue}>{detail.value}</Text>
+                                {detail.values.map((value) => (
+                                    <Text key={value} style={styles.detailValue}>{value}</Text>
+                                ))}
                             </View>
                         ))
                     ) : (
@@ -103,21 +105,30 @@ function getDetailItems(
         const details = [
             buildDetail(
                 "Breastfeed",
-                mealSummary.byType.breastfeed.avgDurationMinutesPerActiveDay > 0
-                    ? `${formatDuration(mealSummary.byType.breastfeed.avgDurationMinutesPerActiveDay)} / day`
-                    : "",
+                [
+                    formatSessionsPerDay(mealSummary.byType.breastfeed.avgSessionsPerActiveDay),
+                    mealSummary.byType.breastfeed.avgDurationMinutesPerActiveDay > 0
+                        ? `${formatDuration(mealSummary.byType.breastfeed.avgDurationMinutesPerActiveDay)} / day`
+                        : "",
+                ],
             ),
             buildDetail(
                 "Breast milk",
-                mealSummary.byType.breastMilk.avgAmountMlPerActiveDay > 0
-                    ? `${formatVolume(mealSummary.byType.breastMilk.avgAmountMlPerActiveDay, preferredVolumeUnit)} / day`
-                    : "",
+                [
+                    formatSessionsPerDay(mealSummary.byType.breastMilk.avgSessionsPerActiveDay),
+                    mealSummary.byType.breastMilk.avgAmountMlPerActiveDay > 0
+                        ? `${formatVolume(mealSummary.byType.breastMilk.avgAmountMlPerActiveDay, preferredVolumeUnit)} / day`
+                        : "",
+                ],
             ),
             buildDetail(
                 "Formula",
-                mealSummary.byType.formula.avgAmountMlPerActiveDay > 0
-                    ? `${formatVolume(mealSummary.byType.formula.avgAmountMlPerActiveDay, preferredVolumeUnit)} / day`
-                    : "",
+                [
+                    formatSessionsPerDay(mealSummary.byType.formula.avgSessionsPerActiveDay),
+                    mealSummary.byType.formula.avgAmountMlPerActiveDay > 0
+                        ? `${formatVolume(mealSummary.byType.formula.avgAmountMlPerActiveDay, preferredVolumeUnit)} / day`
+                        : "",
+                ],
             ),
             buildDetail("Solid", formatSolidAverage(mealSummary)),
         ];
@@ -132,9 +143,11 @@ function getDetailItems(
             .map(([type, detail]) =>
                 buildDetail(
                     getTypeLabel(kind, type),
-                    detail.avgChangesPerActiveDay > 0
-                        ? `${detail.avgChangesPerActiveDay.toFixed(1)} / day`
-                        : "",
+                    [
+                        detail.avgChangesPerActiveDay > 0
+                            ? `${detail.avgChangesPerActiveDay.toFixed(1)} changes / day`
+                            : "",
+                    ],
                 ),
             )
             .filter((detail): detail is DetailItem => detail !== null);
@@ -146,9 +159,12 @@ function getDetailItems(
         .map(([type, detail]) =>
             buildDetail(
                 getTypeLabel(kind, type),
-                detail.avgDurationMinutesPerActiveDay > 0
-                    ? `${formatDuration(detail.avgDurationMinutesPerActiveDay)} / day`
-                    : "",
+                [
+                    formatSessionsPerDay(detail.avgSessionsPerActiveDay),
+                    detail.avgDurationMinutesPerActiveDay > 0
+                        ? `${formatDuration(detail.avgDurationMinutesPerActiveDay)} / day`
+                        : "",
+                ],
             ),
         )
         .filter((detail): detail is DetailItem => detail !== null);
@@ -156,30 +172,40 @@ function getDetailItems(
 
 type DetailItem = {
     label: string;
-    value: string;
+    values: string[];
 };
 
-function buildDetail(label: string, value: string): DetailItem | null {
-    if (!value) {
+function buildDetail(label: string, values: string[]): DetailItem | null {
+    const visibleValues = values.filter(Boolean);
+
+    if (visibleValues.length === 0) {
         return null;
     }
 
-    return { label, value };
+    return { label, values: visibleValues };
+}
+
+function formatSessionsPerDay(value: number) {
+    return value > 0 ? `${value.toFixed(1)} sessions / day` : "";
 }
 
 function formatSolidAverage(summary: MealAverage) {
     const parts: string[] = [];
     const solid = summary.byType.solid;
 
+    if (solid.avgSessionsPerActiveDay > 0) {
+        parts.push(formatSessionsPerDay(solid.avgSessionsPerActiveDay));
+    }
+
     if (solid.avgServingsPerActiveDay > 0) {
-        parts.push(`${solid.avgServingsPerActiveDay.toFixed(2)} servings`);
+        parts.push(`${solid.avgServingsPerActiveDay.toFixed(2)} servings / day`);
     }
 
     if (solid.avgGramsPerActiveDay > 0) {
-        parts.push(`${solid.avgGramsPerActiveDay.toFixed(0)} g`);
+        parts.push(`${solid.avgGramsPerActiveDay.toFixed(0)} g / day`);
     }
 
-    return parts.join(" + ") + (parts.length > 0 ? " / day" : "");
+    return parts;
 }
 
 function createStyles(themeColors: ThemeColors) {
