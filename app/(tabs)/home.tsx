@@ -2,16 +2,18 @@ import { BabyHeader } from "@/components/routine/BabyHeader";
 import { QuickActionGrid, type QuickActionItem } from "@/components/routine/QuickActionGrid";
 import { RoutineDayCard } from "@/components/routine/RoutineDayCard";
 import { SyncStatusCard } from "@/components/sync/SyncStatusCard";
-import { useAppPreferences, useTimelineTimeZone , useAppTheme } from "@/context/AppPreferencesContext";
+import { useAppPreferences, useAppTheme, useTimelineTimeZone } from "@/context/AppPreferencesContext";
 import { useAuthSession } from "@/context/AuthSessionContext";
 import { useBabySelection } from "@/context/BabySelectionContext";
 import { useGrowthData } from "@/context/GrowthDataContext";
+import { useImmunizationData } from "@/context/ImmunizationDataContext";
 import { useRoutineData } from "@/context/RoutineDataContext";
 import {
 	AUTH_REQUIRED_SYNC_MESSAGE,
 	OFFLINE_SYNC_MESSAGE,
 	useSync,
 } from "@/context/SyncContext";
+import { FEATURE_VISUALS } from "@/constants/featureVisuals";
 import type { RoutineConfig, RoutineKind } from "@/data/homeData";
 import { routineConfig } from "@/data/homeData";
 import { getRoutineDays, type RoutineLastLogged } from "@/services/api/routine";
@@ -20,6 +22,7 @@ import {
 	saveRoutineHomeCache,
 } from "@/services/routine/routineOfflineStore";
 import { spacing, type ThemeColors } from "@/styles/globalStyles";
+import { getImmunizationStatusLabel } from "@/utils/immunizationStatus";
 import { formatBabyAge } from "@/utils/routineDisplay";
 import { useCurrentMinute } from "@/utils/useCurrentMinute";
 import { useRouter } from "expo-router";
@@ -37,7 +40,6 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 const ROUTINE_PAGE_DAYS = 7;
 const HOME_SYNC_TIMEOUT_MS = 10000;
-
 type LoadLatestRoutineOptions = {
 	refreshBabyList?: boolean;
 	trigger?: "initial" | "manual";
@@ -56,6 +58,11 @@ export default function HomeScreen() {
 	const { authStatus, session } = useAuthSession();
 	const { languagePreference, preferredVolumeUnit } = useAppPreferences();
 	const { growthRecords } = useGrowthData();
+	const {
+		loadImmunizations,
+		records: immunizationRecords,
+		scheduleItems: immunizationScheduleItems,
+	} = useImmunizationData();
 
 	const {
 		babies,
@@ -109,6 +116,14 @@ export default function HomeScreen() {
 		() => getLastGrowthLoggedLabel(growthRecords, languagePreference),
 		[growthRecords, languagePreference],
 	);
+	const immunizationStatusLabel = useMemo(
+		() => getImmunizationStatusLabel(
+			immunizationScheduleItems,
+			immunizationRecords,
+			selectedBaby?.birthdate,
+		),
+		[immunizationRecords, immunizationScheduleItems, selectedBaby?.birthdate],
+	);
 	const quickActions = useMemo<QuickActionItem[]>(
 		() => [
 			...(["meal", "diaper", "sleep"] as const).map((id) => ({
@@ -117,17 +132,27 @@ export default function HomeScreen() {
 				lastActionLabel: getLastLoggedActionLabel(lastLogged, id, currentTime),
 			})),
 			{
-				accentColor: "#D84D8B",
-				backgroundColor: "#FFEAF4",
+				accentColor: FEATURE_VISUALS.growth.accentColor,
+				backgroundColor: FEATURE_VISUALS.growth.backgroundColor,
 				detailLabel: growthLastLoggedLabel,
-				icon: "scale-outline",
+				icon: FEATURE_VISUALS.growth.icon,
 				id: "growth",
 				kind: "navigation",
 				label: "Growth",
 				onPress: () => router.push("/baby/growth"),
 			},
+			{
+				accentColor: FEATURE_VISUALS.immunization.accentColor,
+				backgroundColor: FEATURE_VISUALS.immunization.backgroundColor,
+				detailLabel: immunizationStatusLabel,
+				icon: FEATURE_VISUALS.immunization.icon,
+				id: "immunization",
+				kind: "navigation",
+				label: "Immunization",
+				onPress: () => router.push("/baby/immunization"),
+			},
 		],
-		[currentTime, growthLastLoggedLabel, lastLogged, router],
+		[currentTime, growthLastLoggedLabel, immunizationStatusLabel, lastLogged, router],
 	);
 
 	const loadLatestRoutineLogs = useCallback(async ({
@@ -263,6 +288,14 @@ export default function HomeScreen() {
 
 		return `${sessionUserId}:${selectedBabyId}:${selectedBabyTimeZone}`;
 	}, [selectedBabyId, selectedBabyTimeZone, sessionUserId]);
+
+	useEffect(() => {
+		if (!selectedBabyId) {
+			return;
+		}
+
+		void loadImmunizations({ sync: true }).catch((error) => console.warn(error));
+	}, [loadImmunizations, selectedBabyId]);
 
 	useEffect(() => {
 		if (!initialRoutineLoadKey) {

@@ -10,6 +10,7 @@ export type Baby = {
 	timezone: string;
 	avatarObjectKey: string | null;
 	avatarUrl: string | null;
+	immunizationScheduleProfile?: "US_CDC" | "KR_KDCA" | "WHO_GENERAL" | "CUSTOM";
 	createdAt: string;
 	updatedAt: string;
 };

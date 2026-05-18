@@ -1,6 +1,7 @@
 import { useAuthSession } from "@/context/AuthSessionContext";
 import { useBabySelection } from "@/context/BabySelectionContext";
 import { useGrowthData } from "@/context/GrowthDataContext";
+import { useImmunizationData } from "@/context/ImmunizationDataContext";
 import { useRoutineData } from "@/context/RoutineDataContext";
 import { syncPendingTagMutations } from "@/services/tags/tagOfflineStore";
 import {
@@ -18,7 +19,7 @@ export type ConnectionStatus = "online" | "offline" | "authRequired";
 
 type SyncNowOptions = {
 	babyId?: string;
-	scope?: "growth" | "routine" | "tags" | "all";
+	scope?: "growth" | "immunizations" | "routine" | "tags" | "all";
 };
 
 type SyncContextValue = {
@@ -40,6 +41,7 @@ export function SyncProvider({ children }: PropsWithChildren) {
 	const { authStatus, session } = useAuthSession();
 	const { refreshBabies, selectedBaby, syncPendingBabyAvatarChanges } = useBabySelection();
 	const { syncPendingGrowthMutations } = useGrowthData();
+	const { syncPendingImmunizationMutations } = useImmunizationData();
 	const { syncPendingMutations } = useRoutineData();
 	const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("online");
 	const [status, setStatus] = useState<SyncStatus>("idle");
@@ -88,7 +90,7 @@ export function SyncProvider({ children }: PropsWithChildren) {
 					await refreshBabies();
 				}
 
-				if (scope === "all" || scope === "routine" || scope === "growth") {
+				if (scope === "all" || scope === "routine" || scope === "growth" || scope === "immunizations") {
 					if (!options.babyId && !selectedBaby) {
 						markOnline();
 						return true;
@@ -101,6 +103,10 @@ export function SyncProvider({ children }: PropsWithChildren) {
 
 				if (scope === "all" || scope === "growth") {
 					await syncPendingGrowthMutations();
+				}
+
+				if (scope === "all" || scope === "immunizations") {
+					await syncPendingImmunizationMutations();
 				}
 
 				if ((scope === "all" || scope === "tags") && selectedBaby) {
@@ -141,6 +147,7 @@ export function SyncProvider({ children }: PropsWithChildren) {
 		selectedBaby,
 		session,
 		syncPendingGrowthMutations,
+		syncPendingImmunizationMutations,
 		syncPendingMutations,
 		syncPendingBabyAvatarChanges,
 	]);

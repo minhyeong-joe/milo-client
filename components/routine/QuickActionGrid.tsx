@@ -25,7 +25,7 @@ type RoutineQuickActionItem = {
 };
 
 type NavigationQuickActionItem = QuickActionStyle & {
-	detailLabel: string;
+	detailLabel?: string;
 	id: string;
 	icon: React.ComponentProps<typeof Ionicons>["name"];
 	kind: "navigation";

@@ -1,6 +1,7 @@
 import { BabySelectorModal } from "@/components/baby/BabySelectorModal";
 import { SettingsGroup, SettingsRow } from "@/components/settings/SettingsRows";
 import { useBabySelection } from "@/context/BabySelectionContext";
+import { FEATURE_VISUALS } from "@/constants/featureVisuals";
 import { spacing, typography, type ThemeColors } from "@/styles/globalStyles";
 import { useAppPreferences, useAppTheme } from "@/context/AppPreferencesContext";
 import { Ionicons } from "@expo/vector-icons";
@@ -69,12 +70,20 @@ export default function SettingsScreen() {
 						title="Manage Caregivers"
 					/>
 					<SettingsRow
-						icon="analytics-outline"
-						iconBackground="#EAF8EF"
-						iconColor="#2FAE62"
+						icon={FEATURE_VISUALS.growth.icon}
+						iconBackground={FEATURE_VISUALS.growth.backgroundColor}
+						iconColor={FEATURE_VISUALS.growth.accentColor}
 						onPress={() => router.push("/baby/growth")}
 						subtitle="Height, Weight, Head Size"
 						title="Growth Records"
+					/>
+					<SettingsRow
+						icon={FEATURE_VISUALS.immunization.icon}
+						iconBackground={FEATURE_VISUALS.immunization.backgroundColor}
+						iconColor={FEATURE_VISUALS.immunization.accentColor}
+						onPress={() => router.push("/baby/immunization")}
+						subtitle="Keep track of immunization schedule"
+						title="Immunization Records"
 					/>
 					<SettingsRow
 						icon="pricetag-outline"
