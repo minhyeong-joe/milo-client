@@ -166,7 +166,7 @@ async function initLocalDb(db: SQLite.SQLiteDatabase) {
       user_id TEXT NOT NULL,
       baby_id TEXT NOT NULL,
       tag_id TEXT NOT NULL,
-      operation TEXT NOT NULL CHECK(operation IN ('update', 'delete')),
+      operation TEXT NOT NULL CHECK(operation IN ('create', 'update', 'delete')),
       payload_json TEXT NOT NULL,
       status TEXT NOT NULL CHECK(status IN ('pending', 'failed')),
       error TEXT,
@@ -210,4 +210,51 @@ async function initLocalDb(db: SQLite.SQLiteDatabase) {
     CREATE INDEX IF NOT EXISTS baby_profile_mutation_queue_pending_idx
     ON baby_profile_mutation_queue(user_id, status, updated_at);
   `);
+
+  await migrateTagMutationQueueCreateOperation(db);
+}
+
+async function migrateTagMutationQueueCreateOperation(db: SQLite.SQLiteDatabase) {
+  const table = await db.getFirstAsync<{ sql: string | null }>(
+    "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'tag_mutation_queue'",
+  );
+
+  if (!table?.sql || table.sql.includes("'create'")) {
+    return;
+  }
+
+  await db.withExclusiveTransactionAsync(async (tx) => {
+    await tx.execAsync(`
+      DROP TABLE IF EXISTS tag_mutation_queue_new;
+
+      CREATE TABLE tag_mutation_queue_new (
+        id TEXT PRIMARY KEY NOT NULL,
+        user_id TEXT NOT NULL,
+        baby_id TEXT NOT NULL,
+        tag_id TEXT NOT NULL,
+        operation TEXT NOT NULL CHECK(operation IN ('create', 'update', 'delete')),
+        payload_json TEXT NOT NULL,
+        status TEXT NOT NULL CHECK(status IN ('pending', 'failed')),
+        error TEXT,
+        retry_count INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      INSERT INTO tag_mutation_queue_new (
+        id, user_id, baby_id, tag_id, operation, payload_json, status, error,
+        retry_count, created_at, updated_at
+      )
+      SELECT
+        id, user_id, baby_id, tag_id, operation, payload_json, status, error,
+        retry_count, created_at, updated_at
+      FROM tag_mutation_queue;
+
+      DROP TABLE tag_mutation_queue;
+      ALTER TABLE tag_mutation_queue_new RENAME TO tag_mutation_queue;
+
+      CREATE INDEX IF NOT EXISTS tag_mutation_queue_pending_idx
+      ON tag_mutation_queue(user_id, baby_id, status, created_at);
+    `);
+  });
 }

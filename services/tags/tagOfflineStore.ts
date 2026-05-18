@@ -1,5 +1,11 @@
 import type { DiaryTag } from "@/services/api/diary";
-import { deleteTag, updateTag, type UpdateTagInput } from "@/services/api/tags";
+import {
+	createTag,
+	deleteTag,
+	updateTag,
+	type CreateTagInput,
+	type UpdateTagInput,
+} from "@/services/api/tags";
 import { getLocalDb, runLocalDbWrite } from "@/services/local/sqlite";
 
 export type LocalTag = DiaryTag & {
@@ -11,8 +17,8 @@ export type QueuedTagMutation = {
 	babyId: string;
 	error?: string | null;
 	id: string;
-	operation: "update" | "delete";
-	payload: UpdateTagInput | Record<string, never>;
+	operation: "create" | "update" | "delete";
+	payload: CreateTagInput | UpdateTagInput | Record<string, never>;
 	status: "pending" | "failed";
 	tagId: string;
 	userId: string;
@@ -28,7 +34,7 @@ type TagMutationRow = {
 	baby_id: string;
 	error: string | null;
 	id: string;
-	operation: "update" | "delete";
+	operation: "create" | "update" | "delete";
 	payload_json: string;
 	status: "pending" | "failed";
 	tag_id: string;
@@ -170,6 +176,42 @@ export async function enqueueTagMutation(mutation: QueuedTagMutation) {
 	});
 }
 
+export async function loadPendingCreateTagMutation(userId: string, babyId: string, tagId: string) {
+	const db = await getLocalDb();
+	const row = await db.getFirstAsync<TagMutationRow>(
+		`
+		SELECT id, user_id, baby_id, tag_id, operation, payload_json, status, error
+		FROM tag_mutation_queue
+		WHERE user_id = ? AND baby_id = ? AND tag_id = ? AND operation = 'create'
+		LIMIT 1
+		`,
+		[userId, babyId, tagId],
+	);
+
+	return row ? parseQueuedTagMutation(row)[0] ?? null : null;
+}
+
+export async function updatePendingCreateTagMutation(
+	userId: string,
+	babyId: string,
+	tagId: string,
+	payload: CreateTagInput,
+) {
+	const now = new Date().toISOString();
+
+	return runLocalDbWrite(async () => {
+		const db = await getLocalDb();
+		await db.runAsync(
+			`
+			UPDATE tag_mutation_queue
+			SET payload_json = ?, status = 'pending', error = NULL, updated_at = ?
+			WHERE user_id = ? AND baby_id = ? AND tag_id = ? AND operation = 'create'
+			`,
+			[JSON.stringify(payload), now, userId, babyId, tagId],
+		);
+	});
+}
+
 export async function loadPendingTagMutations(userId: string, babyId: string) {
 	const db = await getLocalDb();
 	const rows = await db.getAllAsync<TagMutationRow>(
@@ -216,12 +258,35 @@ export async function removeTagCache(userId: string, babyId: string, tagId: stri
 	});
 }
 
+export async function removePendingCreatedTag(userId: string, babyId: string, tagId: string) {
+	return runLocalDbWrite(async () => {
+		const db = await getLocalDb();
+		await db.withExclusiveTransactionAsync(async (tx) => {
+			await tx.runAsync(
+				`
+				DELETE FROM tag_mutation_queue
+				WHERE user_id = ? AND baby_id = ? AND tag_id = ? AND operation = 'create'
+				`,
+				[userId, babyId, tagId],
+			);
+			await tx.runAsync(
+				"DELETE FROM tag_cache WHERE user_id = ? AND baby_id = ? AND id = ?",
+				[userId, babyId, tagId],
+			);
+		});
+	});
+}
+
 export async function syncPendingTagMutations(userId: string, babyId: string) {
 	const mutations = await loadPendingTagMutations(userId, babyId);
 
 	for (const mutation of mutations) {
 		try {
-			if (mutation.operation === "update") {
+			if (mutation.operation === "create") {
+				const response = await createTag(mutation.babyId, mutation.payload as CreateTagInput);
+				await removeTagCache(mutation.userId, mutation.babyId, mutation.tagId);
+				await upsertSyncedTag(mutation.userId, mutation.babyId, response.tag);
+			} else if (mutation.operation === "update") {
 				const response = await updateTag(mutation.babyId, mutation.tagId, mutation.payload);
 				await upsertSyncedTag(mutation.userId, mutation.babyId, response.tag);
 			} else {

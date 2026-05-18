@@ -6,12 +6,15 @@ import { useBabySelection } from "@/context/BabySelectionContext";
 import { useDiaryCache } from "@/context/DiaryCacheContext";
 import { useSync } from "@/context/SyncContext";
 import type { DiaryTag } from "@/services/api/diary";
-import { deleteTag, listTags, updateTag } from "@/services/api/tags";
+import { createTag, deleteTag, listTags, updateTag } from "@/services/api/tags";
 import {
 	enqueueTagMutation,
 	loadCachedTags,
+	loadPendingCreateTagMutation,
 	markTagDeleted,
+	removePendingCreatedTag,
 	saveTagsCache,
+	updatePendingCreateTagMutation,
 	upsertPendingTag,
 } from "@/services/tags/tagOfflineStore";
 import { spacing, typography, type ThemeColors } from "@/styles/globalStyles";
@@ -39,6 +42,7 @@ const TAG_COLORS = [
 	"#64748B",
 ];
 const DEFAULT_TAG_TYPE_ORDER = ["milestone", "emotions", "event"];
+type TagEditorMode = "create" | "edit";
 
 function useThemeStyles() {
 	const { globalStyles, themeColors } = useAppTheme();
@@ -56,6 +60,7 @@ export default function MilestoneTagsScreen() {
 	const { connectionStatus, markOffline, markOnline, syncNow } = useSync();
 	const [tags, setTags] = useState<DiaryTag[]>([]);
 	const [selectedTag, setSelectedTag] = useState<DiaryTag | null>(null);
+	const [editorMode, setEditorMode] = useState<TagEditorMode | null>(null);
 	const [name, setName] = useState("");
 	const [color, setColor] = useState(TAG_COLORS[0]);
 	const [error, setError] = useState<string | null>(null);
@@ -74,8 +79,9 @@ export default function MilestoneTagsScreen() {
 		[tags],
 	);
 	const globalTagsByType = useMemo(() => groupTagsByType(globalTags), [globalTags]);
-	const previewTag = selectedTag
-		? { ...selectedTag, color, name: name.trim() || selectedTag.name }
+	const isEditorOpen = editorMode !== null;
+	const previewTag = isEditorOpen
+		? { color, name: name.trim() || selectedTag?.name || "New tag" }
 		: null;
 
 	const load = useCallback(async ({ forceNetwork = false }: { forceNetwork?: boolean } = {}) => {
@@ -118,11 +124,18 @@ export default function MilestoneTagsScreen() {
 			await saveTagsCache(session.user.id, selectedBaby.id, response.tags);
 			const mergedTags = await loadCachedTags(session.user.id, selectedBaby.id);
 			setTags(mergedTags);
-			setSelectedTag((currentTag) =>
-				currentTag
-					? mergedTags.find((tag) => tag.id === currentTag.id) ?? null
-					: null,
-			);
+			setSelectedTag((currentTag) => {
+				if (!currentTag) {
+					return null;
+				}
+
+				const nextTag = mergedTags.find((tag) => tag.id === currentTag.id) ?? null;
+				if (!nextTag) {
+					setEditorMode(null);
+				}
+
+				return nextTag;
+			});
 			markOnline();
 		} catch (caughtError) {
 			setError(getErrorMessage(caughtError));
@@ -145,10 +158,98 @@ export default function MilestoneTagsScreen() {
 		}
 
 		setSelectedTag(tag);
+		setEditorMode("edit");
 		setName(tag.name);
 		setColor(tag.color);
 		setError(null);
 		setInfoMessage(null);
+	};
+
+	const openCreateTagEditor = () => {
+		setSelectedTag(null);
+		setEditorMode("create");
+		setName("");
+		setColor(TAG_COLORS[0]);
+		setError(null);
+		setInfoMessage(null);
+	};
+
+	const closeTagEditor = () => {
+		setSelectedTag(null);
+		setEditorMode(null);
+		setName("");
+		setColor(TAG_COLORS[0]);
+		setError(null);
+		setInfoMessage(null);
+	};
+
+	const createCustomTag = async () => {
+		if (!selectedBaby || !session) {
+			return;
+		}
+
+		const trimmedName = name.trim();
+
+		if (!trimmedName) {
+			setInfoMessage(null);
+			setError("Tag name is required.");
+			return;
+		}
+
+		setIsSaving(true);
+		setError(null);
+		setInfoMessage(null);
+
+		try {
+			if (connectionStatus !== "online") {
+				const now = new Date().toISOString();
+				const localTag: DiaryTag = {
+					babyId: selectedBaby.id,
+					color,
+					createdAt: now,
+					id: createUuid(),
+					name: trimmedName,
+					scope: "custom",
+					type: "custom",
+					updatedAt: now,
+				};
+
+				setTags((currentTags) => mergeTags(currentTags, [localTag]));
+				setSelectedTag(localTag);
+				setEditorMode("edit");
+				await upsertPendingTag(session.user.id, selectedBaby.id, localTag);
+				await enqueueTagMutation({
+					babyId: selectedBaby.id,
+					id: createUuid(),
+					operation: "create",
+					payload: { color, name: trimmedName, type: "custom" },
+					status: "pending",
+					tagId: localTag.id,
+					userId: session.user.id,
+				});
+				setInfoMessage("Tag created locally. It will sync when you're online.");
+				return;
+			}
+
+			const response = await createTag(selectedBaby.id, {
+				color,
+				name: trimmedName,
+				type: "custom",
+			});
+			setTags((currentTags) => mergeTags(currentTags, [response.tag]));
+			setSelectedTag(response.tag);
+			setEditorMode("edit");
+			setName(response.tag.name);
+			setColor(response.tag.color);
+			await saveTagsCache(session.user.id, selectedBaby.id, mergeTags(tags, [response.tag]));
+			markOnline();
+		} catch (caughtError) {
+			setInfoMessage(null);
+			setError(getErrorMessage(caughtError));
+			markOffline();
+		} finally {
+			setIsSaving(false);
+		}
 	};
 
 	const saveTag = async () => {
@@ -184,6 +285,22 @@ export default function MilestoneTagsScreen() {
 			setColor(nextTag.color);
 			updateTagInDiaryCache(selectedBaby.id, nextTag);
 			await upsertPendingTag(session.user.id, selectedBaby.id, nextTag);
+
+			const pendingCreate = await loadPendingCreateTagMutation(
+				session.user.id,
+				selectedBaby.id,
+				selectedTag.id,
+			);
+
+			if (pendingCreate) {
+				await updatePendingCreateTagMutation(session.user.id, selectedBaby.id, selectedTag.id, {
+					color,
+					name: trimmedName,
+					type: "custom",
+				});
+				setInfoMessage("Tag saved locally. It will sync when you're online.");
+				return;
+			}
 
 			if (connectionStatus !== "online") {
 				await enqueueTagMutation({
@@ -234,8 +351,24 @@ export default function MilestoneTagsScreen() {
 		setInfoMessage(null);
 
 		try {
+			const pendingCreate = await loadPendingCreateTagMutation(
+				session.user.id,
+				selectedBaby.id,
+				selectedTag.id,
+			);
+
 			setTags((currentTags) => currentTags.filter((tag) => tag.id !== selectedTag.id));
 			removeTagFromDiaryCache(selectedBaby.id, selectedTag.id);
+
+			if (pendingCreate) {
+				await removePendingCreatedTag(session.user.id, selectedBaby.id, selectedTag.id);
+				setSelectedTag(null);
+				setEditorMode(null);
+				setIsDeleteModalVisible(false);
+				setInfoMessage("Tag removed.");
+				return;
+			}
+
 			await markTagDeleted(session.user.id, selectedBaby.id, selectedTag.id);
 
 			if (connectionStatus !== "online") {
@@ -249,6 +382,7 @@ export default function MilestoneTagsScreen() {
 					userId: session.user.id,
 				});
 				setSelectedTag(null);
+				setEditorMode(null);
 				setIsDeleteModalVisible(false);
 				setInfoMessage("Tag removed locally. It will sync when you're online.");
 				return;
@@ -256,6 +390,7 @@ export default function MilestoneTagsScreen() {
 
 			await deleteTag(selectedBaby.id, selectedTag.id);
 			setSelectedTag(null);
+			setEditorMode(null);
 			setIsDeleteModalVisible(false);
 			markOnline();
 		} catch (caughtError) {
@@ -291,22 +426,34 @@ export default function MilestoneTagsScreen() {
 					<Text style={styles.sectionTitle}>Custom Tags</Text>
 					<Text style={styles.helper}>Tap a custom tag to edit its name or color.</Text>
 					<View style={styles.tagWrap}>
+						<Pressable
+							accessibilityLabel="Add custom tag"
+							accessibilityRole="button"
+							disabled={!selectedBaby}
+							onPress={openCreateTagEditor}
+							style={[styles.addTagButton, !selectedBaby && styles.disabled]}
+						>
+							<Ionicons color={themeColors.primary} name="add" size={18} />
+							<Text style={styles.addTagText}>New</Text>
+						</Pressable>
 						{customTags.map((tag) => (
 							<Pressable key={tag.id} onPress={() => selectTag(tag)} style={styles.tagButton}>
 								<DiaryTagPill tag={tag} />
 							</Pressable>
 						))}
 						{customTags.length === 0 ? (
-							<Text style={styles.helper}>No custom tags yet. Create tags from a diary entry.</Text>
+							<Text style={styles.helper}>No custom tags yet. Tap New to add one.</Text>
 						) : null}
 					</View>
 				</View>
 
-				{selectedTag ? (
+				{isEditorOpen ? (
 					<View style={globalStyles.card}>
 						<View style={globalStyles.rowBetween}>
-							<Text style={styles.sectionTitle}>Edit Custom Tag</Text>
-							<Pressable onPress={() => setSelectedTag(null)} style={styles.iconButton}>
+							<Text style={styles.sectionTitle}>
+								{editorMode === "create" ? "Add Custom Tag" : "Edit Custom Tag"}
+							</Text>
+							<Pressable onPress={closeTagEditor} style={styles.iconButton}>
 								<Ionicons color={themeColors.textSecondary} name="close" size={20} />
 							</Pressable>
 						</View>
@@ -341,19 +488,25 @@ export default function MilestoneTagsScreen() {
 							))}
 						</View>
 						<View style={styles.actionRow}>
+							{editorMode === "edit" ? (
+								<Pressable
+									disabled={isSaving}
+									onPress={() => setIsDeleteModalVisible(true)}
+									style={[styles.actionButton, styles.deleteButton]}
+								>
+									<Text style={styles.deleteText}>Remove</Text>
+								</Pressable>
+							) : null}
 							<Pressable
 								disabled={isSaving}
-								onPress={() => setIsDeleteModalVisible(true)}
-								style={[styles.actionButton, styles.deleteButton]}
-							>
-								<Text style={styles.deleteText}>Remove</Text>
-							</Pressable>
-							<Pressable
-								disabled={isSaving}
-								onPress={() => void saveTag()}
+								onPress={() => void (editorMode === "create" ? createCustomTag() : saveTag())}
 								style={[styles.actionButton, styles.saveButton, isSaving && styles.disabled]}
 							>
-								<Text style={styles.saveText}>{isSaving ? "Saving..." : "Save"}</Text>
+								<Text style={styles.saveText}>
+									{editorMode === "create"
+										? isSaving ? "Creating..." : "Create"
+										: isSaving ? "Saving..." : "Save"}
+								</Text>
 							</Pressable>
 						</View>
 					</View>
@@ -416,6 +569,16 @@ function sortTags(left: DiaryTag, right: DiaryTag) {
 	return left.name.localeCompare(right.name);
 }
 
+function mergeTags(currentTags: DiaryTag[], nextTags: DiaryTag[]) {
+	const tagById = new Map(currentTags.map((tag) => [tag.id, tag]));
+
+	for (const tag of nextTags) {
+		tagById.set(tag.id, tag);
+	}
+
+	return Array.from(tagById.values()).sort(sortTags);
+}
+
 function groupTagsByType(tags: DiaryTag[]) {
 	const typeToTags = new Map<string, DiaryTag[]>();
 
@@ -471,6 +634,22 @@ function getErrorMessage(error: unknown) {
 
 function createStyles(themeColors: ThemeColors) {
 	return StyleSheet.create({
+	addTagButton: {
+		alignItems: "center",
+		backgroundColor: themeColors.surface,
+		borderColor: themeColors.primary,
+		borderRadius: 999,
+		borderWidth: 1,
+		flexDirection: "row",
+		gap: spacing.xs,
+		paddingHorizontal: spacing.md,
+		paddingVertical: spacing.xs,
+	},
+	addTagText: {
+		...typography.caption,
+		color: themeColors.primary,
+		fontWeight: "800",
+	},
 	actionButton: {
 		alignItems: "center",
 		borderRadius: 12,
