@@ -1,4 +1,5 @@
 import type { RoutineConfig, RoutineDay } from "@/data/homeData";
+import type { DailyRoutineInsight } from "@/services/api/ai";
 import { type ThemeColors } from "@/styles/globalStyles";
 import { useAppPreferences, useAppTheme } from "@/context/AppPreferencesContext";
 import { formatDayLabel } from "@/utils/routineDisplay";
@@ -25,12 +26,16 @@ export function RoutineDayCard({
 	day,
 	defaultView,
 	timeZone,
+	aiInsight,
+	onGenerateAiInsight,
 }: {
 	config: RoutineConfig;
 	currentTime: string;
 	day: RoutineDay;
 	defaultView: RoutineDayCardView;
 	timeZone?: string;
+	aiInsight?: DailyRoutineInsight;
+	onGenerateAiInsight?: (date: string) => Promise<void>;
 }) {
 	const { languagePreference } = useAppPreferences(); 
 	const { globalStyles, themeColors, styles } = useThemeStyles(); 
@@ -66,7 +71,13 @@ export function RoutineDayCard({
 			) : (
 				<>
 					<RoutineSummary config={config} summary={day.summary} />
-					{!isToday ? <RoutineAIInsight /> : null}
+					{!isToday && onGenerateAiInsight ? (
+						<RoutineAIInsight
+							date={day.date}
+							insight={aiInsight}
+							onGenerate={onGenerateAiInsight}
+						/>
+					) : null}
 				</>
 			)}
 		</RoutineCard>

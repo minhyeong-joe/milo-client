@@ -16,6 +16,11 @@ import {
 import { FEATURE_VISUALS } from "@/constants/featureVisuals";
 import type { RoutineConfig, RoutineKind } from "@/data/homeData";
 import { routineConfig } from "@/data/homeData";
+import {
+	getDailyRoutineInsight,
+	listDailyRoutineInsightStatuses,
+	type DailyRoutineInsight,
+} from "@/services/api/ai";
 import { getRoutineDays, type RoutineLastLogged } from "@/services/api/routine";
 import {
 	loadCachedRoutineHome,
@@ -101,6 +106,7 @@ export default function HomeScreen() {
 	const [routineError, setRoutineError] = useState<string | null>(null);
 	const [nextRoutineStartDate, setNextRoutineStartDate] = useState<string | null>(null);
 	const [isRefreshing, setIsRefreshing] = useState(false);
+	const [aiInsightsByDate, setAiInsightsByDate] = useState<Record<string, DailyRoutineInsight>>({});
 	const routineRequestIdRef = useRef(0);
 	const isOlderRoutineLoadingRef = useRef(false);
 	const lastInitialRoutineLoadKeyRef = useRef<string | null>(null);
@@ -155,12 +161,71 @@ export default function HomeScreen() {
 		[currentTime, growthLastLoggedLabel, immunizationStatusLabel, lastLogged, router],
 	);
 
+	const loadAiInsightStatuses = useCallback(async (logs: { date: string }[]) => {
+		if (!selectedBabyId || !selectedBabyTimeZone || logs.length === 0) {
+			return;
+		}
+
+		const todayKey = getDateKeyInTimeZone(new Date(), selectedBabyTimeZone);
+		const dates = logs
+			.map((log) => log.date)
+			.filter((date) => date < todayKey)
+			.sort();
+
+		if (dates.length === 0) {
+			return;
+		}
+
+		try {
+			const responses = await Promise.all(
+				chunkDates(dates, 30).map((range) =>
+					listDailyRoutineInsightStatuses({
+						babyId: selectedBabyId,
+						startDate: range[0],
+						endDate: range[range.length - 1],
+					}),
+				),
+			);
+
+			setAiInsightsByDate((current) => {
+				const next = { ...current };
+
+				responses.forEach((response) => {
+					response.insights.forEach((insight) => {
+						next[insight.analysisDate] = insight;
+					});
+				});
+
+				return next;
+			});
+		} catch (error) {
+			console.warn("Could not load AI insight statuses", error);
+		}
+	}, [selectedBabyId, selectedBabyTimeZone]);
+
+	const generateAiInsight = useCallback(async (date: string) => {
+		if (!selectedBabyId) {
+			throw new Error("Choose a baby before generating an insight.");
+		}
+
+		const response = await getDailyRoutineInsight({
+			babyId: selectedBabyId,
+			date,
+		});
+
+		setAiInsightsByDate((current) => ({
+			...current,
+			[date]: response.insight,
+		}));
+	}, [selectedBabyId]);
+
 	const loadLatestRoutineLogs = useCallback(async ({
 		refreshBabyList = false,
 		trigger = "manual",
 	}: LoadLatestRoutineOptions = {}) => {
 		if (!selectedBabyId || !selectedBabyTimeZone) {
 			replaceDailyLogs([]);
+			setAiInsightsByDate({});
 			setRoutineError(null);
 			setNextRoutineStartDate(null);
 			setLastLogged(null);
@@ -176,6 +241,7 @@ export default function HomeScreen() {
 		isOlderRoutineLoadingRef.current = false;
 		setRoutineError(null);
 		setNextRoutineStartDate(null);
+		setAiInsightsByDate({});
 
 		let didLoadCachedData = false;
 
@@ -190,6 +256,7 @@ export default function HomeScreen() {
 					if (cached.dailyLogs.length > 0) {
 						replaceDailyLogs(cached.dailyLogs);
 						setNextRoutineStartDate(cached.nextStartDate);
+						void loadAiInsightStatuses(cached.dailyLogs);
 					}
 				}
 			} else {
@@ -238,10 +305,12 @@ export default function HomeScreen() {
 				replaceDailyLogs(reconciledCache.dailyLogs);
 				setNextRoutineStartDate(reconciledCache.nextStartDate);
 				setLastLogged(reconciledCache.lastLogged);
+				void loadAiInsightStatuses(reconciledCache.dailyLogs);
 			} else {
 				replaceDailyLogs(response.dailyLogs);
 				setNextRoutineStartDate(response.nextStartDate);
 				setLastLogged(response.lastLogged ?? null);
+				void loadAiInsightStatuses(response.dailyLogs);
 			}
 			markOnline();
 			setRoutineError(null);
@@ -265,6 +334,7 @@ export default function HomeScreen() {
 		}
 	}, [
 		authStatus,
+		loadAiInsightStatuses,
 		markAuthRequired,
 		markOffline,
 		markOnline,
@@ -359,9 +429,11 @@ export default function HomeScreen() {
 
 				replaceDailyLogs(reconciledCache.dailyLogs);
 				setNextRoutineStartDate(reconciledCache.nextStartDate);
+				void loadAiInsightStatuses(response.dailyLogs);
 			} else {
 				prependOlderDailyLogs(response.dailyLogs);
 				setNextRoutineStartDate(response.nextStartDate);
+				void loadAiInsightStatuses(response.dailyLogs);
 			}
 
 			await syncPendingMutations();
@@ -382,6 +454,7 @@ export default function HomeScreen() {
 		dailyLogs.length,
 		isInitialRoutineLoading,
 		lastLogged,
+		loadAiInsightStatuses,
 		markOffline,
 		nextRoutineStartDate,
 		prependOlderDailyLogs,
@@ -525,11 +598,13 @@ export default function HomeScreen() {
 						dailyLogs.length > 0 &&
 						dailyLogs.map((log, index) => (
 							<RoutineDayCard
+								aiInsight={aiInsightsByDate[log.date]}
 								config={routineDisplayConfig}
 								currentTime={currentTime}
 								day={log}
 								defaultView={index === 0 ? "timeline" : "summary"}
 								key={log.date}
+								onGenerateAiInsight={generateAiInsight}
 								timeZone={timelineTimeZone}
 							/>
 						))}
@@ -638,6 +713,16 @@ function getDateKeyInTimeZone(value: Date, timeZone: string) {
 	const byType = Object.fromEntries(parts.map((part) => [part.type, part.value]));
 
 	return `${byType.year}-${byType.month}-${byType.day}`;
+}
+
+function chunkDates(dates: string[], size: number) {
+	const chunks: string[][] = [];
+
+	for (let index = 0; index < dates.length; index += size) {
+		chunks.push(dates.slice(index, index + size));
+	}
+
+	return chunks;
 }
 
 function isNearBottom({
