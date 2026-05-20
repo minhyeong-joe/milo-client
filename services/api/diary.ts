@@ -89,6 +89,72 @@ export type DiaryEntryResponse = {
 	diaryEntry: DiaryEntry;
 };
 
+export type DiaryReflectionTone =
+	| "celebratory"
+	| "reassuring"
+	| "empathetic"
+	| "gentle";
+
+export type DiaryReflectionOutput = {
+	headline: string;
+	reflection: string;
+	milestone_context: string | null;
+	encouragement: string;
+	detected_themes: {
+		milestones: string[];
+		emotions: string[];
+		events: string[];
+	};
+	tone: DiaryReflectionTone;
+};
+
+export type DiaryReflectionInputSnapshot = {
+	task: "diary_reflection";
+	baby: {
+		name: string;
+		ageDays: number;
+		ageMonths: number;
+		sex?: "BOY" | "GIRL";
+		timezone: string;
+	};
+	diaryEntry: {
+		title?: string;
+		content: string;
+		diaryDate: string;
+		tags: Array<{
+			type: string;
+			name: string;
+		}>;
+	};
+	language: string;
+};
+
+export type DiaryReflection = {
+	cached: boolean;
+	diaryId: string;
+	generatedAt: string;
+	id: string;
+	isCurrentPrompt: boolean;
+	json: DiaryReflectionOutput | null;
+	language: string | null;
+	promptId: string;
+	promptVersion: string;
+	text: string | null;
+	type: "diary_reflection";
+};
+
+export type DiaryReflectionResponse = {
+	contentModifiedAfterReflection: boolean;
+	inputSnapshot: DiaryReflectionInputSnapshot | null;
+	reflection: DiaryReflection;
+};
+
+export type DiaryReflectionStatusResponse = {
+	contentModifiedAfterReflection: boolean;
+	inputSnapshot: DiaryReflectionInputSnapshot | null;
+	reflection: DiaryReflection | null;
+};
+
 export type CreateDiaryMediaUploadRequest = {
 	fileType: string;
 	sizeBytes: number;
@@ -192,4 +258,38 @@ export function deleteDiaryEntry(babyId: string, diaryId: string) {
 	return apiDelete<void>(`/babies/${babyId}/diaries/${diaryId}`, {
 		auth: true,
 	});
+}
+
+export function getDiaryReflection({
+	babyId,
+	diaryId,
+	language,
+}: {
+	babyId: string;
+	diaryId: string;
+	language: string;
+}) {
+	return apiGet<DiaryReflectionResponse>(
+		`/babies/${babyId}/diaries/${diaryId}/ai-reflection`,
+		{
+			auth: true,
+			query: { language },
+			timeoutMs: 60000,
+		},
+	);
+}
+
+export function getDiaryReflectionStatus({
+	babyId,
+	diaryId,
+}: {
+	babyId: string;
+	diaryId: string;
+}) {
+	return apiGet<DiaryReflectionStatusResponse>(
+		`/babies/${babyId}/diaries/${diaryId}/ai-reflection/status`,
+		{
+			auth: true,
+		},
+	);
 }

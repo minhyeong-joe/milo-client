@@ -1,5 +1,6 @@
 import { DiaryActionsModal } from "@/components/diary/DiaryActionsModal";
 import { DiaryHeroCarousel } from "@/components/diary/DiaryMediaPreview";
+import { DiaryReflectionCard } from "@/components/diary/DiaryReflectionCard";
 import { DiaryTagPill } from "@/components/diary/DiaryTagPill";
 import { ConfirmDeleteModal } from "@/components/routine/ConfirmDeleteModal";
 import { useAppPreferences, useTimelineTimeZone , useAppTheme } from "@/context/AppPreferencesContext";
@@ -10,9 +11,10 @@ import { deleteDiaryEntry, type DiaryEntry } from "@/services/api/diary";
 import { spacing, typography, type ThemeColors } from "@/styles/globalStyles";
 import { formatBabyAge } from "@/utils/routineDisplay";
 import { Ionicons } from "@expo/vector-icons";
+import { usePreventRemove } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useState, useMemo } from "react";
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useCallback, useEffect, useState, useMemo } from "react";
+import { Alert, BackHandler, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 function useThemeStyles() {
@@ -40,11 +42,42 @@ export default function DiaryDetailScreen() {
 	const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
 	const [isMetadataVisible, setIsMetadataVisible] = useState(false);
 	const [isDeleting, setIsDeleting] = useState(false);
+	const [isAiReflectionBusy, setIsAiReflectionBusy] = useState(false);
 	const insets = useSafeAreaInsets();
 	const footerBottomPadding = Math.max(insets.bottom, 12);
 	const isDiaryOffline = connectionStatus !== "online";
+	const handleAiBusyChange = useCallback((isBusy: boolean) => {
+		setIsAiReflectionBusy(isBusy);
+	}, []);
+
+	usePreventRemove(isAiReflectionBusy, () => {});
+
+	useEffect(() => {
+		if (!isAiReflectionBusy) {
+			return;
+		}
+
+		const subscription = BackHandler.addEventListener(
+			"hardwareBackPress",
+			() => true,
+		);
+
+		return () => subscription.remove();
+	}, [isAiReflectionBusy]);
+
+	const goBack = () => {
+		if (isAiReflectionBusy) {
+			return;
+		}
+
+		router.back();
+	};
 
 	const openEdit = () => {
+		if (isAiReflectionBusy) {
+			return;
+		}
+
 		if (!entry) {
 			return;
 		}
@@ -65,6 +98,10 @@ export default function DiaryDetailScreen() {
 	};
 
 	const requestDelete = () => {
+		if (isAiReflectionBusy) {
+			return;
+		}
+
 		setIsActionsVisible(false);
 
 		if (isDiaryOffline) {
@@ -105,17 +142,18 @@ export default function DiaryDetailScreen() {
 			<View style={styles.header}>
 				<Pressable
 					accessibilityLabel="Go back"
+					disabled={isAiReflectionBusy}
 					hitSlop={10}
-					onPress={() => router.back()}
-					style={styles.iconButton}
+					onPress={goBack}
+					style={[styles.iconButton, isAiReflectionBusy && styles.disabledControl]}
 				>
 					<Ionicons color={themeColors.textPrimary} name="chevron-back" size={24} />
 				</Pressable>
 				<Pressable
 					accessibilityRole="button"
-					disabled={!entry}
+					disabled={!entry || isAiReflectionBusy}
 					onPress={() => setIsMetadataVisible(true)}
-					style={styles.dateButton}
+					style={[styles.dateButton, isAiReflectionBusy && styles.disabledControl]}
 				>
 					<Text style={styles.headerTitle}>
 						{entry ? formatHeaderDate(entry.diaryDate, timelineTimeZone, languagePreference) : "Diary"}
@@ -128,9 +166,10 @@ export default function DiaryDetailScreen() {
 				</Pressable>
 				<Pressable
 					accessibilityLabel="Diary actions"
+					disabled={isAiReflectionBusy}
 					hitSlop={10}
 					onPress={() => setIsActionsVisible(true)}
-					style={styles.iconButton}
+					style={[styles.iconButton, isAiReflectionBusy && styles.disabledControl]}
 				>
 					<Ionicons color={themeColors.textSecondary} name="ellipsis-horizontal" size={22} />
 				</Pressable>
@@ -163,15 +202,16 @@ export default function DiaryDetailScreen() {
 											))}
 										</View>
 									) : null}
-						<View style={[globalStyles.card, styles.aiCard]}>
-							<View style={styles.aiHeader}>
-								<Ionicons color={themeColors.primary} name="sparkles" size={22} />
-								<Text style={styles.aiTitle}>AI Reflection</Text>
-							</View>
-							<Text style={styles.aiText}>
-								A gentle reflection to diary entry will display here.
-							</Text>
-						</View>
+						{selectedBaby ? (
+							<DiaryReflectionCard
+								babyId={selectedBaby.id}
+								diaryId={entry.id}
+								isOnline={!isDiaryOffline}
+								language={languagePreference}
+								onBusyChange={handleAiBusyChange}
+								timeZone={timelineTimeZone}
+							/>
+						) : null}
 					</>
 				) : (
 					<View style={globalStyles.card}>
@@ -330,6 +370,9 @@ function createStyles(themeColors: ThemeColors) {
 		justifyContent: "center",
 		minWidth: 0,
 	},
+	disabledControl: {
+		opacity: 0.45,
+	},
 	header: {
 		alignItems: "center",
 		flexDirection: "row",
@@ -354,31 +397,9 @@ function createStyles(themeColors: ThemeColors) {
 		justifyContent: "center",
 		width: 44,
 	},
-	aiCard: {
-		backgroundColor: themeColors.secondary,
-		borderColor: themeColors.border,
-		borderWidth: 1,
-		gap: spacing.sm,
-		marginTop: spacing.md,
-	},
-	aiHeader: {
-		alignItems: "center",
-		flexDirection: "row",
-		gap: spacing.sm,
-	},
-	aiText: {
-		...typography.body,
-		color: themeColors.textPrimary,
-		lineHeight: 22,
-	},
-	aiTitle: {
-		...typography.label,
-		color: themeColors.primary,
-		fontWeight: "800",
-	},
 	metadataBackdrop: {
 		alignItems: "center",
-		backgroundColor: "rgba(21, 24, 39, 0.35)",
+		backgroundColor: themeColors.backdrop,
 		flex: 1,
 		justifyContent: "center",
 		padding: spacing.lg,
@@ -411,7 +432,7 @@ function createStyles(themeColors: ThemeColors) {
 	},
 	quoteBadge: {
 		alignItems: "center",
-		backgroundColor: "#F0E5FF",
+		backgroundColor: themeColors.tintSurfaceStrong,
 		borderRadius: 999,
 		height: 40,
 		justifyContent: "center",

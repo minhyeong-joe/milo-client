@@ -78,7 +78,7 @@ export function RoutineAIInsight({
 						<Text style={styles.title}>AI Daily Insight</Text>
 					</View>
 					<Text style={styles.body}>
-						Generate a gentle summary from this day's routine stats.
+						Generate a gentle summary from this day's logs.
 					</Text>
 					<Text style={styles.actionText}>Generate AI Insight</Text>
 				</Pressable>
@@ -255,7 +255,7 @@ function InsightModal({
 	);
 }
 
-function DisclaimerText({ text }: { text: string }) {
+export function DisclaimerText({ text }: { text: string }) {
 	const { styles, themeColors } = useThemeStyles();
 
 	return (
@@ -373,6 +373,7 @@ function createStyles(themeColors: ThemeColors) {
 		disclaimerList: {
 			alignSelf: "stretch",
 			gap: spacing.sm,
+			paddingRight: spacing.sm,
 		},
 		disclaimerRow: {
 			alignItems: "flex-start",
