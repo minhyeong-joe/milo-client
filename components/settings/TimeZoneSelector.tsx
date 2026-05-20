@@ -26,11 +26,15 @@ function useThemeStyles() {
 export function TimeZoneSelector({
 	disabled = false,
 	label,
+	labelSuffixForTimeZone,
+	layout = "stacked",
 	onChange,
 	timeZone,
 }: {
 	disabled?: boolean;
 	label: string;
+	labelSuffixForTimeZone?: { label: string; timeZone?: string | null };
+	layout?: "inline" | "stacked";
 	onChange: (timeZone: string) => void;
 	timeZone: string;
 }) {
@@ -41,9 +45,14 @@ export function TimeZoneSelector({
 		() => getTimeZoneOptions(normalizedTimeZone),
 		[normalizedTimeZone],
 	);
+	const suffixTimeZone = normalizeTimeZone(labelSuffixForTimeZone?.timeZone);
+	const selectedSuffix =
+		labelSuffixForTimeZone && normalizedTimeZone === suffixTimeZone
+			? ` (${labelSuffixForTimeZone.label})`
+			: "";
 
 	return (
-		<View style={styles.field}>
+		<View style={[styles.field, layout === "inline" && styles.inlineField]}>
 			<Text style={styles.fieldLabel}>{label}</Text>
 			<Pressable
 				accessibilityRole="button"
@@ -51,12 +60,14 @@ export function TimeZoneSelector({
 				onPress={() => setIsOpen(true)}
 				style={({ pressed }) => [
 					styles.selectorButton,
+					layout === "inline" && styles.inlineSelectorButton,
 					disabled && styles.selectorButtonDisabled,
 					pressed && !disabled && styles.pressedButton,
 				]}
 			>
 				<Text style={styles.selectorValue}>
 					{getTimeZoneDisplayLabel(normalizedTimeZone)}
+					{selectedSuffix}
 				</Text>
 				<Ionicons
 					color={themeColors.textSecondary}
@@ -90,6 +101,10 @@ export function TimeZoneSelector({
 							keyExtractor={(item) => item.timeZone}
 							renderItem={({ item }) => {
 								const isSelected = item.timeZone === normalizedTimeZone;
+								const optionSuffix =
+									labelSuffixForTimeZone && item.timeZone === suffixTimeZone
+										? ` (${labelSuffixForTimeZone.label})`
+										: "";
 
 								return (
 									<Pressable
@@ -104,7 +119,7 @@ export function TimeZoneSelector({
 										]}
 									>
 										<View style={styles.optionText}>
-											<Text style={styles.optionLabel}>{item.label}</Text>
+											<Text style={styles.optionLabel}>{item.label}{optionSuffix}</Text>
 											<Text style={styles.optionSubtext}>{item.offsetLabel}</Text>
 										</View>
 										{isSelected ? (
@@ -134,6 +149,16 @@ function createStyles(themeColors: ThemeColors) {
 	fieldLabel: {
 		...typography.label,
 		color: themeColors.textPrimary,
+	},
+	inlineField: {
+		alignItems: "center",
+		flexDirection: "row",
+		gap: spacing.md,
+		marginTop: 0,
+	},
+	inlineSelectorButton: {
+		flex: 1,
+		minWidth: 180,
 	},
 	modalBackdrop: {
 		alignItems: "center",

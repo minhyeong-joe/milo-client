@@ -2,7 +2,7 @@ import { BabyHeader } from "@/components/routine/BabyHeader";
 import { QuickActionGrid, type QuickActionItem } from "@/components/routine/QuickActionGrid";
 import { RoutineDayCard } from "@/components/routine/RoutineDayCard";
 import { SyncStatusCard } from "@/components/sync/SyncStatusCard";
-import { useAppPreferences, useAppTheme, useTimelineTimeZone } from "@/context/AppPreferencesContext";
+import { useAppPreferences, useAppTheme, useDisplayTimeZone, useTimelineTimeZone } from "@/context/AppPreferencesContext";
 import { useAuthSession } from "@/context/AuthSessionContext";
 import { useBabySelection } from "@/context/BabySelectionContext";
 import { useGrowthData } from "@/context/GrowthDataContext";
@@ -98,6 +98,7 @@ export default function HomeScreen() {
 	const currentDate = useCurrentMinute();
 	const currentTime = currentDate.toISOString();
 	const timelineTimeZone = useTimelineTimeZone(selectedBaby);
+	const displayTimeZone = useDisplayTimeZone(selectedBaby);
 	const selectedBabyId = selectedBaby?.id ?? null;
 	const selectedBabyTimeZone = selectedBaby?.timezone ?? null;
 	const sessionUserId = session?.user.id ?? null;
@@ -603,6 +604,7 @@ export default function HomeScreen() {
 								currentTime={currentTime}
 								day={log}
 								defaultView={index === 0 ? "timeline" : "summary"}
+								displayTimeZone={displayTimeZone}
 								key={log.date}
 								onGenerateAiInsight={generateAiInsight}
 								timeZone={timelineTimeZone}

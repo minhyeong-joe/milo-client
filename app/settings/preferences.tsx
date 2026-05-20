@@ -4,8 +4,7 @@ import { TimeZoneSelector } from "@/components/settings/TimeZoneSelector";
 import { useAppPreferences } from "@/context/AppPreferencesContext";
 import { useBabySelection } from "@/context/BabySelectionContext";
 import { spacing, type ThemeColors, typography } from "@/styles/globalStyles";
-import { getDeviceTimeZone } from "@/utils/timeZones";
-import { Ionicons } from "@expo/vector-icons";
+import { getDeviceTimeZone, normalizeTimeZone } from "@/utils/timeZones";
 import { useRouter } from "expo-router";
 import { useMemo, type ReactNode } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -25,25 +24,24 @@ export default function AppPreferencesScreen() {
 		setPreferredWeightUnit,
 		setThemePreference,
 		setLanguagePreference,
+		setDisplayTimeZonePreference,
 		themeColors,
 		themePreference,
 		languagePreference,
+		displayTimeZonePreference,
 	} = useAppPreferences();
-	const { selectedBaby, updateSelectedBabyProfile } = useBabySelection();
+	const { selectedBaby } = useBabySelection();
 	const styles = useMemo(() => createStyles(themeColors), [themeColors]);
-	const selectedBabyTimeZone = selectedBaby?.timezone ?? getDeviceTimeZone();
+	const babyTimeZone = normalizeTimeZone(selectedBaby?.timezone);
+	const displayTimeZone = normalizeTimeZone(
+		displayTimeZonePreference ?? babyTimeZone ?? getDeviceTimeZone(),
+	);
 
-	const handleBabyTimeZoneChange = async (timeZone: string) => {
-		if (!selectedBaby) {
-			return;
-		}
-
-		await updateSelectedBabyProfile({
-			birthdate: selectedBaby.birthdate,
-			name: selectedBaby.name,
-			sex: selectedBaby.sex,
-			timezone: timeZone,
-		});
+	const handleDisplayTimeZoneChange = (timeZone: string) => {
+		const normalizedTimeZone = normalizeTimeZone(timeZone);
+		void setDisplayTimeZonePreference(
+			normalizedTimeZone === babyTimeZone ? null : normalizedTimeZone,
+		);
 	};
 
 	return (
@@ -51,100 +49,134 @@ export default function AppPreferencesScreen() {
 			<SettingsHeader onBack={() => router.back()} title="App Preferences" />
 			<ScrollView contentContainerStyle={styles.content}>
 				<View style={globalStyles.card}>
-					<Text style={styles.sectionTitle}>Unit Preference</Text>
-					<PreferenceRow label="Volume" styles={styles} helper="Bottle">
-						<SegmentButton
-							active={preferredVolumeUnit === "ml"}
-							label="mL"
-							onPress={() => void setPreferredVolumeUnit("ml")}
+					<PreferenceSection styles={styles}>
+						<Text style={globalStyles.sectionTitleText}>Units</Text>
+						<PreferenceRow label="Volume" styles={styles} helper="Bottle">
+							<SegmentButton
+								active={preferredVolumeUnit === "ml"}
+								label="mL"
+								onPress={() => void setPreferredVolumeUnit("ml")}
+								styles={styles}
+							/>
+							<SegmentButton
+								active={preferredVolumeUnit === "oz"}
+								label="oz"
+								onPress={() => void setPreferredVolumeUnit("oz")}
+								styles={styles}
+							/>
+						</PreferenceRow>
+						<PreferenceRow
+							label="Length"
 							styles={styles}
-						/>
-						<SegmentButton
-							active={preferredVolumeUnit === "oz"}
-							label="oz"
-							onPress={() => void setPreferredVolumeUnit("oz")}
-							styles={styles}
-						/>
-					</PreferenceRow>
-					<PreferenceRow label="Length" styles={styles} helper="Height, Head size">
-						<SegmentButton
-							active={preferredLengthUnit === "cm"}
-							label="cm"
-							onPress={() => void setPreferredLengthUnit("cm")}
-							styles={styles}
-						/>
-						<SegmentButton
-							active={preferredLengthUnit === "in"}
-							label="in"
-							onPress={() => void setPreferredLengthUnit("in")}
-							styles={styles}
-						/>
-					</PreferenceRow>
-					<PreferenceRow label="Weight" styles={styles} helper="Weight">
-						<SegmentButton
-							active={preferredWeightUnit === "kg"}
-							label="kg"
-							onPress={() => void setPreferredWeightUnit("kg")}
-							styles={styles}
-						/>
-						<SegmentButton
-							active={preferredWeightUnit === "lb"}
-							label="lb"
-							onPress={() => void setPreferredWeightUnit("lb")}
-							styles={styles}
-						/>
-					</PreferenceRow>
-				</View>
+							helper="Height, Head size"
+						>
+							<SegmentButton
+								active={preferredLengthUnit === "cm"}
+								label="cm"
+								onPress={() => void setPreferredLengthUnit("cm")}
+								styles={styles}
+							/>
+							<SegmentButton
+								active={preferredLengthUnit === "in"}
+								label="in"
+								onPress={() => void setPreferredLengthUnit("in")}
+								styles={styles}
+							/>
+						</PreferenceRow>
+						<PreferenceRow label="Weight" styles={styles} helper="Weight">
+							<SegmentButton
+								active={preferredWeightUnit === "kg"}
+								label="kg"
+								onPress={() => void setPreferredWeightUnit("kg")}
+								styles={styles}
+							/>
+							<SegmentButton
+								active={preferredWeightUnit === "lb"}
+								label="lb"
+								onPress={() => void setPreferredWeightUnit("lb")}
+								styles={styles}
+							/>
+						</PreferenceRow>
+					</PreferenceSection>
 
-				<View style={globalStyles.card}>
-					<Text style={styles.sectionTitle}>App Preference</Text>
-					<PreferenceRow
-						helper="Choose app appearance"
-						label="Theme"
-						styles={styles}
-					>
-						<SegmentButton
-							active={themePreference === "system"}
-							label="System"
-							onPress={() => void setThemePreference("system")}
+					<PreferenceSection divider styles={styles}>
+						<PreferenceRow
+							helper="Choose app appearance"
+							label="Theme"
 							styles={styles}
+						>
+							<SegmentButton
+								active={themePreference === "system"}
+								label="System"
+								onPress={() => void setThemePreference("system")}
+								styles={styles}
+							/>
+							<SegmentButton
+								active={themePreference === "light"}
+								label="Light"
+								onPress={() => void setThemePreference("light")}
+								styles={styles}
+							/>
+							<SegmentButton
+								active={themePreference === "dark"}
+								label="Dark"
+								onPress={() => void setThemePreference("dark")}
+								styles={styles}
+							/>
+						</PreferenceRow>
+					</PreferenceSection>
+
+					<PreferenceSection divider styles={styles}>
+						<LanguageSelector
+							label="Language"
+							layout="inline"
+							language={languagePreference}
+							onChange={(language) => void setLanguagePreference(language)}
 						/>
-						<SegmentButton
-							active={themePreference === "light"}
-							label="Light"
-							onPress={() => void setThemePreference("light")}
-							styles={styles}
+					</PreferenceSection>
+
+					<PreferenceSection divider styles={styles}>
+						<TimeZoneSelector
+							label="Display Timezone"
+							labelSuffixForTimeZone={
+								selectedBaby
+									? {
+											label: "Baby timezone",
+											timeZone: babyTimeZone,
+										}
+									: undefined
+							}
+							onChange={handleDisplayTimeZoneChange}
+							timeZone={displayTimeZone}
 						/>
-						<SegmentButton
-							active={themePreference === "dark"}
-							label="Dark"
-							onPress={() => void setThemePreference("dark")}
-							styles={styles}
-						/>
-					</PreferenceRow>
-					<LanguageSelector
-						label="Language"
-						language={languagePreference}
-						onChange={(language) => void setLanguagePreference(language)}
-					/>
-					<TimeZoneSelector
-						disabled={!selectedBaby}
-						label="Timezone"
-						onChange={(timeZone) => void handleBabyTimeZoneChange(timeZone)}
-						timeZone={selectedBabyTimeZone}
-					/>
-					<Text style={styles.timeZoneHelper}>
-						{selectedBaby
-							? "Used for routine, diary, and reports for this baby."
-							: "Select a baby before changing timezone."}
-					</Text>
-					<Text style={{...styles.timeZoneHelper, color: themeColors.error}}>
-						<Ionicons name="warning-outline" size={12} />
-						This changes timezone for all caregivers for this baby
-					</Text>
+						<Text style={styles.sectionHelper}>
+							Only affects how times are displayed on this device.
+						</Text>
+					</PreferenceSection>
 				</View>
 			</ScrollView>
 		</SafeAreaView>
+	);
+}
+
+function PreferenceSection({
+	children,
+	divider = false,
+	styles,
+}: {
+	children: ReactNode;
+	divider?: boolean;
+	styles: PreferencesStyles;
+}) {
+	return (
+		<View
+			style={[
+				styles.preferenceSection,
+				divider && styles.preferenceSectionDivider,
+			]}
+		>
+			{children}
+		</View>
 	);
 }
 
@@ -188,7 +220,9 @@ function SegmentButton({
 			onPress={onPress}
 			style={[styles.segmentButton, active && styles.segmentButtonActive]}
 		>
-			<Text style={[styles.segmentText, active && styles.segmentTextActive]}>{label}</Text>
+			<Text style={[styles.segmentText, active && styles.segmentTextActive]}>
+				{label}
+			</Text>
 		</Pressable>
 	);
 }
@@ -215,17 +249,22 @@ function createStyles(themeColors: ThemeColors) {
 			gap: spacing.md,
 			marginTop: spacing.md,
 		},
+		preferenceSection: {
+			gap: spacing.md,
+		},
+		preferenceSectionDivider: {
+			borderTopColor: themeColors.border,
+			borderTopWidth: StyleSheet.hairlineWidth,
+			marginTop: spacing.lg,
+			paddingTop: spacing.lg,
+		},
 		preferenceText: {
 			flex: 1,
 		},
-		sectionTitle: {
-			...typography.sectionTitle,
-			color: themeColors.textPrimary,
-		},
-		timeZoneHelper: {
+		sectionHelper: {
 			...typography.caption,
 			color: themeColors.textSecondary,
-			marginTop: spacing.md,
+			lineHeight: 18,
 		},
 		segmentButton: {
 			alignItems: "center",

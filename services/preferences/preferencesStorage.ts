@@ -13,11 +13,13 @@ const DEFAULT_LENGTH_UNIT: PreferredLengthUnit = "cm";
 const DEFAULT_WEIGHT_UNIT: PreferredWeightUnit = "kg";
 const DEFAULT_THEME_PREFERENCE: ThemePreference = "system";
 const DEFAULT_LANGUAGE: LanguagePreference = "en-US";
+const DEFAULT_DISPLAY_TIME_ZONE_PREFERENCE: DisplayTimeZonePreference = null;
 
 export type PreferredSolidFoodUnit = "servings" | "grams";
 export type PreferredLengthUnit = "cm" | "in";
 export type PreferredWeightUnit = "kg" | "lb";
 export type ThemePreference = "system" | "light" | "dark";
+export type DisplayTimeZonePreference = string | null;
 export type { LanguagePreference } from "@/data/languages";
 
 export type StoredPreferences = {
@@ -27,6 +29,7 @@ export type StoredPreferences = {
 	preferredWeightUnit: PreferredWeightUnit;
 	themePreference: ThemePreference;
 	languagePreference: LanguagePreference;
+	displayTimeZonePreference: DisplayTimeZonePreference;
 };
 
 export async function loadStoredPreferences(): Promise<StoredPreferences> {
@@ -58,6 +61,9 @@ export async function loadStoredPreferences(): Promise<StoredPreferences> {
 			languagePreference: isLanguagePreference(parsed.languagePreference)
 				? parsed.languagePreference
 				: DEFAULT_LANGUAGE,
+			displayTimeZonePreference: isDisplayTimeZonePreference(parsed.displayTimeZonePreference)
+				? parsed.displayTimeZonePreference
+				: DEFAULT_DISPLAY_TIME_ZONE_PREFERENCE,
 		};
 	} catch {
 		await saveStoredPreferences(getDefaultPreferences());
@@ -77,6 +83,7 @@ function getDefaultPreferences(): StoredPreferences {
 		preferredWeightUnit: DEFAULT_WEIGHT_UNIT,
 		themePreference: DEFAULT_THEME_PREFERENCE,
 		languagePreference: DEFAULT_LANGUAGE,
+		displayTimeZonePreference: DEFAULT_DISPLAY_TIME_ZONE_PREFERENCE,
 	};
 }
 
@@ -98,6 +105,10 @@ function isPreferredWeightUnit(value: unknown): value is PreferredWeightUnit {
 
 function isThemePreference(value: unknown): value is ThemePreference {
 	return value === "system" || value === "light" || value === "dark";
+}
+
+function isDisplayTimeZonePreference(value: unknown): value is DisplayTimeZonePreference {
+	return value === null || (typeof value === "string" && value.trim().length > 0);
 }
 
 async function readPreferencesValue() {

@@ -3,7 +3,7 @@ import { DiaryHeroCarousel } from "@/components/diary/DiaryMediaPreview";
 import { DiaryReflectionCard } from "@/components/diary/DiaryReflectionCard";
 import { DiaryTagPill } from "@/components/diary/DiaryTagPill";
 import { ConfirmDeleteModal } from "@/components/routine/ConfirmDeleteModal";
-import { useAppPreferences, useTimelineTimeZone , useAppTheme } from "@/context/AppPreferencesContext";
+import { useAppPreferences, useDisplayTimeZone, useTimelineTimeZone , useAppTheme } from "@/context/AppPreferencesContext";
 import { useBabySelection } from "@/context/BabySelectionContext";
 import { useDiaryCache } from "@/context/DiaryCacheContext";
 import { useSync } from "@/context/SyncContext";
@@ -31,6 +31,7 @@ export default function DiaryDetailScreen() {
 	const params = useLocalSearchParams<{ diaryId: string; entry?: string }>();
 	const { selectedBaby } = useBabySelection();
 	const timelineTimeZone = useTimelineTimeZone(selectedBaby);
+	const displayTimeZone = useDisplayTimeZone(selectedBaby);
 	const { getDiaryCache, removeDiaryEntryFromCache } = useDiaryCache();
 	const { connectionStatus } = useSync();
 	const parsedEntry = parseEntryParam(params.entry);
@@ -252,9 +253,9 @@ export default function DiaryDetailScreen() {
 						{entry ? (
 							<>
 								<MetadataRow label="Created by" value={formatUser(entry.createdBy, entry.createdById)} />
-								<MetadataRow label="Created at" value={formatDateTime(entry.createdAt, timelineTimeZone, languagePreference)} />
+								<MetadataRow label="Created at" value={formatDateTime(entry.createdAt, displayTimeZone, languagePreference)} />
 								<MetadataRow label="Modified by" value={formatUser(entry.updatedBy, entry.updatedById)} />
-								<MetadataRow label="Modified at" value={formatDateTime(entry.updatedAt, timelineTimeZone, languagePreference)} />
+								<MetadataRow label="Modified at" value={formatDateTime(entry.updatedAt, displayTimeZone, languagePreference)} />
 							</>
 						) : null}
 					</Pressable>

@@ -25,6 +25,7 @@ export function RoutineDayCard({
 	currentTime,
 	day,
 	defaultView,
+	displayTimeZone,
 	timeZone,
 	aiInsight,
 	onGenerateAiInsight,
@@ -33,6 +34,7 @@ export function RoutineDayCard({
 	currentTime: string;
 	day: RoutineDay;
 	defaultView: RoutineDayCardView;
+	displayTimeZone?: string;
 	timeZone?: string;
 	aiInsight?: DailyRoutineInsight;
 	onGenerateAiInsight?: (date: string) => Promise<void>;
@@ -67,7 +69,7 @@ export function RoutineDayCard({
 			</Pressable>
 
 			{isTimeline ? (
-				<Timeline config={config} currentTime={currentTime} events={day.timeline} timeZone={timeZone} />
+				<Timeline config={config} currentTime={currentTime} events={day.timeline} timeZone={displayTimeZone ?? timeZone} />
 			) : (
 				<>
 					<RoutineSummary config={config} summary={day.summary} />

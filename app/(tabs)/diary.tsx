@@ -2,7 +2,7 @@ import { DiaryEntryCard } from "@/components/diary/DiaryEntryCard";
 import { DiaryActionsModal } from "@/components/diary/DiaryActionsModal";
 import { DiaryTagPill } from "@/components/diary/DiaryTagPill";
 import { ConfirmDeleteModal } from "@/components/routine/ConfirmDeleteModal";
-import { useAppPreferences, useTimelineTimeZone , useAppTheme } from "@/context/AppPreferencesContext";
+import { useAppPreferences, useDisplayTimeZone, useTimelineTimeZone , useAppTheme } from "@/context/AppPreferencesContext";
 import { useBabySelection } from "@/context/BabySelectionContext";
 import { useDiaryCache } from "@/context/DiaryCacheContext";
 import { useSync } from "@/context/SyncContext";
@@ -74,6 +74,7 @@ export default function DiaryScreen() {
 	const { languagePreference } = useAppPreferences();
 	const { selectedBaby } = useBabySelection();
 	const timelineTimeZone = useTimelineTimeZone(selectedBaby);
+	const displayTimeZone = useDisplayTimeZone(selectedBaby);
 	const { connectionStatus, markOffline, markOnline } = useSync();
 	const {
 		appendDiaryPage,
@@ -417,7 +418,7 @@ export default function DiaryScreen() {
 									removeFilterValue(currentFilters, key, value),
 								);
 							}}
-							timeZone={timelineTimeZone}
+							timeZone={displayTimeZone}
 							tags={availableTags}
 						/>
 					) : null}
@@ -488,7 +489,7 @@ export default function DiaryScreen() {
 								locale={languagePreference}
 								onMorePress={setActionEntry}
 								onPress={openEntry}
-								timeZone={timelineTimeZone}
+								timeZone={displayTimeZone}
 								todayDate={todayDate}
 							/>
 						)}
@@ -532,7 +533,7 @@ export default function DiaryScreen() {
 				onDraftChange={setDraftFilters}
 				onOpenDatePicker={setDatePickerTarget}
 				locale={languagePreference}
-				timeZone={timelineTimeZone}
+				timeZone={displayTimeZone}
 				visible={isFilterVisible}
 			/>
 		</SafeAreaView>

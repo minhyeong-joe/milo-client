@@ -58,9 +58,11 @@ function ThemedRootLayout() {
                       <Stack.Screen name="settings/account" />
                       <Stack.Screen name="settings/about" />
                       <Stack.Screen name="settings/ai-insights" />
+                      <Stack.Screen name="settings/baby-timezone" />
                       <Stack.Screen name="settings/backup-export" />
                       <Stack.Screen name="settings/caregivers" />
                       <Stack.Screen name="settings/preferences" />
+                      <Stack.Screen name="settings/storage-usage" />
                       <Stack.Screen name="settings/tags" />
                     </Stack>
                   </SyncProvider>

@@ -35,61 +35,83 @@ export default function SettingsScreen() {
 	const { languagePreference } = useAppPreferences();
 	const { babies, selectBaby, selectedBaby } = useBabySelection();
 	const [isSelectorOpen, setIsSelectorOpen] = useState(false);
+	const isOwnerCapable =
+		selectedBaby?.role === "FATHER" || selectedBaby?.role === "MOTHER";
 
 	return (
 		<SafeAreaView edges={["top", "left", "right"]} style={globalStyles.screen}>
 			<ScrollView contentContainerStyle={styles.content}>
 				<Text style={globalStyles.sectionTitleText}>Settings</Text>
 
-				<Pressable
-					accessibilityRole="button"
-					accessibilityLabel="Select baby"
-					onPress={() => setIsSelectorOpen(true)}
-					style={({ pressed }) => [
-						styles.profileCard,
-						pressed && styles.pressed,
-					]}
-				>
-					<Image
-						source={
-							selectedBaby?.avatarUrl
-								? { uri: selectedBaby.avatarUrl }
-								: fallbackBabyAvatar
-						}
-						style={styles.avatar}
-					/>
-					<View style={styles.profileText}>
-						<Text style={styles.babyName}>
-							{selectedBaby?.name ?? "Baby Profile"}
-						</Text>
-						<Text style={styles.profileSubtitle}>
-							{selectedBaby
-								? `Born ${formatBirthdate(selectedBaby.birthdate, selectedBaby.timezone, languagePreference)}\n${formatAge(selectedBaby.birthdate)} old`
-								: "Create or choose a baby profile"}
-						</Text>
-					</View>
-					<Ionicons
-						color={themeColors.textSecondary}
-						name="chevron-down"
-						size={22}
-					/>
-				</Pressable>
-
-				<SettingsGroup>
+				<View style={styles.babySettingsGroup}>
+					<Pressable
+						accessibilityRole="button"
+						accessibilityLabel="Select baby"
+						onPress={() => setIsSelectorOpen(true)}
+						style={({ pressed }) => [
+							styles.profileCard,
+							pressed && styles.pressed,
+						]}
+					>
+						<Image
+							source={
+								selectedBaby?.avatarUrl
+									? { uri: selectedBaby.avatarUrl }
+									: fallbackBabyAvatar
+							}
+							style={styles.avatar}
+						/>
+						<View style={styles.profileText}>
+							<Text style={styles.babyName}>
+								{selectedBaby?.name ?? "Baby Profile"}
+							</Text>
+							<Text style={styles.profileSubtitle}>
+								{selectedBaby
+									? `Born ${formatBirthdate(selectedBaby.birthdate, selectedBaby.timezone, languagePreference)}\n${formatAge(selectedBaby.birthdate)} old`
+									: "Create or choose a baby profile"}
+							</Text>
+						</View>
+						<Ionicons
+							color={themeColors.textSecondary}
+							name="chevron-down"
+							size={22}
+						/>
+					</Pressable>
 					<SettingsRow
+						disabled={!!selectedBaby && !isOwnerCapable}
 						icon="create-outline"
 						iconBackground="#F1ECFF"
 						iconColor={themeColors.primary}
 						onPress={() => router.push("/baby/edit-profile")}
-						subtitle="Name, birthday, photo"
+						subtitle={
+							isOwnerCapable || !selectedBaby
+								? "Name, birthday, photo"
+								: "Owner only"
+						}
 						title="Edit Baby Profile"
 					/>
 					<SettingsRow
+						disabled={!!selectedBaby && !isOwnerCapable}
+						icon="time-outline"
+						iconBackground="#F1ECFF"
+						iconColor={themeColors.primary}
+						onPress={() => router.push("/settings/baby-timezone")}
+						subtitle={`${selectedBaby?.timezone} ${
+							isOwnerCapable || !selectedBaby ? "" : " (Owner only)"
+						}`}
+						title="Baby Timezone"
+					/>
+					<SettingsRow
+						disabled={!!selectedBaby && !isOwnerCapable}
 						icon="people-outline"
 						iconBackground="#EAF8EF"
 						iconColor="#2FAE62"
 						onPress={() => router.push("/settings/caregivers")}
-						subtitle="Access and invitations"
+						subtitle={
+							isOwnerCapable || !selectedBaby
+								? "Access and invitations"
+								: "Owner only"
+						}
 						title="Manage Caregivers"
 					/>
 					<SettingsRow
@@ -116,38 +138,30 @@ export default function SettingsScreen() {
 						subtitle="View and manage diary tags"
 						title="Diary Tags"
 					/>
-				</SettingsGroup>
+					<SettingsRow
+						icon="cloud-outline"
+						onPress={() => router.push("/settings/storage-usage")}
+						subtitle="1.2 GB of 5 GB used"
+						title="Storage Usage"
+					/>
+				</View>
 
 				<SettingsGroup>
 					<SettingsRow
 						icon="settings-outline"
+						iconBackground="#EAF4FF"
+						iconColor="#2563EB"
 						onPress={() => router.push("/settings/preferences")}
 						subtitle="Units, Language, Theme"
 						title="App Preferences"
 					/>
 					<SettingsRow
-						icon="sparkles-outline"
-						onPress={() => undefined}
-						subtitle="Coming soon"
-						title="AI & Insights"
-					/>
-					<SettingsRow
 						icon="person-outline"
+						iconBackground="#EAF8EF"
+						iconColor="#2FAE62"
 						onPress={() => router.push("/settings/account")}
 						subtitle="Email, Password, Security"
 						title="Account"
-					/>
-					<SettingsRow
-						icon="cloud-upload-outline"
-						onPress={() => undefined}
-						subtitle="Coming soon"
-						title="Backup & Export"
-					/>
-					<SettingsRow
-						icon="information-circle-outline"
-						onPress={() => router.push("/settings/about")}
-						subtitle="Version 1.0.0"
-						title="About"
 					/>
 				</SettingsGroup>
 				<BabySelectorModal
@@ -208,6 +222,13 @@ function createStyles(themeColors: ThemeColors) {
 			...typography.label,
 			color: themeColors.textPrimary,
 		},
+		babySettingsGroup: {
+			backgroundColor: themeColors.surface,
+			borderColor: themeColors.border,
+			borderRadius: 16,
+			borderWidth: 1,
+			overflow: "hidden",
+		},
 		content: {
 			gap: spacing.md,
 			padding: spacing.md,
@@ -218,10 +239,8 @@ function createStyles(themeColors: ThemeColors) {
 		},
 		profileCard: {
 			alignItems: "center",
-			backgroundColor: themeColors.surface,
-			borderColor: themeColors.border,
-			borderRadius: 16,
-			borderWidth: 1,
+			borderBottomColor: themeColors.border,
+			borderBottomWidth: StyleSheet.hairlineWidth,
 			flexDirection: "row",
 			gap: spacing.md,
 			padding: spacing.md,

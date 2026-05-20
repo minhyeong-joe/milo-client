@@ -19,9 +19,11 @@ function useThemeStyles() {
 export function LanguageSelector({
 	label,
 	language,
+	layout = "stacked",
 	onChange,
 }: {
 	label: string;
+	layout?: "inline" | "stacked";
 	language: LanguagePreference;
 	onChange: (language: LanguagePreference) => void;
 }) {
@@ -29,18 +31,23 @@ export function LanguageSelector({
 	const [isOpen, setIsOpen] = useState(false);
 
 	return (
-		<View style={styles.field}>
+		<View style={[styles.field, layout === "inline" && styles.inlineField]}>
 			<Text style={styles.fieldLabel}>{label}</Text>
 			<Pressable
 				accessibilityRole="button"
 				onPress={() => setIsOpen(true)}
 				style={({ pressed }) => [
 					styles.selectorButton,
+					layout === "inline" && styles.inlineSelectorButton,
 					pressed && styles.pressedButton,
 				]}
 			>
 				<Text style={styles.selectorValue}>{getLanguageLabel(language)}</Text>
-				<Ionicons color={themeColors.textSecondary} name="chevron-down" size={20} />
+				<Ionicons
+					color={themeColors.textSecondary}
+					name="chevron-down"
+					size={20}
+				/>
 			</Pressable>
 			<Modal
 				animationType="fade"
@@ -56,7 +63,11 @@ export function LanguageSelector({
 								accessibilityRole="button"
 								onPress={() => setIsOpen(false)}
 							>
-								<Ionicons color={themeColors.textSecondary} name="close" size={22} />
+								<Ionicons
+									color={themeColors.textSecondary}
+									name="close"
+									size={22}
+								/>
 							</Pressable>
 						</View>
 						{languageOptions.map((option) => {
@@ -104,6 +115,17 @@ function createStyles(themeColors: ThemeColors) {
 		fieldLabel: {
 			...typography.label,
 			color: themeColors.textPrimary,
+		},
+		inlineField: {
+			alignItems: "center",
+			flexDirection: "row",
+			gap: spacing.md,
+			justifyContent: "space-between",
+			marginTop: 0,
+		},
+		inlineSelectorButton: {
+			minWidth: 180,
+			width: 180,
 		},
 		modalBackdrop: {
 			alignItems: "center",
