@@ -4,6 +4,7 @@ import { BabySelectionProvider } from "@/context/BabySelectionContext";
 import { DiaryCacheProvider } from "@/context/DiaryCacheContext";
 import { GrowthDataProvider } from "@/context/GrowthDataContext";
 import { ImmunizationDataProvider } from "@/context/ImmunizationDataContext";
+import { PreviewOtaUpdatePrompt } from "@/components/updates/PreviewOtaUpdatePrompt";
 import { RoutineDataProvider } from "@/context/RoutineDataContext";
 import { SyncProvider } from "@/context/SyncContext";
 import { StatusBar } from "expo-status-bar";
@@ -28,6 +29,7 @@ function ThemedRootLayout() {
               <ImmunizationDataProvider>
                 <DiaryCacheProvider>
                   <SyncProvider>
+                    <PreviewOtaUpdatePrompt />
                     <StatusBar
                       backgroundColor={themeColors.background}
                       style={resolvedTheme === "dark" ? "light" : "dark"}
@@ -54,6 +56,7 @@ function ThemedRootLayout() {
                       <Stack.Screen name="routine/add-meal" />
                       <Stack.Screen name="routine/add-sleep" />
                       <Stack.Screen name="settings/account" />
+                      <Stack.Screen name="settings/about" />
                       <Stack.Screen name="settings/ai-insights" />
                       <Stack.Screen name="settings/backup-export" />
                       <Stack.Screen name="settings/caregivers" />

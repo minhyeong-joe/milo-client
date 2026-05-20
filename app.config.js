@@ -38,6 +38,13 @@ module.exports = ({ config }) => {
 		...config,
 		name: appVariant.name,
 		scheme: appVariant.scheme,
+		updates:
+			VARIANT === "preview"
+				? {
+						...config.updates,
+						checkAutomatically: "NEVER",
+					}
+				: config.updates,
 		ios: {
 			...config.ios,
 			bundleIdentifier: appVariant.identifier,

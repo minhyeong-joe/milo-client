@@ -3,11 +3,21 @@ import { SettingsGroup, SettingsRow } from "@/components/settings/SettingsRows";
 import { useBabySelection } from "@/context/BabySelectionContext";
 import { FEATURE_VISUALS } from "@/constants/featureVisuals";
 import { spacing, typography, type ThemeColors } from "@/styles/globalStyles";
-import { useAppPreferences, useAppTheme } from "@/context/AppPreferencesContext";
+import {
+	useAppPreferences,
+	useAppTheme,
+} from "@/context/AppPreferencesContext";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useState, useMemo } from "react";
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+	Image,
+	Pressable,
+	ScrollView,
+	StyleSheet,
+	Text,
+	View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const fallbackBabyAvatar = require("@/assets/images/baby.png");
@@ -35,21 +45,34 @@ export default function SettingsScreen() {
 					accessibilityRole="button"
 					accessibilityLabel="Select baby"
 					onPress={() => setIsSelectorOpen(true)}
-					style={({ pressed }) => [styles.profileCard, pressed && styles.pressed]}
+					style={({ pressed }) => [
+						styles.profileCard,
+						pressed && styles.pressed,
+					]}
 				>
 					<Image
-						source={selectedBaby?.avatarUrl ? { uri: selectedBaby.avatarUrl } : fallbackBabyAvatar}
+						source={
+							selectedBaby?.avatarUrl
+								? { uri: selectedBaby.avatarUrl }
+								: fallbackBabyAvatar
+						}
 						style={styles.avatar}
 					/>
 					<View style={styles.profileText}>
-						<Text style={styles.babyName}>{selectedBaby?.name ?? "Baby Profile"}</Text>
+						<Text style={styles.babyName}>
+							{selectedBaby?.name ?? "Baby Profile"}
+						</Text>
 						<Text style={styles.profileSubtitle}>
 							{selectedBaby
 								? `Born ${formatBirthdate(selectedBaby.birthdate, selectedBaby.timezone, languagePreference)}\n${formatAge(selectedBaby.birthdate)} old`
 								: "Create or choose a baby profile"}
 						</Text>
 					</View>
-					<Ionicons color={themeColors.textSecondary} name="chevron-down" size={22} />
+					<Ionicons
+						color={themeColors.textSecondary}
+						name="chevron-down"
+						size={22}
+					/>
 				</Pressable>
 
 				<SettingsGroup>
@@ -104,8 +127,8 @@ export default function SettingsScreen() {
 					/>
 					<SettingsRow
 						icon="sparkles-outline"
-						onPress={() => router.push("/settings/ai-insights")}
-						subtitle="Insight settings and daily summary"
+						onPress={() => undefined}
+						subtitle="Coming soon"
 						title="AI & Insights"
 					/>
 					<SettingsRow
@@ -116,12 +139,13 @@ export default function SettingsScreen() {
 					/>
 					<SettingsRow
 						icon="cloud-upload-outline"
-						onPress={() => router.push("/settings/backup-export")}
-						subtitle="Export data and backups"
+						onPress={() => undefined}
+						subtitle="Coming soon"
 						title="Backup & Export"
 					/>
 					<SettingsRow
 						icon="information-circle-outline"
+						onPress={() => router.push("/settings/about")}
 						subtitle="Version 1.0.0"
 						title="About"
 					/>
@@ -160,7 +184,10 @@ function formatAge(dateKey: string) {
 
 	const monthAnchor = new Date(birthdate);
 	monthAnchor.setMonth(birthdate.getMonth() + Math.max(months, 0));
-	const days = Math.max(0, Math.floor((today.getTime() - monthAnchor.getTime()) / 86400000));
+	const days = Math.max(
+		0,
+		Math.floor((today.getTime() - monthAnchor.getTime()) / 86400000),
+	);
 
 	if (months <= 0) {
 		return `${days} days`;
@@ -171,42 +198,42 @@ function formatAge(dateKey: string) {
 
 function createStyles(themeColors: ThemeColors) {
 	return StyleSheet.create({
-	avatar: {
-		backgroundColor: "#D9BFAE",
-		borderRadius: 28,
-		height: 56,
-		width: 56,
-	},
-	babyName: {
-		...typography.label,
-		color: themeColors.textPrimary,
-	},
-	content: {
-		gap: spacing.md,
-		padding: spacing.md,
-		paddingBottom: spacing.xl,
-	},
-	pressed: {
-		opacity: 0.72,
-	},
-	profileCard: {
-		alignItems: "center",
-		backgroundColor: themeColors.surface,
-		borderColor: themeColors.border,
-		borderRadius: 16,
-		borderWidth: 1,
-		flexDirection: "row",
-		gap: spacing.md,
-		padding: spacing.md,
-	},
-	profileSubtitle: {
-		...typography.caption,
-		color: themeColors.textSecondary,
-		lineHeight: 18,
-		marginTop: 3,
-	},
-	profileText: {
-		flex: 1,
-	},
-});
+		avatar: {
+			backgroundColor: "#D9BFAE",
+			borderRadius: 28,
+			height: 56,
+			width: 56,
+		},
+		babyName: {
+			...typography.label,
+			color: themeColors.textPrimary,
+		},
+		content: {
+			gap: spacing.md,
+			padding: spacing.md,
+			paddingBottom: spacing.xl,
+		},
+		pressed: {
+			opacity: 0.72,
+		},
+		profileCard: {
+			alignItems: "center",
+			backgroundColor: themeColors.surface,
+			borderColor: themeColors.border,
+			borderRadius: 16,
+			borderWidth: 1,
+			flexDirection: "row",
+			gap: spacing.md,
+			padding: spacing.md,
+		},
+		profileSubtitle: {
+			...typography.caption,
+			color: themeColors.textSecondary,
+			lineHeight: 18,
+			marginTop: 3,
+		},
+		profileText: {
+			flex: 1,
+		},
+	});
 }
