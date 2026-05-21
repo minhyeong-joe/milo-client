@@ -7,6 +7,7 @@ import {
 	useAppPreferences,
 	useAppTheme,
 } from "@/context/AppPreferencesContext";
+import { getTimeZoneDisplayLabel } from "@/utils/timeZones";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useState, useMemo } from "react";
@@ -93,7 +94,7 @@ export default function SettingsScreen() {
 						iconBackground="#F1ECFF"
 						iconColor={themeColors.primary}
 						onPress={() => router.push("/settings/baby-timezone")}
-						subtitle={`${selectedBaby?.timezone} ${
+						subtitle={`${getTimeZoneDisplayLabel(selectedBaby?.timezone)} ${
 							isOwner || !selectedBaby ? "" : " (Owner only)"
 						}`}
 						title="Baby Timezone"

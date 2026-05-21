@@ -13,6 +13,7 @@ import {
 	listSentBabyInvites,
 	normalizeInviteCode,
 	removeBabyMember,
+	revokeBabyInvite,
 	type BabyInvite,
 	type BabyMember,
 	type BabyRole,
@@ -62,6 +63,7 @@ export default function ManageCaregiversScreen() {
 	const [isSendingInvite, setIsSendingInvite] = useState(false);
 	const [actionInviteId, setActionInviteId] = useState<string | null>(null);
 	const [actionMemberId, setActionMemberId] = useState<string | null>(null);
+	const [actionSentInviteId, setActionSentInviteId] = useState<string | null>(null);
 	const [notice, setNotice] = useState<Notice | null>(null);
 	const isOwner = selectedBaby?.isOwner === true;
 
@@ -200,6 +202,57 @@ export default function ManageCaregiversScreen() {
 			});
 		} finally {
 			setActionInviteId(null);
+		}
+	};
+
+	const handleCancelSentInvite = (invite: BabyInvite) => {
+		if (!selectedBaby || !isOwner) {
+			return;
+		}
+
+		const recipientName =
+			invite.recipientUser?.displayName ||
+			invite.recipientUser?.email ||
+			invite.email;
+
+		Alert.alert(
+			"Cancel invitation?",
+			`${recipientName} will no longer be able to join ${getBabyGroupLabel(selectedBaby.name)} with this code.`,
+			[
+				{ style: "cancel", text: "Keep invite" },
+				{
+					onPress: () => void cancelSentInvite(invite),
+					style: "destructive",
+					text: "Cancel invite",
+				},
+			],
+		);
+	};
+
+	const cancelSentInvite = async (invite: BabyInvite) => {
+		if (!selectedBaby) {
+			return;
+		}
+
+		setActionSentInviteId(invite.id);
+		setNotice(null);
+
+		try {
+			await revokeBabyInvite(selectedBaby.id, invite.id);
+			await loadSharingData();
+			setNotice({
+				message: `${invite.email} can no longer join ${getBabyGroupLabel(selectedBaby.name)} with that code.`,
+				title: "Invitation canceled",
+				type: "success",
+			});
+		} catch (caughtError) {
+			setNotice({
+				message: getErrorMessage(caughtError),
+				title: "Could not cancel invitation",
+				type: "error",
+			});
+		} finally {
+			setActionSentInviteId(null);
 		}
 	};
 
@@ -388,7 +441,12 @@ export default function ManageCaregiversScreen() {
 							) : (
 								<View style={styles.inviteList}>
 									{sentInvites.map((invite) => (
-										<SentInviteCard invite={invite} key={invite.id} />
+										<SentInviteCard
+											invite={invite}
+											isBusy={actionSentInviteId === invite.id}
+											key={invite.id}
+											onCancel={handleCancelSentInvite}
+										/>
 									))}
 								</View>
 							)}
@@ -564,21 +622,43 @@ function InviteCard({
 	);
 }
 
-function SentInviteCard({ invite }: { invite: BabyInvite }) {
-	const { styles } = useThemeStyles();
+function SentInviteCard({
+	invite,
+	isBusy,
+	onCancel,
+}: {
+	invite: BabyInvite;
+	isBusy: boolean;
+	onCancel: (invite: BabyInvite) => void;
+}) {
+	const { themeColors, styles } = useThemeStyles();
 	const recipientName =
 		invite.recipientUser?.displayName ||
 		invite.recipientUser?.email ||
 		invite.email;
 
 	return (
-		<View style={styles.sentInviteCard}>
+		<View style={[styles.sentInviteCard, isBusy && styles.disabled]}>
 			<View style={styles.sentInviteHeader}>
 				<View style={styles.userText}>
 					<Text style={styles.inviteTitle}>{recipientName}</Text>
 					<Text style={styles.userMeta}>{invite.email}</Text>
 				</View>
-				<Text style={styles.codePill}>{invite.inviteCode}</Text>
+				<View style={styles.sentInviteActions}>
+					<Text style={styles.codePill}>{invite.inviteCode}</Text>
+					<Pressable
+						accessibilityLabel="Cancel invitation"
+						accessibilityRole="button"
+						disabled={isBusy}
+						onPress={() => onCancel(invite)}
+						style={({ pressed }) => [
+							styles.cancelInviteButton,
+							pressed && !isBusy && styles.pressed,
+						]}
+					>
+						<Ionicons color={themeColors.error} name="close" size={18} />
+					</Pressable>
+				</View>
 			</View>
 			<Text style={styles.expiryText}>
 				Expires {formatDateTime(invite.expiresAt)}
@@ -756,6 +836,15 @@ function createStyles(themeColors: ThemeColors) {
 		actionRow: {
 			flexDirection: "row",
 			gap: spacing.sm,
+		},
+		cancelInviteButton: {
+			alignItems: "center",
+			borderColor: themeColors.error,
+			borderRadius: 10,
+			borderWidth: 1,
+			height: 32,
+			justifyContent: "center",
+			width: 32,
 		},
 		codePill: {
 			...typography.caption,
@@ -971,6 +1060,11 @@ function createStyles(themeColors: ThemeColors) {
 			flexDirection: "row",
 			gap: spacing.sm,
 			justifyContent: "space-between",
+		},
+		sentInviteActions: {
+			alignItems: "center",
+			flexDirection: "row",
+			gap: spacing.xs,
 		},
 		sentInviteSection: {
 			borderTopColor: themeColors.border,

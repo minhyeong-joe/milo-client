@@ -231,6 +231,12 @@ export function listSentBabyInvites(babyId: string) {
 	});
 }
 
+export function revokeBabyInvite(babyId: string, inviteId: string) {
+	return apiDelete<void>(`/babies/${babyId}/invites/${inviteId}`, {
+		auth: true,
+	});
+}
+
 export function listMyInvites() {
 	return apiGet<ListInvitesResponse>("/invites", {
 		auth: true,
