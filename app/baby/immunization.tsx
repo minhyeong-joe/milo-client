@@ -107,7 +107,7 @@ export default function ImmunizationScreen() {
 	const [isProfileModalVisible, setIsProfileModalVisible] = useState(false);
 
 	useEffect(() => {
-		void loadImmunizations({ sync: true }).catch((error) => console.warn(error));
+		void loadImmunizations({ sync: false }).catch((error) => console.warn(error));
 	}, [loadImmunizations]);
 
 	const derived = useMemo(

@@ -83,9 +83,7 @@ export default function SettingsScreen() {
 						iconColor={themeColors.primary}
 						onPress={() => router.push("/baby/edit-profile")}
 						subtitle={
-							selectedBaby
-								? "Name, birthday, photo"
-								: "Choose a baby first"
+							selectedBaby ? "Name, birthday, photo" : "Choose a baby first"
 						}
 						title="Edit Baby Profile"
 					/>
@@ -106,11 +104,9 @@ export default function SettingsScreen() {
 						iconColor="#2FAE62"
 						onPress={() => router.push("/settings/caregivers")}
 						subtitle={
-							selectedBaby
-								? "Access and invitations"
-								: "Choose a baby first"
+							selectedBaby ? "Access and invitations" : "Choose a baby first"
 						}
-						title="Manage Caregivers"
+						title="Manage Family Profile"
 					/>
 					<SettingsRow
 						icon={FEATURE_VISUALS.growth.icon}

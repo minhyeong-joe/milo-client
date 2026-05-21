@@ -36,6 +36,33 @@ export default function AccountScreen() {
 				<SettingsGroup>
 					<SettingsRow
 						disabled
+						icon="person-outline"
+						iconBackground="#F7F8FC"
+						iconColor="#64748B"
+						subtitle={user?.displayName ?? "Unknown"}
+						title={"Username"}
+					/>
+					<SettingsRow
+						disabled
+						icon="mail-outline"
+						iconBackground="#F7F8FC"
+						iconColor="#64748B"
+						subtitle={user?.email ?? "Not signed in"}
+						title={"Email"}
+					/>
+					<SettingsRow
+						disabled
+						icon="key-outline"
+						iconBackground="#F7F8FC"
+						iconColor="#64748B"
+						subtitle={"Change to new password"}
+						title={"Reset Password"}
+					/>
+				</SettingsGroup>
+
+				<SettingsGroup>
+					<SettingsRow
+						disabled
 						icon="card-outline"
 						iconBackground="#EAF8EF"
 						iconColor="#2FAE62"
@@ -53,14 +80,6 @@ export default function AccountScreen() {
 				</SettingsGroup>
 
 				<SettingsGroup>
-					<SettingsRow
-						disabled
-						icon="mail-outline"
-						iconBackground="#F7F8FC"
-						iconColor="#64748B"
-						subtitle={user?.email ?? "Not signed in"}
-						title="Email / Security"
-					/>
 					<SettingsRow
 						icon="sparkles-outline"
 						iconBackground="#F1ECFF"

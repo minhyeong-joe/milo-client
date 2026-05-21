@@ -69,6 +69,8 @@ export function BabySelectionProvider({ children }: PropsWithChildren) {
 	const [isLoading, setIsLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const selectedBabyIdRef = useRef<string | null>(null);
+	const refreshPromiseRef = useRef<Promise<void> | null>(null);
+	const refreshRequestIdRef = useRef(0);
 
 	useEffect(() => {
 		selectedBabyIdRef.current = selectedBabyId;
@@ -76,6 +78,7 @@ export function BabySelectionProvider({ children }: PropsWithChildren) {
 
 	const refreshBabies = useCallback(async () => {
 		if (!session) {
+			refreshRequestIdRef.current += 1;
 			setBabies([]);
 			setSelectedBabyId(null);
 			selectedBabyIdRef.current = null;
@@ -83,64 +86,99 @@ export function BabySelectionProvider({ children }: PropsWithChildren) {
 			return;
 		}
 
-		setIsLoading(true);
-		setError(null);
-
-		try {
-			const cachedSelection = await loadCachedBabySelection(session.user.id);
-
-			if (cachedSelection) {
-				const currentSelectedBabyId = selectedBabyIdRef.current;
-				const cachedSelectedBabyId =
-					getAccessibleBabyId(cachedSelection.babies, currentSelectedBabyId) ??
-					getAccessibleBabyId(cachedSelection.babies, cachedSelection.selectedBabyId) ??
-					cachedSelection.babies[0]?.id ??
-					null;
-				const cachedBabiesWithPendingProfiles = await applyPendingBabyProfileMutations(
-					session.user.id,
-					cachedSelection.babies,
-				);
-				const cachedBabiesWithPendingAvatars = await applyPendingBabyAvatarMutations(
-					session.user.id,
-					cachedBabiesWithPendingProfiles,
-				);
-
-				setBabies(cachedBabiesWithPendingAvatars);
-				setSelectedBabyId(cachedSelectedBabyId);
-				selectedBabyIdRef.current = cachedSelectedBabyId;
-			}
-
-			const response = await getBabies();
-			const babiesWithPendingProfiles = await applyPendingBabyProfileMutations(
-				session.user.id,
-				response.babies,
-			);
-			const babiesWithPendingAvatars = await applyPendingBabyAvatarMutations(
-				session.user.id,
-				babiesWithPendingProfiles,
-			);
-			const storedBabyId = await loadStoredSelectedBabyId(session.user.id);
-			const currentSelectedBabyId = selectedBabyIdRef.current;
-			const nextSelectedBabyId =
-				getAccessibleBabyId(babiesWithPendingAvatars, currentSelectedBabyId) ??
-				getAccessibleBabyId(babiesWithPendingAvatars, storedBabyId) ??
-				babiesWithPendingAvatars[0]?.id ??
-				null;
-
-			setBabies(babiesWithPendingAvatars);
-			setSelectedBabyId(nextSelectedBabyId);
-			selectedBabyIdRef.current = nextSelectedBabyId;
-			await saveCachedBabySelection(session.user.id, babiesWithPendingAvatars, nextSelectedBabyId);
-
-			if (nextSelectedBabyId) {
-				await saveStoredSelectedBabyId(session.user.id, nextSelectedBabyId);
-			}
-		} catch (caughtError) {
-			setError(getErrorMessage(caughtError));
-		} finally {
-			setIsLoading(false);
+		if (refreshPromiseRef.current) {
+			return refreshPromiseRef.current;
 		}
+
+		const requestId = refreshRequestIdRef.current + 1;
+		refreshRequestIdRef.current = requestId;
+
+		refreshPromiseRef.current = (async () => {
+			setIsLoading(true);
+			setError(null);
+
+			try {
+				const cachedSelection = await loadCachedBabySelection(session.user.id);
+
+				if (cachedSelection && refreshRequestIdRef.current === requestId) {
+					const currentSelectedBabyId = selectedBabyIdRef.current;
+					const cachedSelectedBabyId =
+						getAccessibleBabyId(cachedSelection.babies, currentSelectedBabyId) ??
+						getAccessibleBabyId(cachedSelection.babies, cachedSelection.selectedBabyId) ??
+						cachedSelection.babies[0]?.id ??
+						null;
+					const cachedBabiesWithPendingProfiles = await applyPendingBabyProfileMutations(
+						session.user.id,
+						cachedSelection.babies,
+					);
+					const cachedBabiesWithPendingAvatars = await applyPendingBabyAvatarMutations(
+						session.user.id,
+						cachedBabiesWithPendingProfiles,
+					);
+
+					setBabies(cachedBabiesWithPendingAvatars);
+					setSelectedBabyId(cachedSelectedBabyId);
+					selectedBabyIdRef.current = cachedSelectedBabyId;
+				}
+
+				const response = await getBabies();
+				const babiesWithPendingProfiles = await applyPendingBabyProfileMutations(
+					session.user.id,
+					response.babies,
+				);
+				const babiesWithPendingAvatars = await applyPendingBabyAvatarMutations(
+					session.user.id,
+					babiesWithPendingProfiles,
+				);
+				const storedBabyId = await loadStoredSelectedBabyId(session.user.id);
+
+				if (refreshRequestIdRef.current !== requestId) {
+					return;
+				}
+
+				const currentSelectedBabyId = selectedBabyIdRef.current;
+				const nextSelectedBabyId =
+					getAccessibleBabyId(babiesWithPendingAvatars, currentSelectedBabyId) ??
+					getAccessibleBabyId(babiesWithPendingAvatars, storedBabyId) ??
+					babiesWithPendingAvatars[0]?.id ??
+					null;
+
+				setBabies(babiesWithPendingAvatars);
+				setSelectedBabyId(nextSelectedBabyId);
+				selectedBabyIdRef.current = nextSelectedBabyId;
+				await saveCachedBabySelection(session.user.id, babiesWithPendingAvatars, nextSelectedBabyId);
+
+				if (nextSelectedBabyId) {
+					await saveStoredSelectedBabyId(session.user.id, nextSelectedBabyId);
+				}
+			} catch (caughtError) {
+				if (refreshRequestIdRef.current === requestId) {
+					setError(getErrorMessage(caughtError));
+				}
+			} finally {
+				if (refreshRequestIdRef.current === requestId) {
+					setIsLoading(false);
+				}
+				refreshPromiseRef.current = null;
+			}
+		})();
+
+		return refreshPromiseRef.current;
 	}, [session]);
+
+	const selectBaby = useCallback((babyId: string) => {
+		if (selectedBabyIdRef.current === babyId) {
+			return;
+		}
+
+		setSelectedBabyId(babyId);
+		selectedBabyIdRef.current = babyId;
+
+		if (session) {
+			void saveStoredSelectedBabyId(session.user.id, babyId);
+			void saveCachedBabySelection(session.user.id, babies, babyId).catch(reportBackgroundError);
+		}
+	}, [babies, session]);
 
 	useEffect(() => {
 		if (!isReady) {
@@ -340,15 +378,7 @@ export function BabySelectionProvider({ children }: PropsWithChildren) {
 			removeSelectedBabyAvatar,
 			refreshBabies,
 			saveSelectedBabyProfileDraft,
-			selectBaby: (babyId) => {
-				setSelectedBabyId(babyId);
-				selectedBabyIdRef.current = babyId;
-
-				if (session) {
-					void saveStoredSelectedBabyId(session.user.id, babyId);
-					void saveCachedBabySelection(session.user.id, babies, babyId).catch(reportBackgroundError);
-				}
-			},
+			selectBaby,
 			selectedBaby,
 			selectedBabyId,
 			setSelectedBabyAvatar,
@@ -362,6 +392,7 @@ export function BabySelectionProvider({ children }: PropsWithChildren) {
 			refreshBabies,
 			removeSelectedBabyAvatar,
 			saveSelectedBabyProfileDraft,
+			selectBaby,
 			selectedBaby,
 			selectedBabyId,
 			session,

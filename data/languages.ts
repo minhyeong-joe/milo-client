@@ -4,11 +4,11 @@ export const languageOptions = [
 		label: "English",
 		textConfigKey: "en",
 	},
-	{
-		code: "ko-KR",
-		label: "한국어",
-		textConfigKey: "ko",
-	},
+	// {
+	// 	code: "ko-KR",
+	// 	label: "한국어",
+	// 	textConfigKey: "ko",
+	// },
 ] as const;
 
 export type LanguagePreference = (typeof languageOptions)[number]["code"];

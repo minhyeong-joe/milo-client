@@ -64,7 +64,6 @@ export default function HomeScreen() {
 	const { languagePreference, preferredVolumeUnit } = useAppPreferences();
 	const { growthRecords } = useGrowthData();
 	const {
-		loadImmunizations,
 		records: immunizationRecords,
 		scheduleItems: immunizationScheduleItems,
 	} = useImmunizationData();
@@ -111,6 +110,9 @@ export default function HomeScreen() {
 	const routineRequestIdRef = useRef(0);
 	const isOlderRoutineLoadingRef = useRef(false);
 	const lastInitialRoutineLoadKeyRef = useRef<string | null>(null);
+	const selectedBabyIdRef = useRef<string | null>(null);
+	const aiStatusInFlightKeysRef = useRef<Set<string>>(new Set());
+	const aiStatusLoadedKeysRef = useRef<Set<string>>(new Set());
 	const syncBannerMessage = syncProviderError ?? routineError ?? syncError;
 	const routineDisplayConfig = useMemo<RoutineConfig>(
 		() => ({
@@ -167,6 +169,7 @@ export default function HomeScreen() {
 			return;
 		}
 
+		const babyId = selectedBabyId;
 		const todayKey = getDateKeyInTimeZone(new Date(), selectedBabyTimeZone);
 		const dates = logs
 			.map((log) => log.date)
@@ -177,16 +180,40 @@ export default function HomeScreen() {
 			return;
 		}
 
+		let pendingRanges: string[][] = [];
+
 		try {
+			pendingRanges = chunkDates(dates, 30).filter((range) => {
+				const rangeKey = getAiStatusRangeKey(babyId, range[0], range[range.length - 1]);
+
+				if (
+					aiStatusLoadedKeysRef.current.has(rangeKey) ||
+					aiStatusInFlightKeysRef.current.has(rangeKey)
+				) {
+					return false;
+				}
+
+				aiStatusInFlightKeysRef.current.add(rangeKey);
+				return true;
+			});
+
+			if (pendingRanges.length === 0) {
+				return;
+			}
+
 			const responses = await Promise.all(
-				chunkDates(dates, 30).map((range) =>
+				pendingRanges.map((range) =>
 					listDailyRoutineInsightStatuses({
-						babyId: selectedBabyId,
+						babyId,
 						startDate: range[0],
 						endDate: range[range.length - 1],
 					}),
 				),
 			);
+
+			if (selectedBabyIdRef.current !== babyId) {
+				return;
+			}
 
 			setAiInsightsByDate((current) => {
 				const next = { ...current };
@@ -199,8 +226,15 @@ export default function HomeScreen() {
 
 				return next;
 			});
+			pendingRanges.forEach((range) => {
+				aiStatusLoadedKeysRef.current.add(getAiStatusRangeKey(babyId, range[0], range[range.length - 1]));
+			});
 		} catch (error) {
 			console.warn("Could not load AI insight statuses", error);
+		} finally {
+			pendingRanges.forEach((range) => {
+				aiStatusInFlightKeysRef.current.delete(getAiStatusRangeKey(babyId, range[0], range[range.length - 1]));
+			});
 		}
 	}, [selectedBabyId, selectedBabyTimeZone]);
 
@@ -233,9 +267,12 @@ export default function HomeScreen() {
 			return;
 		}
 
+		const babyId = selectedBabyId;
+		const babyTimeZone = selectedBabyTimeZone;
+		const userId = sessionUserId;
 		const requestId = routineRequestIdRef.current + 1;
 		routineRequestIdRef.current = requestId;
-		const startDate = getDateKeyInTimeZone(new Date(), selectedBabyTimeZone);
+		const startDate = getDateKeyInTimeZone(new Date(), babyTimeZone);
 		const isManualSync = trigger === "manual";
 
 		setIsInitialRoutineLoading(true);
@@ -247,10 +284,10 @@ export default function HomeScreen() {
 		let didLoadCachedData = false;
 
 		try {
-			if (sessionUserId) {
-				const cached = await loadCachedRoutineHome(sessionUserId, selectedBabyId);
+			if (userId) {
+				const cached = await loadCachedRoutineHome(userId, babyId);
 
-				if (routineRequestIdRef.current === requestId) {
+				if (routineRequestIdRef.current === requestId && selectedBabyIdRef.current === babyId) {
 					didLoadCachedData = cached.dailyLogs.length > 0 || cached.lastLogged !== null;
 					setLastLogged(cached.lastLogged);
 
@@ -283,25 +320,29 @@ export default function HomeScreen() {
 			}
 
 			const response = await withTimeout(getRoutineDays({
-				babyId: selectedBabyId,
+				babyId,
 				count: ROUTINE_PAGE_DAYS,
 				includeLastLogged: true,
 				startDate,
 			}), HOME_SYNC_TIMEOUT_MS);
 
-			if (routineRequestIdRef.current !== requestId) {
+			if (routineRequestIdRef.current !== requestId || selectedBabyIdRef.current !== babyId) {
 				return;
 			}
 
-			if (sessionUserId) {
+			if (userId) {
 				await saveRoutineHomeCache({
-					babyId: selectedBabyId,
+					babyId,
 					dailyLogs: response.dailyLogs,
 					lastLogged: response.lastLogged ?? null,
 					nextStartDate: response.nextStartDate,
-					userId: sessionUserId,
+					userId,
 				});
-				const reconciledCache = await loadCachedRoutineHome(sessionUserId, selectedBabyId);
+				const reconciledCache = await loadCachedRoutineHome(userId, babyId);
+
+				if (routineRequestIdRef.current !== requestId || selectedBabyIdRef.current !== babyId) {
+					return;
+				}
 
 				replaceDailyLogs(reconciledCache.dailyLogs);
 				setNextRoutineStartDate(reconciledCache.nextStartDate);
@@ -317,7 +358,7 @@ export default function HomeScreen() {
 			setRoutineError(null);
 
 		} catch (caughtError) {
-			if (routineRequestIdRef.current !== requestId) {
+			if (routineRequestIdRef.current !== requestId || selectedBabyIdRef.current !== babyId) {
 				return;
 			}
 
@@ -361,12 +402,16 @@ export default function HomeScreen() {
 	}, [selectedBabyId, selectedBabyTimeZone, sessionUserId]);
 
 	useEffect(() => {
-		if (!selectedBabyId) {
-			return;
-		}
-
-		void loadImmunizations({ sync: true }).catch((error) => console.warn(error));
-	}, [loadImmunizations, selectedBabyId]);
+		selectedBabyIdRef.current = selectedBabyId;
+		routineRequestIdRef.current += 1;
+		isOlderRoutineLoadingRef.current = false;
+		setIsOlderRoutineLoading(false);
+		setRoutineError(null);
+		setNextRoutineStartDate(null);
+		setAiInsightsByDate({});
+		aiStatusInFlightKeysRef.current.clear();
+		aiStatusLoadedKeysRef.current.clear();
+	}, [selectedBabyId]);
 
 	useEffect(() => {
 		if (!initialRoutineLoadKey) {
@@ -402,6 +447,8 @@ export default function HomeScreen() {
 		}
 
 		const requestId = routineRequestIdRef.current;
+		const babyId = selectedBabyId;
+		const userId = sessionUserId;
 
 		isOlderRoutineLoadingRef.current = true;
 		setIsOlderRoutineLoading(true);
@@ -409,24 +456,28 @@ export default function HomeScreen() {
 
 		try {
 			const response = await getRoutineDays({
-				babyId: selectedBabyId,
+				babyId,
 				count: ROUTINE_PAGE_DAYS,
 				startDate: nextRoutineStartDate,
 			});
 
-			if (routineRequestIdRef.current !== requestId) {
+			if (routineRequestIdRef.current !== requestId || selectedBabyIdRef.current !== babyId) {
 				return;
 			}
 
-			if (sessionUserId) {
+			if (userId) {
 				await saveRoutineHomeCache({
-					babyId: selectedBabyId,
+					babyId,
 					dailyLogs: response.dailyLogs,
 					lastLogged,
 					nextStartDate: response.nextStartDate,
-					userId: sessionUserId,
+					userId,
 				});
-				const reconciledCache = await loadCachedRoutineHome(sessionUserId, selectedBabyId);
+				const reconciledCache = await loadCachedRoutineHome(userId, babyId);
+
+				if (routineRequestIdRef.current !== requestId || selectedBabyIdRef.current !== babyId) {
+					return;
+				}
 
 				replaceDailyLogs(reconciledCache.dailyLogs);
 				setNextRoutineStartDate(reconciledCache.nextStartDate);
@@ -439,7 +490,7 @@ export default function HomeScreen() {
 
 			await syncPendingMutations();
 		} catch (caughtError) {
-			if (routineRequestIdRef.current !== requestId) {
+			if (routineRequestIdRef.current !== requestId || selectedBabyIdRef.current !== babyId) {
 				return;
 			}
 
@@ -725,6 +776,10 @@ function chunkDates(dates: string[], size: number) {
 	}
 
 	return chunks;
+}
+
+function getAiStatusRangeKey(babyId: string, startDate: string, endDate: string) {
+	return `${babyId}:${startDate}:${endDate}`;
 }
 
 function isNearBottom({

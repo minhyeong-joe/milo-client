@@ -64,15 +64,32 @@ function reportBackgroundError(error: unknown) {
 export function ImmunizationDataProvider({ children }: PropsWithChildren) {
 	const { authStatus, session } = useAuthSession();
 	const { selectedBaby } = useBabySelection();
+	const selectedScopeKey = useMemo(
+		() => session && selectedBaby ? getImmunizationScopeKey(session.user.id, selectedBaby.id) : null,
+		[session?.user.id, selectedBaby?.id],
+	);
 	const [records, setRecords] = useState<LocalImmunizationRecord[]>([]);
 	const [scheduleItems, setScheduleItems] = useState<ImmunizationScheduleItem[]>([]);
 	const [scheduleProfile, setScheduleProfile] = useState<ImmunizationScheduleProfile>("US_CDC");
+	const [dataScopeKey, setDataScopeKey] = useState<string | null>(selectedScopeKey);
 	const [isLoading, setIsLoading] = useState(false);
 	const [syncError, setSyncError] = useState<string | null>(null);
 	const syncPromiseRef = useRef<Promise<void> | null>(null);
+	const syncPromiseScopeRef = useRef<string | null>(null);
+	const loadRequestIdRef = useRef(0);
+	const selectedScopeKeyRef = useRef<string | null>(selectedScopeKey);
+
+	useEffect(() => {
+		selectedScopeKeyRef.current = selectedScopeKey;
+	}, [selectedScopeKey]);
+
+	const scopedRecords = dataScopeKey === selectedScopeKey ? records : [];
+	const scopedScheduleItems = dataScopeKey === selectedScopeKey ? scheduleItems : [];
+	const scopedScheduleProfile = dataScopeKey === selectedScopeKey ? scheduleProfile : "US_CDC";
 
 	const reloadLocalImmunizations = useCallback(async () => {
 		if (!session || !selectedBaby) {
+			setDataScopeKey(selectedScopeKey);
 			setRecords([]);
 			setScheduleItems([]);
 			setScheduleProfile("US_CDC");
@@ -80,7 +97,14 @@ export function ImmunizationDataProvider({ children }: PropsWithChildren) {
 			return;
 		}
 
+		const scopeKey = getImmunizationScopeKey(session.user.id, selectedBaby.id);
 		const cached = await loadCachedImmunizations(session.user.id, selectedBaby.id);
+
+		if (selectedScopeKeyRef.current !== scopeKey) {
+			return;
+		}
+
+		setDataScopeKey(scopeKey);
 		setRecords(cached.records.sort(sortRecordsDescending));
 		setScheduleItems(cached.scheduleItems);
 		setScheduleProfile(cached.scheduleProfile);
@@ -94,10 +118,17 @@ export function ImmunizationDataProvider({ children }: PropsWithChildren) {
 			return;
 		}
 
-		if (syncPromiseRef.current) {
+		const scopeKey = getImmunizationScopeKey(session.user.id, selectedBaby.id);
+
+		if (syncPromiseRef.current && syncPromiseScopeRef.current === scopeKey) {
 			return syncPromiseRef.current;
 		}
 
+		if (syncPromiseRef.current) {
+			return;
+		}
+
+		syncPromiseScopeRef.current = scopeKey;
 		syncPromiseRef.current = (async () => {
 			const mutations = await loadPendingImmunizationMutations(session.user.id, selectedBaby.id);
 			let hadTransientError = false;
@@ -175,37 +206,45 @@ export function ImmunizationDataProvider({ children }: PropsWithChildren) {
 						if (mutation.recordId ?? mutation.localId) {
 							const failedId = mutation.recordId ?? mutation.localId;
 							setRecords((currentRecords) =>
-								currentRecords.map((record) =>
+								selectedScopeKeyRef.current === scopeKey
+									? currentRecords.map((record) =>
 									record.id === failedId
 										? { ...record, syncError: message, syncStatus: "failed" }
 										: record,
-								),
+									)
+									: currentRecords,
 							);
 						}
 					} else {
 						hadTransientError = true;
-						setSyncError(OFFLINE_SYNC_MESSAGE);
+						if (selectedScopeKeyRef.current === scopeKey) {
+							setSyncError(OFFLINE_SYNC_MESSAGE);
+						}
 						break;
 					}
 				}
 			}
 
-			if (!hadTransientError) {
+			if (!hadTransientError && selectedScopeKeyRef.current === scopeKey) {
 				setSyncError(null);
 			}
 
-			await reloadLocalImmunizations();
+			if (selectedScopeKeyRef.current === scopeKey) {
+				await reloadLocalImmunizations();
+			}
 		})();
 
 		try {
 			await syncPromiseRef.current;
 		} finally {
 			syncPromiseRef.current = null;
+			syncPromiseScopeRef.current = null;
 		}
 	}, [authStatus, reloadLocalImmunizations, selectedBaby, session]);
 
 	const loadImmunizations = useCallback(async (options: { sync?: boolean } = {}) => {
 		if (!session || !selectedBaby) {
+			setDataScopeKey(selectedScopeKey);
 			setRecords([]);
 			setScheduleItems([]);
 			setScheduleProfile("US_CDC");
@@ -213,14 +252,27 @@ export function ImmunizationDataProvider({ children }: PropsWithChildren) {
 			return;
 		}
 
+		const requestId = loadRequestIdRef.current + 1;
+		loadRequestIdRef.current = requestId;
+		const scopeKey = getImmunizationScopeKey(session.user.id, selectedBaby.id);
+
 		setIsLoading(true);
 
 		try {
 			await reloadLocalImmunizations();
 
+			if (selectedScopeKeyRef.current !== scopeKey) {
+				return;
+			}
+
 			if (options.sync) {
 				await syncPendingImmunizationMutations();
 				const response = await getImmunizations(selectedBaby.id);
+
+				if (selectedScopeKeyRef.current !== scopeKey || loadRequestIdRef.current !== requestId) {
+					return;
+				}
+
 				await saveImmunizationPayload({
 					babyId: selectedBaby.id,
 					scheduleItems: response.scheduleItems,
@@ -233,13 +285,19 @@ export function ImmunizationDataProvider({ children }: PropsWithChildren) {
 					userId: session.user.id,
 				});
 				await reloadLocalImmunizations();
-				setSyncError(null);
+				if (selectedScopeKeyRef.current === scopeKey) {
+					setSyncError(null);
+				}
 			}
 		} catch (error) {
-			setSyncError(getErrorMessage(error));
+			if (selectedScopeKeyRef.current === scopeKey) {
+				setSyncError(getErrorMessage(error));
+			}
 			throw error;
 		} finally {
-			setIsLoading(false);
+			if (loadRequestIdRef.current === requestId) {
+				setIsLoading(false);
+			}
 		}
 	}, [
 		reloadLocalImmunizations,
@@ -258,7 +316,7 @@ export function ImmunizationDataProvider({ children }: PropsWithChildren) {
 		const now = new Date().toISOString();
 		const localId = getLocalId();
 		const scheduleItem = input.scheduleItemId
-			? scheduleItems.find((item) => item.id === input.scheduleItemId)
+			? scopedScheduleItems.find((item) => item.id === input.scheduleItemId)
 			: undefined;
 		const localRecord: LocalImmunizationRecord = {
 			babyId: selectedBaby.id,
@@ -277,6 +335,7 @@ export function ImmunizationDataProvider({ children }: PropsWithChildren) {
 			vaccineName: scheduleItem?.vaccineName ?? input.vaccineName?.trim() ?? "Immunization",
 		};
 
+		setDataScopeKey(selectedScopeKey);
 		setRecords((currentRecords) => [localRecord, ...currentRecords].sort(sortRecordsDescending));
 		await upsertLocalImmunizationRecord({
 			babyId: selectedBaby.id,
@@ -295,15 +354,15 @@ export function ImmunizationDataProvider({ children }: PropsWithChildren) {
 		});
 		void syncPendingImmunizationMutations();
 		return true;
-	}, [scheduleItems, selectedBaby, session, syncPendingImmunizationMutations]);
+	}, [scopedScheduleItems, selectedBaby, selectedScopeKey, session, syncPendingImmunizationMutations]);
 
 	const updateImmunizationRecord = useCallback(async (recordId: string, input: ImmunizationRecordInput) => {
 		if (!session || !selectedBaby) return false;
 
 		const now = new Date().toISOString();
-		const existingRecord = records.find((record) => record.id === recordId);
+		const existingRecord = scopedRecords.find((record) => record.id === recordId);
 		const scheduleItem = input.scheduleItemId
-			? scheduleItems.find((item) => item.id === input.scheduleItemId)
+			? scopedScheduleItems.find((item) => item.id === input.scheduleItemId)
 			: undefined;
 
 		if (!existingRecord) return false;
@@ -322,6 +381,7 @@ export function ImmunizationDataProvider({ children }: PropsWithChildren) {
 			vaccineName: scheduleItem?.vaccineName ?? input.vaccineName?.trim() ?? existingRecord.vaccineName,
 		};
 
+		setDataScopeKey(selectedScopeKey);
 		setRecords((currentRecords) =>
 			currentRecords
 				.map((record) =>
@@ -360,11 +420,12 @@ export function ImmunizationDataProvider({ children }: PropsWithChildren) {
 
 		void syncPendingImmunizationMutations();
 		return true;
-	}, [records, scheduleItems, selectedBaby, session, syncPendingImmunizationMutations]);
+	}, [scopedRecords, scopedScheduleItems, selectedBaby, selectedScopeKey, session, syncPendingImmunizationMutations]);
 
 	const deleteImmunizationRecord = useCallback(async (recordId: string) => {
 		if (!session || !selectedBaby) return false;
 
+		setDataScopeKey(selectedScopeKey);
 		setRecords((currentRecords) => currentRecords.filter((record) => record.id !== recordId));
 
 		if (recordId.startsWith("local:")) {
@@ -397,11 +458,12 @@ export function ImmunizationDataProvider({ children }: PropsWithChildren) {
 
 		void syncPendingImmunizationMutations();
 		return true;
-	}, [selectedBaby, session, syncPendingImmunizationMutations]);
+	}, [selectedBaby, selectedScopeKey, session, syncPendingImmunizationMutations]);
 
 	const updateImmunizationProfile = useCallback(async (profile: ImmunizationScheduleProfile) => {
 		if (!session || !selectedBaby) return false;
 
+		setDataScopeKey(selectedScopeKey);
 		setScheduleProfile(profile);
 		if (profile === "CUSTOM") {
 			setScheduleItems([]);
@@ -409,7 +471,7 @@ export function ImmunizationDataProvider({ children }: PropsWithChildren) {
 
 		await saveImmunizationPayload({
 			babyId: selectedBaby.id,
-			scheduleItems: profile === "CUSTOM" ? [] : scheduleItems,
+			scheduleItems: profile === "CUSTOM" ? [] : scopedScheduleItems,
 			scheduleProfile: profile,
 			userId: session.user.id,
 		});
@@ -423,29 +485,30 @@ export function ImmunizationDataProvider({ children }: PropsWithChildren) {
 		});
 		void syncPendingImmunizationMutations();
 		return true;
-	}, [scheduleItems, selectedBaby, session, syncPendingImmunizationMutations]);
+	}, [scopedScheduleItems, selectedBaby, selectedScopeKey, session, syncPendingImmunizationMutations]);
 
 	const value = useMemo<ImmunizationDataContextValue>(() => ({
 		createImmunizationRecord,
 		deleteImmunizationRecord,
-		getImmunizationRecord: (recordId) => records.find((record) => record.id === recordId),
+		getImmunizationRecord: (recordId) => scopedRecords.find((record) => record.id === recordId),
 		isLoading,
 		loadImmunizations,
-		records,
-		scheduleItems,
-		scheduleProfile,
+		records: scopedRecords,
+		scheduleItems: scopedScheduleItems,
+		scheduleProfile: scopedScheduleProfile,
 		syncError,
 		syncPendingImmunizationMutations,
 		updateImmunizationProfile,
 		updateImmunizationRecord,
 	}), [
 		createImmunizationRecord,
+		dataScopeKey,
 		deleteImmunizationRecord,
 		isLoading,
 		loadImmunizations,
-		records,
-		scheduleItems,
-		scheduleProfile,
+		scopedRecords,
+		scopedScheduleItems,
+		scopedScheduleProfile,
 		syncError,
 		syncPendingImmunizationMutations,
 		updateImmunizationProfile,
@@ -493,6 +556,10 @@ function getDateKey(value: Date) {
 
 function getLocalId() {
 	return `local:immunization:${createUuid()}`;
+}
+
+function getImmunizationScopeKey(userId: string, babyId: string) {
+	return `${userId}:${babyId}`;
 }
 
 function createUuid() {

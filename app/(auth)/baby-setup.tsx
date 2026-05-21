@@ -58,7 +58,8 @@ export default function BabySetupScreen() {
 	const [setupMode, setSetupMode] = useState<SetupMode>("addBaby");
 	const [babyName, setBabyName] = useState("");
 	const [birthdate, setBirthdate] = useState(() => new Date());
-	const [isBirthdatePickerVisible, setIsBirthdatePickerVisible] = useState(false);
+	const [isBirthdatePickerVisible, setIsBirthdatePickerVisible] =
+		useState(false);
 	const [sex, setSex] = useState<BabySex>("GIRL");
 	const [role, setRole] = useState<BabyRole>("MOTHER");
 	const [inviteCode, setInviteCode] = useState("");
@@ -91,7 +92,9 @@ export default function BabySetupScreen() {
 		}
 
 		if (trimmedName.length > BABY_NAME_MAX_LENGTH) {
-			setSetupError(`Baby name must be ${BABY_NAME_MAX_LENGTH} characters or fewer.`);
+			setSetupError(
+				`Baby name must be ${BABY_NAME_MAX_LENGTH} characters or fewer.`,
+			);
 			return;
 		}
 
@@ -190,7 +193,8 @@ export default function BabySetupScreen() {
 					<View style={styles.header}>
 						<Text style={styles.title}>Add your baby</Text>
 						<Text style={styles.body}>
-							Milo works around a baby profile, so finish setup with a new baby or an invitation code.
+							Milo works around a baby profile, so finish setup with a new baby
+							or an invitation code.
 						</Text>
 					</View>
 
@@ -217,7 +221,13 @@ export default function BabySetupScreen() {
 						/>
 					</View>
 
-					<View style={[globalStyles.card, globalStyles.shadowCard, styles.formCard]}>
+					<View
+						style={[
+							globalStyles.card,
+							globalStyles.shadowCard,
+							styles.formCard,
+						]}
+					>
 						{setupMode === "addBaby" ? (
 							<>
 								<BabyAvatarField />
@@ -250,12 +260,13 @@ export default function BabySetupScreen() {
 										setInviteCode(normalizeInviteCode(value));
 										setSetupError(null);
 									}}
-									placeholder="2YCP53IC"
+									placeholder="XXXXXXXX"
 									value={inviteCode}
 								/>
 								<RoleSelector role={role} onChange={setRole} />
 								<Text style={styles.helpText}>
-									Choose your role for this baby, then join with the invite code.
+									Choose your role for this baby, then join with the invite
+									code.
 								</Text>
 							</>
 						)}
@@ -274,7 +285,9 @@ export default function BabySetupScreen() {
 							</Text>
 						</Pressable>
 
-						{(setupError || error) && <Text style={styles.errorText}>{setupError ?? error}</Text>}
+						{(setupError || error) && (
+							<Text style={styles.errorText}>{setupError ?? error}</Text>
+						)}
 					</View>
 				</ScrollView>
 			</KeyboardAvoidingView>
@@ -308,7 +321,9 @@ function SetupChoice({
 				name={icon}
 				size={22}
 			/>
-			<Text style={[styles.choiceText, active && styles.choiceTextActive]}>{label}</Text>
+			<Text style={[styles.choiceText, active && styles.choiceTextActive]}>
+				{label}
+			</Text>
 		</Pressable>
 	);
 }
@@ -344,8 +359,16 @@ function RoleSelector({
 		<View style={styles.field}>
 			<Text style={styles.fieldLabel}>I am a</Text>
 			<View style={styles.roleRow}>
-				<RoleButton active={role === "FATHER"} label="Father" onPress={() => onChange("FATHER")} />
-				<RoleButton active={role === "MOTHER"} label="Mother" onPress={() => onChange("MOTHER")} />
+				<RoleButton
+					active={role === "FATHER"}
+					label="Father"
+					onPress={() => onChange("FATHER")}
+				/>
+				<RoleButton
+					active={role === "MOTHER"}
+					label="Mother"
+					onPress={() => onChange("MOTHER")}
+				/>
 				<RoleButton
 					active={role === "CAREGIVER"}
 					label="Caregiver"
@@ -375,7 +398,9 @@ function RoleButton({
 				pressed && styles.pressedButton,
 			]}
 		>
-			<Text style={[styles.roleText, active && styles.roleTextActive]}>{label}</Text>
+			<Text style={[styles.roleText, active && styles.roleTextActive]}>
+				{label}
+			</Text>
 		</Pressable>
 	);
 }
@@ -390,134 +415,134 @@ function getSetupErrorMessage(error: unknown) {
 
 function createStyles(themeColors: ThemeColors) {
 	return StyleSheet.create({
-	keyboardView: {
-		flex: 1,
-	},
-	content: {
-		flexGrow: 1,
-		justifyContent: "center",
-		padding: spacing.lg,
-	},
-	header: {
-		marginBottom: spacing.xl,
-	},
-	iconCircle: {
-		alignItems: "center",
-		backgroundColor: "#F0EBFF",
-		borderRadius: 18,
-		height: 54,
-		justifyContent: "center",
-		marginBottom: spacing.md,
-		width: 54,
-	},
-	title: {
-		...typography.title,
-		color: themeColors.textPrimary,
-		marginBottom: spacing.sm,
-	},
-	body: {
-		...typography.body,
-		color: themeColors.textSecondary,
-	},
-	choiceGrid: {
-		flexDirection: "row",
-		gap: spacing.md,
-		marginBottom: spacing.md,
-	},
-	choice: {
-		alignItems: "center",
-		backgroundColor: themeColors.surface,
-		borderColor: themeColors.border,
-		borderRadius: 16,
-		borderWidth: 1,
-		flex: 1,
-		gap: spacing.sm,
-		padding: spacing.md,
-	},
-	choiceActive: {
-		backgroundColor: "#F7F3FF",
-		borderColor: themeColors.primary,
-	},
-	choiceText: {
-		...typography.label,
-		color: themeColors.textSecondary,
-	},
-	choiceTextActive: {
-		color: themeColors.primary,
-	},
-	formCard: {
-		gap: spacing.md,
-	},
-	field: {
-		gap: spacing.xs,
-	},
-	fieldLabel: {
-		...typography.caption,
-		color: themeColors.textSecondary,
-		textTransform: "uppercase",
-	},
-	input: {
-		...typography.body,
-		backgroundColor: themeColors.background,
-		borderColor: themeColors.border,
-		borderRadius: 14,
-		borderWidth: 1,
-		color: themeColors.textPrimary,
-		minHeight: 50,
-		paddingHorizontal: spacing.md,
-	},
-	roleRow: {
-		backgroundColor: themeColors.background,
-		borderRadius: 14,
-		flexDirection: "row",
-		gap: spacing.xs,
-		padding: spacing.xs,
-	},
-	roleButton: {
-		alignItems: "center",
-		borderRadius: 11,
-		flex: 1,
-		justifyContent: "center",
-		minHeight: 42,
-		paddingHorizontal: spacing.xs,
-	},
-	roleButtonActive: {
-		backgroundColor: themeColors.surface,
-	},
-	roleText: {
-		...typography.caption,
-		color: themeColors.textSecondary,
-		textAlign: "center",
-	},
-	roleTextActive: {
-		color: themeColors.primary,
-	},
-	primaryButton: {
-		alignItems: "center",
-		backgroundColor: themeColors.primary,
-		borderRadius: 16,
-		justifyContent: "center",
-		marginTop: spacing.xs,
-		minHeight: 52,
-	},
-	disabledButton: {
-		opacity: 0.45,
-	},
-	pressedButton: {
-		opacity: 0.75,
-	},
-	primaryButtonText: {
-		...typography.label,
-		color: themeColors.surface,
-	},
-	helpText: {
-		...typography.body,
-		color: themeColors.textSecondary,
-	},
-	errorText: {
-		...typography.body,
-		color: themeColors.error,
-		textAlign: "center",
-	},
-});
+		keyboardView: {
+			flex: 1,
+		},
+		content: {
+			flexGrow: 1,
+			justifyContent: "center",
+			padding: spacing.lg,
+		},
+		header: {
+			marginBottom: spacing.xl,
+		},
+		iconCircle: {
+			alignItems: "center",
+			backgroundColor: "#F0EBFF",
+			borderRadius: 18,
+			height: 54,
+			justifyContent: "center",
+			marginBottom: spacing.md,
+			width: 54,
+		},
+		title: {
+			...typography.title,
+			color: themeColors.textPrimary,
+			marginBottom: spacing.sm,
+		},
+		body: {
+			...typography.body,
+			color: themeColors.textSecondary,
+		},
+		choiceGrid: {
+			flexDirection: "row",
+			gap: spacing.md,
+			marginBottom: spacing.md,
+		},
+		choice: {
+			alignItems: "center",
+			backgroundColor: themeColors.surface,
+			borderColor: themeColors.border,
+			borderRadius: 16,
+			borderWidth: 1,
+			flex: 1,
+			gap: spacing.sm,
+			padding: spacing.md,
+		},
+		choiceActive: {
+			backgroundColor: "#F7F3FF",
+			borderColor: themeColors.primary,
+		},
+		choiceText: {
+			...typography.label,
+			color: themeColors.textSecondary,
+		},
+		choiceTextActive: {
+			color: themeColors.primary,
+		},
+		formCard: {
+			gap: spacing.md,
+		},
+		field: {
+			gap: spacing.xs,
+		},
+		fieldLabel: {
+			...typography.caption,
+			color: themeColors.textSecondary,
+			textTransform: "uppercase",
+		},
+		input: {
+			...typography.body,
+			backgroundColor: themeColors.background,
+			borderColor: themeColors.border,
+			borderRadius: 14,
+			borderWidth: 1,
+			color: themeColors.textPrimary,
+			minHeight: 50,
+			paddingHorizontal: spacing.md,
+		},
+		roleRow: {
+			backgroundColor: themeColors.background,
+			borderRadius: 14,
+			flexDirection: "row",
+			gap: spacing.xs,
+			padding: spacing.xs,
+		},
+		roleButton: {
+			alignItems: "center",
+			borderRadius: 11,
+			flex: 1,
+			justifyContent: "center",
+			minHeight: 42,
+			paddingHorizontal: spacing.xs,
+		},
+		roleButtonActive: {
+			backgroundColor: themeColors.surface,
+		},
+		roleText: {
+			...typography.caption,
+			color: themeColors.textSecondary,
+			textAlign: "center",
+		},
+		roleTextActive: {
+			color: themeColors.primary,
+		},
+		primaryButton: {
+			alignItems: "center",
+			backgroundColor: themeColors.primary,
+			borderRadius: 16,
+			justifyContent: "center",
+			marginTop: spacing.xs,
+			minHeight: 52,
+		},
+		disabledButton: {
+			opacity: 0.45,
+		},
+		pressedButton: {
+			opacity: 0.75,
+		},
+		primaryButtonText: {
+			...typography.label,
+			color: themeColors.surface,
+		},
+		helpText: {
+			...typography.body,
+			color: themeColors.textSecondary,
+		},
+		errorText: {
+			...typography.body,
+			color: themeColors.error,
+			textAlign: "center",
+		},
+	});
 }

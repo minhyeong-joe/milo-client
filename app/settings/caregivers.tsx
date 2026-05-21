@@ -244,7 +244,10 @@ export default function ManageCaregiversScreen() {
 
 	return (
 		<SafeAreaView style={globalStyles.screen}>
-			<SettingsHeader onBack={() => router.back()} title="Manage Caregivers" />
+			<SettingsHeader
+				onBack={() => router.back()}
+				title="Manage Family Profile"
+			/>
 			<ScrollView
 				contentContainerStyle={styles.content}
 				keyboardShouldPersistTaps="handled"

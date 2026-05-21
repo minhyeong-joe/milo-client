@@ -17,7 +17,7 @@ import {
 	saveRoutineStatsCache,
 } from "@/services/routine/routineStatsCacheStore";
 import { spacing, typography, type ThemeColors } from "@/styles/globalStyles";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
 	Pressable,
 	StyleSheet,
@@ -80,6 +80,7 @@ export default function ReportsScreen() {
 	const [isRefreshing, setIsRefreshing] = useState(false);
 	const [growthError, setGrowthError] = useState<string | null>(null);
 	const [patternError, setPatternError] = useState<string | null>(null);
+	const patternRequestKeyRef = useRef<string | null>(null);
 
 	const loadGrowthRecords = useCallback(async () => {
 		if (!selectedBaby) {
@@ -147,6 +148,15 @@ export default function ReportsScreen() {
 	);
 
 	const refreshPatternStats = useCallback(async () => {
+		const requestKey = selectedBaby && session
+			? getPatternRequestKey({
+					babyId: selectedBaby.id,
+					endDate: patternEndDateKey,
+					startDate: patternStartDate,
+					timeZone: timelineTimeZone,
+					userId: session.user.id,
+				})
+			: null;
 		const localStats = buildRoutineStatsFromLocalLogs(
 			dailyLogs,
 			patternStartDate,
@@ -155,11 +165,13 @@ export default function ReportsScreen() {
 		);
 
 		if (!selectedBaby) {
+			patternRequestKeyRef.current = requestKey;
 			setPatternStats(localStats);
 			setPatternError(null);
 			return;
 		}
 
+		patternRequestKeyRef.current = requestKey;
 		setPatternError(null);
 
 		if (
@@ -179,7 +191,7 @@ export default function ReportsScreen() {
 					userId: session.user.id,
 				});
 
-				if (cachedStats) {
+				if (cachedStats && patternRequestKeyRef.current === requestKey) {
 					setPatternStats(cachedStats);
 				}
 			}
@@ -193,6 +205,9 @@ export default function ReportsScreen() {
 				}),
 				REPORT_SYNC_TIMEOUT_MS,
 			);
+			if (patternRequestKeyRef.current !== requestKey) {
+				return;
+			}
 			setPatternStats(response);
 			if (session) {
 				await saveRoutineStatsCache({
@@ -204,6 +219,10 @@ export default function ReportsScreen() {
 			}
 			markOnline();
 		} catch (caughtError) {
+			if (patternRequestKeyRef.current !== requestKey) {
+				return;
+			}
+
 			if (isAuthRequiredError(caughtError)) {
 				markAuthRequired();
 				setPatternError(AUTH_REQUIRED_SYNC_MESSAGE);
@@ -307,12 +326,14 @@ export default function ReportsScreen() {
 
 	useEffect(() => {
 		if (!selectedBaby) {
+			patternRequestKeyRef.current = null;
 			setPatternEndDate(null);
 			setCustomPatternStartDate(null);
 			setCustomPatternEndDate(null);
 			return;
 		}
 
+		patternRequestKeyRef.current = null;
 		setPatternEndDate(getDateKeyInTimeZone(new Date(), selectedBaby.timezone));
 		setCustomPatternStartDate(null);
 		setCustomPatternEndDate(null);
@@ -322,6 +343,15 @@ export default function ReportsScreen() {
 
 	useEffect(() => {
 		let isMounted = true;
+		const requestKey = selectedBaby && session
+			? getPatternRequestKey({
+					babyId: selectedBaby.id,
+					endDate: patternEndDateKey,
+					startDate: patternStartDate,
+					timeZone: timelineTimeZone,
+					userId: session.user.id,
+				})
+			: null;
 
 		if (!selectedBaby) {
 			setPatternStats(localPatternStats);
@@ -329,6 +359,7 @@ export default function ReportsScreen() {
 			return;
 		}
 
+		patternRequestKeyRef.current = requestKey;
 		setPatternStats((currentStats) =>
 			currentStats.startDate === patternStartDate &&
 			currentStats.endDate === patternEndDateKey
@@ -347,7 +378,7 @@ export default function ReportsScreen() {
 			timeZone: timelineTimeZone,
 			userId: session.user.id,
 		}).then((cachedStats) => {
-			if (isMounted && cachedStats) {
+			if (isMounted && cachedStats && patternRequestKeyRef.current === requestKey) {
 				setPatternStats(cachedStats);
 			}
 		});
@@ -813,6 +844,22 @@ function getPresetPatternEndDate(currentEndDate: string | null, presetMaxDate: s
 	}
 
 	return currentEndDate;
+}
+
+function getPatternRequestKey({
+	babyId,
+	endDate,
+	startDate,
+	timeZone,
+	userId,
+}: {
+	babyId: string;
+	endDate: string;
+	startDate: string;
+	timeZone?: string;
+	userId: string;
+}) {
+	return `${userId}:${babyId}:${timeZone ?? "local"}:${startDate}:${endDate}`;
 }
 
 function isAuthRequiredError(error: unknown) {

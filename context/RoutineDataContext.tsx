@@ -368,6 +368,10 @@ function getQueueId() {
 	return createUuid();
 }
 
+function getRoutineScopeKey(userId: string, babyId: string) {
+	return `${userId}:${babyId}`;
+}
+
 function getLocalId(kind: "meal" | "diaper" | "sleep") {
 	return `local:${kind}:${createUuid()}`;
 }
@@ -522,25 +526,45 @@ export function RoutineDataProvider({ children }: PropsWithChildren) {
 	const { authStatus, session } = useAuthSession();
 	const { selectedBaby } = useBabySelection();
 	const timelineTimeZone = useTimelineTimeZone(selectedBaby);
+	const selectedScopeKey = useMemo(
+		() => session && selectedBaby ? getRoutineScopeKey(session.user.id, selectedBaby.id) : null,
+		[session?.user.id, selectedBaby?.id],
+	);
 	const [dailyLogs, setDailyLogs] = useState<RoutineDay[]>([]);
 	const [lastLogged, setLastLogged] = useState<RoutineLastLogged | null>(null);
+	const [routineScopeKey, setRoutineScopeKey] = useState<string | null>(selectedScopeKey);
 	const [syncError, setSyncError] = useState<string | null>(null);
 	const syncPromiseRef = useRef<Promise<void> | null>(null);
+	const scopedDailyLogs = routineScopeKey === selectedScopeKey ? dailyLogs : [];
+	const scopedLastLogged = routineScopeKey === selectedScopeKey ? lastLogged : null;
 	const replaceDailyLogs = useCallback((logs: RoutineDay[]) => {
+		setRoutineScopeKey(selectedScopeKey);
 		setDailyLogs([...logs].sort(sortDaysDescending));
-	}, []);
+	}, [selectedScopeKey]);
 
 	const prependOlderDailyLogs = useCallback((logs: RoutineDay[]) => {
-		setDailyLogs((currentLogs) => mergeDailyLogs(currentLogs, logs));
-	}, []);
+		setRoutineScopeKey(selectedScopeKey);
+		setDailyLogs((currentLogs) =>
+			routineScopeKey === selectedScopeKey
+				? mergeDailyLogs(currentLogs, logs)
+				: [...logs].sort(sortDaysDescending),
+		);
+	}, [routineScopeKey, selectedScopeKey]);
+
+	const setScopedLastLogged = useCallback((nextLastLogged: RoutineLastLogged | null) => {
+		setRoutineScopeKey(selectedScopeKey);
+		setLastLogged(nextLastLogged);
+	}, [selectedScopeKey]);
 
 	const applyMutationResult = useCallback((logs: RoutineDay[], nextLastLogged: RoutineLastLogged) => {
+		setRoutineScopeKey(selectedScopeKey);
 		setDailyLogs((currentLogs) => mergeDailyLogs(currentLogs, logs));
 		setLastLogged(nextLastLogged);
-	}, []);
+	}, [selectedScopeKey]);
 
 	const persistRoutineCache = useCallback((logs: RoutineDay[], nextLastLogged: RoutineLastLogged | null) => {
 		if (!session || !selectedBaby) return;
+		if (routineScopeKey !== selectedScopeKey) return;
 		if (logs.length === 0 && nextLastLogged === null) return;
 
 		void saveRoutineHomeCache({
@@ -549,11 +573,18 @@ export function RoutineDataProvider({ children }: PropsWithChildren) {
 			lastLogged: nextLastLogged,
 			userId: session.user.id,
 		}).catch(reportBackgroundError);
-	}, [selectedBaby, session]);
+	}, [routineScopeKey, selectedBaby, selectedScopeKey, session]);
 
 	useEffect(() => {
 		persistRoutineCache(dailyLogs, lastLogged);
 	}, [dailyLogs, lastLogged, persistRoutineCache]);
+
+	useEffect(() => {
+		setRoutineScopeKey(selectedScopeKey);
+		setDailyLogs([]);
+		setLastLogged(null);
+		setSyncError(null);
+	}, [selectedScopeKey]);
 
 	const syncQueuedMutations = useCallback(async () => {
 		if (!session || !selectedBaby) return;
@@ -581,6 +612,11 @@ export function RoutineDataProvider({ children }: PropsWithChildren) {
 							.map((day) => deleteRoutineDayCache(session.user.id, selectedBaby.id, day.date)),
 					);
 
+					if (getRoutineScopeKey(session.user.id, mutation.babyId) !== selectedScopeKey) {
+						continue;
+					}
+
+					setRoutineScopeKey(selectedScopeKey);
 					setDailyLogs((currentLogs) => {
 						const clientMutationId =
 							mutation.clientMutationId ??
@@ -617,29 +653,29 @@ export function RoutineDataProvider({ children }: PropsWithChildren) {
 		} finally {
 			syncPromiseRef.current = null;
 		}
-	}, [authStatus, selectedBaby, session]);
+	}, [authStatus, selectedBaby, selectedScopeKey, session]);
 
 	const value = useMemo<RoutineDataContextValue>(() => {
 		const getLatestMeal = () =>
-			dailyLogs
+			scopedDailyLogs
 				.flatMap((day) => day.timeline)
 				.filter((event): event is MealEvent => event.kind === "meal")
 				.sort(sortEventsDescending)[0];
 
 		const getLatestDiaper = () =>
-			dailyLogs
+			scopedDailyLogs
 				.flatMap((day) => day.timeline)
 				.filter((event): event is DiaperEvent => event.kind === "diaper")
 				.sort(sortEventsDescending)[0];
 
 		const getLatestSleep = () =>
-			dailyLogs
+			scopedDailyLogs
 				.flatMap((day) => day.timeline)
 				.filter((event): event is SleepEvent => event.kind === "sleep")
 				.sort(sortEventsDescending)[0];
 
 		const getOngoingSleep = () =>
-			dailyLogs
+			scopedDailyLogs
 				.flatMap((day) => day.timeline)
 				.filter((event): event is SleepEvent => event.kind === "sleep" && !event.endTime)
 				.sort(sortEventsDescending)[0];
@@ -670,9 +706,11 @@ export function RoutineDataProvider({ children }: PropsWithChildren) {
 			};
 			const mealDate = getHomeTimelineDate(meal, timelineTimeZone);
 
+			setRoutineScopeKey(selectedScopeKey);
 			setDailyLogs((currentLogs) => {
-				const hasDay = currentLogs.some((day) => day.date === mealDate);
-				const logs = hasDay ? currentLogs : [createEmptyRoutineDay(mealDate), ...currentLogs];
+				const currentScopedLogs = routineScopeKey === selectedScopeKey ? currentLogs : [];
+				const hasDay = currentScopedLogs.some((day) => day.date === mealDate);
+				const logs = hasDay ? currentScopedLogs : [createEmptyRoutineDay(mealDate), ...currentScopedLogs];
 
 				const nextLogs = logs
 					.map((day) => day.date === mealDate
@@ -723,9 +761,11 @@ export function RoutineDataProvider({ children }: PropsWithChildren) {
 			};
 			const sleepDate = getHomeTimelineDate(sleep, timelineTimeZone);
 
+			setRoutineScopeKey(selectedScopeKey);
 			setDailyLogs((currentLogs) => {
-				const hasDay = currentLogs.some((day) => day.date === sleepDate);
-				const logs = hasDay ? currentLogs : [createEmptyRoutineDay(sleepDate), ...currentLogs];
+				const currentScopedLogs = routineScopeKey === selectedScopeKey ? currentLogs : [];
+				const hasDay = currentScopedLogs.some((day) => day.date === sleepDate);
+				const logs = hasDay ? currentScopedLogs : [createEmptyRoutineDay(sleepDate), ...currentScopedLogs];
 
 				const nextLogs = logs
 					.map((day) => day.date === sleepDate
@@ -776,9 +816,11 @@ export function RoutineDataProvider({ children }: PropsWithChildren) {
 			};
 			const diaperDate = getHomeTimelineDate(diaper, timelineTimeZone);
 
+			setRoutineScopeKey(selectedScopeKey);
 			setDailyLogs((currentLogs) => {
-				const hasDay = currentLogs.some((day) => day.date === diaperDate);
-				const logs = hasDay ? currentLogs : [createEmptyRoutineDay(diaperDate), ...currentLogs];
+				const currentScopedLogs = routineScopeKey === selectedScopeKey ? currentLogs : [];
+				const hasDay = currentScopedLogs.some((day) => day.date === diaperDate);
+				const logs = hasDay ? currentScopedLogs : [createEmptyRoutineDay(diaperDate), ...currentScopedLogs];
 
 				const nextLogs = logs
 					.map((day) => day.date === diaperDate
@@ -811,10 +853,15 @@ export function RoutineDataProvider({ children }: PropsWithChildren) {
 			if (!selectedBaby || !session) return false;
 
 			const { id, ...payload } = input;
-			const existingMeal = findEventById(dailyLogs, id);
+			const existingMeal = findEventById(scopedDailyLogs, id);
 			const clientMutationId = existingMeal?.clientMutationId ?? createUuid();
+			setRoutineScopeKey(selectedScopeKey);
 			setDailyLogs((currentLogs) => {
-				const nextLogs = updateMealInLogs(currentLogs, input, timelineTimeZone);
+				const nextLogs = updateMealInLogs(
+					routineScopeKey === selectedScopeKey ? currentLogs : [],
+					input,
+					timelineTimeZone,
+				);
 				setLastLogged(getLastLoggedFromLogs(nextLogs));
 				return nextLogs;
 			});
@@ -845,10 +892,15 @@ export function RoutineDataProvider({ children }: PropsWithChildren) {
 			if (!selectedBaby || !session) return false;
 
 			const { id, ...payload } = input;
-			const existingDiaper = findEventById(dailyLogs, id);
+			const existingDiaper = findEventById(scopedDailyLogs, id);
 			const clientMutationId = existingDiaper?.clientMutationId ?? createUuid();
+			setRoutineScopeKey(selectedScopeKey);
 			setDailyLogs((currentLogs) => {
-				const nextLogs = updateDiaperInLogs(currentLogs, input, timelineTimeZone);
+				const nextLogs = updateDiaperInLogs(
+					routineScopeKey === selectedScopeKey ? currentLogs : [],
+					input,
+					timelineTimeZone,
+				);
 				setLastLogged(getLastLoggedFromLogs(nextLogs));
 				return nextLogs;
 			});
@@ -879,16 +931,21 @@ export function RoutineDataProvider({ children }: PropsWithChildren) {
 			if (!selectedBaby || !session) return false;
 
 			const { id, ...payload } = input;
-			const existingSleep = findEventById(dailyLogs, id);
+			const existingSleep = findEventById(scopedDailyLogs, id);
 			const clientMutationId = existingSleep?.clientMutationId ?? createUuid();
 			const previousDate = existingSleep ? getHomeTimelineDate(existingSleep, timelineTimeZone) : null;
 			const updatedSleep = existingSleep && existingSleep.kind === "sleep"
 				? { ...existingSleep, ...payload }
 				: null;
 			const nextDate = updatedSleep ? getHomeTimelineDate(updatedSleep, timelineTimeZone) : null;
-			const predictedNextLogs = updateSleepInLogs(dailyLogs, input, timelineTimeZone);
+			const predictedNextLogs = updateSleepInLogs(scopedDailyLogs, input, timelineTimeZone);
+			setRoutineScopeKey(selectedScopeKey);
 			setDailyLogs((currentLogs) => {
-				const nextLogs = updateSleepInLogs(currentLogs, input, timelineTimeZone);
+				const nextLogs = updateSleepInLogs(
+					routineScopeKey === selectedScopeKey ? currentLogs : [],
+					input,
+					timelineTimeZone,
+				);
 				setLastLogged(getLastLoggedFromLogs(nextLogs));
 				return nextLogs;
 			});
@@ -928,8 +985,12 @@ export function RoutineDataProvider({ children }: PropsWithChildren) {
 		const removeMeal = async (mealId: string) => {
 			if (!selectedBaby || !session) return false;
 
+			setRoutineScopeKey(selectedScopeKey);
 			setDailyLogs((currentLogs) => {
-				const nextLogs = removeEventById(currentLogs, mealId);
+				const nextLogs = removeEventById(
+					routineScopeKey === selectedScopeKey ? currentLogs : [],
+					mealId,
+				);
 				setLastLogged(getLastLoggedFromLogs(nextLogs));
 				return nextLogs;
 			});
@@ -955,8 +1016,12 @@ export function RoutineDataProvider({ children }: PropsWithChildren) {
 		const removeDiaper = async (diaperId: string) => {
 			if (!selectedBaby || !session) return false;
 
+			setRoutineScopeKey(selectedScopeKey);
 			setDailyLogs((currentLogs) => {
-				const nextLogs = removeEventById(currentLogs, diaperId);
+				const nextLogs = removeEventById(
+					routineScopeKey === selectedScopeKey ? currentLogs : [],
+					diaperId,
+				);
 				setLastLogged(getLastLoggedFromLogs(nextLogs));
 				return nextLogs;
 			});
@@ -982,8 +1047,12 @@ export function RoutineDataProvider({ children }: PropsWithChildren) {
 		const removeSleep = async (sleepId: string) => {
 			if (!selectedBaby || !session) return false;
 
+			setRoutineScopeKey(selectedScopeKey);
 			setDailyLogs((currentLogs) => {
-				const nextLogs = removeEventById(currentLogs, sleepId);
+				const nextLogs = removeEventById(
+					routineScopeKey === selectedScopeKey ? currentLogs : [],
+					sleepId,
+				);
 				setLastLogged(getLastLoggedFromLogs(nextLogs));
 				return nextLogs;
 			});
@@ -1010,14 +1079,14 @@ export function RoutineDataProvider({ children }: PropsWithChildren) {
 			addDiaper,
 			addMeal,
 			addSleep,
-			dailyLogs,
+			dailyLogs: scopedDailyLogs,
 			getLatestDiaper,
 			getLatestMeal,
 			getLatestSleep,
 			getOngoingSleep,
-			lastLogged,
+			lastLogged: scopedLastLogged,
 			prependOlderDailyLogs,
-			setLastLogged,
+			setLastLogged: setScopedLastLogged,
 			syncError,
 			syncPendingMutations: syncQueuedMutations,
 			updateDiaper,
@@ -1029,8 +1098,10 @@ export function RoutineDataProvider({ children }: PropsWithChildren) {
 			replaceDailyLogs,
 		};
 	}, [
-		dailyLogs,
-		lastLogged,
+		routineScopeKey,
+		scopedDailyLogs,
+		scopedLastLogged,
+		selectedScopeKey,
 		prependOlderDailyLogs,
 		replaceDailyLogs,
 		selectedBaby,

@@ -57,21 +57,42 @@ function reportBackgroundError(error: unknown) {
 export function GrowthDataProvider({ children }: PropsWithChildren) {
 	const { authStatus, session } = useAuthSession();
 	const { selectedBaby } = useBabySelection();
+	const selectedScopeKey = useMemo(
+		() => session && selectedBaby ? getGrowthScopeKey(session.user.id, selectedBaby.id) : null,
+		[session?.user.id, selectedBaby?.id],
+	);
 	const [growthRecords, setGrowthRecords] = useState<LocalGrowthRecord[]>([]);
+	const [dataScopeKey, setDataScopeKey] = useState<string | null>(selectedScopeKey);
 	const [isLoading, setIsLoading] = useState(false);
 	const [syncError, setSyncError] = useState<string | null>(null);
 	const syncPromiseRef = useRef<Promise<void> | null>(null);
+	const syncPromiseScopeRef = useRef<string | null>(null);
+	const loadRequestIdRef = useRef(0);
+	const selectedScopeKeyRef = useRef<string | null>(selectedScopeKey);
+	const scopedGrowthRecords = dataScopeKey === selectedScopeKey ? growthRecords : [];
+
+	useEffect(() => {
+		selectedScopeKeyRef.current = selectedScopeKey;
+	}, [selectedScopeKey]);
 
 	const reloadLocalGrowthRecords = useCallback(async () => {
 		if (!session || !selectedBaby) {
+			setDataScopeKey(selectedScopeKey);
 			setGrowthRecords([]);
 			setSyncError(null);
 			return;
 		}
 
+		const scopeKey = getGrowthScopeKey(session.user.id, selectedBaby.id);
 		const cachedRecords = await loadCachedGrowthRecords(session.user.id, selectedBaby.id);
+
+		if (selectedScopeKeyRef.current !== scopeKey) {
+			return;
+		}
+
+		setDataScopeKey(scopeKey);
 		setGrowthRecords(cachedRecords.sort(sortGrowthRecordsDescending));
-	}, [selectedBaby, session]);
+	}, [selectedBaby, selectedScopeKey, session]);
 
 	const syncPendingGrowthMutations = useCallback(async () => {
 		if (!session || !selectedBaby) return;
@@ -81,10 +102,17 @@ export function GrowthDataProvider({ children }: PropsWithChildren) {
 			return;
 		}
 
-		if (syncPromiseRef.current) {
+		const scopeKey = getGrowthScopeKey(session.user.id, selectedBaby.id);
+
+		if (syncPromiseRef.current && syncPromiseScopeRef.current === scopeKey) {
 			return syncPromiseRef.current;
 		}
 
+		if (syncPromiseRef.current) {
+			return;
+		}
+
+		syncPromiseScopeRef.current = scopeKey;
 		syncPromiseRef.current = (async () => {
 			const mutations = await loadPendingGrowthMutations(session.user.id, selectedBaby.id);
 			let hadTransientError = false;
@@ -147,63 +175,90 @@ export function GrowthDataProvider({ children }: PropsWithChildren) {
 						if (mutation.growthId ?? mutation.localId) {
 							const failedId = mutation.growthId ?? mutation.localId;
 							setGrowthRecords((records) =>
-								records.map((record) =>
+								selectedScopeKeyRef.current === scopeKey
+									? records.map((record) =>
 									record.id === failedId
 										? { ...record, syncError: message, syncStatus: "failed" }
 										: record,
-								),
+									)
+									: records,
 							);
 						}
 					} else {
 						hadTransientError = true;
-						setSyncError(OFFLINE_SYNC_MESSAGE);
+						if (selectedScopeKeyRef.current === scopeKey) {
+							setSyncError(OFFLINE_SYNC_MESSAGE);
+						}
 						break;
 					}
 				}
 			}
 
-			if (!hadTransientError) {
+			if (!hadTransientError && selectedScopeKeyRef.current === scopeKey) {
 				setSyncError(null);
 			}
 
-			await reloadLocalGrowthRecords();
+			if (selectedScopeKeyRef.current === scopeKey) {
+				await reloadLocalGrowthRecords();
+			}
 		})();
 
 		try {
 			await syncPromiseRef.current;
 		} finally {
 			syncPromiseRef.current = null;
+			syncPromiseScopeRef.current = null;
 		}
 	}, [authStatus, reloadLocalGrowthRecords, selectedBaby, session]);
 
 	const loadGrowthRecords = useCallback(async (options: { sync?: boolean } = {}) => {
 		if (!session || !selectedBaby) {
+			setDataScopeKey(selectedScopeKey);
 			setGrowthRecords([]);
 			setSyncError(null);
 			return;
 		}
+
+		const requestId = loadRequestIdRef.current + 1;
+		loadRequestIdRef.current = requestId;
+		const scopeKey = getGrowthScopeKey(session.user.id, selectedBaby.id);
 
 		setIsLoading(true);
 
 		try {
 			await reloadLocalGrowthRecords();
 
+			if (selectedScopeKeyRef.current !== scopeKey) {
+				return;
+			}
+
 			if (options.sync) {
 				await syncPendingGrowthMutations();
 				const response = await getGrowthRecords(selectedBaby.id);
+
+				if (selectedScopeKeyRef.current !== scopeKey || loadRequestIdRef.current !== requestId) {
+					return;
+				}
+
 				await mergeServerGrowthRecords({
 					babyId: selectedBaby.id,
 					records: response.growthRecords,
 					userId: session.user.id,
 				});
 				await reloadLocalGrowthRecords();
-				setSyncError(null);
+				if (selectedScopeKeyRef.current === scopeKey) {
+					setSyncError(null);
+				}
 			}
 		} catch (error) {
-			setSyncError(getErrorMessage(error));
+			if (selectedScopeKeyRef.current === scopeKey) {
+				setSyncError(getErrorMessage(error));
+			}
 			throw error;
 		} finally {
-			setIsLoading(false);
+			if (loadRequestIdRef.current === requestId) {
+				setIsLoading(false);
+			}
 		}
 	}, [
 		reloadLocalGrowthRecords,
@@ -234,6 +289,7 @@ export function GrowthDataProvider({ children }: PropsWithChildren) {
 			weightGrams: input.weightGrams ?? null,
 		};
 
+		setDataScopeKey(selectedScopeKey);
 		setGrowthRecords((records) =>
 			[localRecord, ...records].sort(sortGrowthRecordsDescending),
 		);
@@ -254,14 +310,15 @@ export function GrowthDataProvider({ children }: PropsWithChildren) {
 		});
 		void syncPendingGrowthMutations();
 		return true;
-	}, [selectedBaby, session, syncPendingGrowthMutations]);
+	}, [selectedBaby, selectedScopeKey, session, syncPendingGrowthMutations]);
 
 	const updateGrowthRecord = useCallback(async (growthId: string, input: GrowthRecordInput) => {
 		if (!session || !selectedBaby) return false;
 
 		const now = new Date().toISOString();
-		const existingRecord = growthRecords.find((record) => record.id === growthId);
+		const existingRecord = scopedGrowthRecords.find((record) => record.id === growthId);
 
+		setDataScopeKey(selectedScopeKey);
 		setGrowthRecords((records) => {
 			if (!existingRecord) {
 				return records;
@@ -328,11 +385,12 @@ export function GrowthDataProvider({ children }: PropsWithChildren) {
 
 		void syncPendingGrowthMutations();
 		return true;
-	}, [growthRecords, selectedBaby, session, syncPendingGrowthMutations]);
+	}, [scopedGrowthRecords, selectedBaby, selectedScopeKey, session, syncPendingGrowthMutations]);
 
 	const deleteGrowthRecord = useCallback(async (growthId: string) => {
 		if (!session || !selectedBaby) return false;
 
+		setDataScopeKey(selectedScopeKey);
 		setGrowthRecords((records) => records.filter((record) => record.id !== growthId));
 
 		if (growthId.startsWith("local:")) {
@@ -365,13 +423,13 @@ export function GrowthDataProvider({ children }: PropsWithChildren) {
 
 		void syncPendingGrowthMutations();
 		return true;
-	}, [selectedBaby, session, syncPendingGrowthMutations]);
+	}, [selectedBaby, selectedScopeKey, session, syncPendingGrowthMutations]);
 
 	const value = useMemo<GrowthDataContextValue>(() => ({
 		createGrowthRecord,
 		deleteGrowthRecord,
-		getGrowthRecord: (growthId) => growthRecords.find((record) => record.id === growthId),
-		growthRecords,
+		getGrowthRecord: (growthId) => scopedGrowthRecords.find((record) => record.id === growthId),
+		growthRecords: scopedGrowthRecords,
 		isLoading,
 		loadGrowthRecords,
 		syncError,
@@ -379,8 +437,9 @@ export function GrowthDataProvider({ children }: PropsWithChildren) {
 		updateGrowthRecord,
 	}), [
 		createGrowthRecord,
+		dataScopeKey,
 		deleteGrowthRecord,
-		growthRecords,
+		scopedGrowthRecords,
 		isLoading,
 		loadGrowthRecords,
 		syncError,
@@ -417,6 +476,10 @@ function sortGrowthRecordsDescending(left: GrowthRecord, right: GrowthRecord) {
 
 function getLocalId() {
 	return `local:growth:${createUuid()}`;
+}
+
+function getGrowthScopeKey(userId: string, babyId: string) {
+	return `${userId}:${babyId}`;
 }
 
 function createUuid() {
