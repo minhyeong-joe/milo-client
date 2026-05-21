@@ -10,11 +10,13 @@ import {
 	leaveBaby,
 	listBabyMembers,
 	listMyInvites,
+	listSentBabyInvites,
 	normalizeInviteCode,
 	removeBabyMember,
 	type BabyInvite,
 	type BabyMember,
 	type BabyRole,
+	type EmailDelivery,
 } from "@/services/api/babies";
 import { spacing, typography, type ThemeColors } from "@/styles/globalStyles";
 import { Ionicons } from "@expo/vector-icons";
@@ -33,6 +35,12 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 const DEFAULT_INVITE_ROLE: BabyRole = "CAREGIVER";
 
+type Notice = {
+	message: string;
+	title: string;
+	type: "success" | "warning" | "error";
+};
+
 function useThemeStyles() {
 	const { globalStyles, themeColors } = useAppTheme();
 	const styles = useMemo(() => createStyles(themeColors), [themeColors]);
@@ -47,30 +55,37 @@ export default function ManageCaregiversScreen() {
 	const { refreshBabies, selectBaby, selectedBaby } = useBabySelection();
 	const [members, setMembers] = useState<BabyMember[]>([]);
 	const [invites, setInvites] = useState<BabyInvite[]>([]);
+	const [sentInvites, setSentInvites] = useState<BabyInvite[]>([]);
 	const [inviteRoles, setInviteRoles] = useState<Record<string, BabyRole>>({});
 	const [email, setEmail] = useState("");
 	const [isLoading, setIsLoading] = useState(false);
 	const [isSendingInvite, setIsSendingInvite] = useState(false);
 	const [actionInviteId, setActionInviteId] = useState<string | null>(null);
 	const [actionMemberId, setActionMemberId] = useState<string | null>(null);
-	const [message, setMessage] = useState<string | null>(null);
-	const [error, setError] = useState<string | null>(null);
+	const [notice, setNotice] = useState<Notice | null>(null);
 	const isOwner = selectedBaby?.isOwner === true;
 
 	const loadSharingData = useCallback(async () => {
 		setIsLoading(true);
-		setError(null);
+		setNotice((currentNotice) =>
+			currentNotice?.type === "error" ? null : currentNotice,
+		);
 
 		try {
-			const [membersResponse, invitesResponse] = await Promise.all([
-				selectedBaby
-					? listBabyMembers(selectedBaby.id)
-					: Promise.resolve({ members: [] }),
-				listMyInvites(),
-			]);
+			const [membersResponse, invitesResponse, sentInvitesResponse] =
+				await Promise.all([
+					selectedBaby
+						? listBabyMembers(selectedBaby.id)
+						: Promise.resolve({ members: [] }),
+					listMyInvites(),
+					selectedBaby && isOwner
+						? listSentBabyInvites(selectedBaby.id)
+						: Promise.resolve({ invites: [] }),
+				]);
 
 			setMembers(membersResponse.members);
 			setInvites(invitesResponse.invites);
+			setSentInvites(sentInvitesResponse.invites);
 			setInviteRoles((currentRoles) => {
 				const nextRoles = { ...currentRoles };
 
@@ -81,11 +96,15 @@ export default function ManageCaregiversScreen() {
 				return nextRoles;
 			});
 		} catch (caughtError) {
-			setError(getErrorMessage(caughtError));
+			setNotice({
+				message: getErrorMessage(caughtError),
+				title: "Could not load sharing details",
+				type: "error",
+			});
 		} finally {
 			setIsLoading(false);
 		}
-	}, [selectedBaby]);
+	}, [isOwner, selectedBaby]);
 
 	useEffect(() => {
 		void loadSharingData();
@@ -99,23 +118,32 @@ export default function ManageCaregiversScreen() {
 		const trimmedEmail = email.trim().toLowerCase();
 
 		if (!trimmedEmail) {
-			setError("Enter an email address.");
+			setNotice({
+				message: "Enter an email address.",
+				title: "Email required",
+				type: "error",
+			});
 			return;
 		}
 
 		setIsSendingInvite(true);
-		setError(null);
-		setMessage(null);
+		setNotice(null);
 
 		try {
 			const response = await createBabyInvite(selectedBaby.id, {
 				email: trimmedEmail,
 			});
 			setEmail("");
-			setMessage(getInviteDeliveryMessage(response.emailDelivery));
+			setNotice(
+				getInviteDeliveryNotice(response.emailDelivery, response.invite),
+			);
 			await loadSharingData();
 		} catch (caughtError) {
-			setError(getErrorMessage(caughtError));
+			setNotice({
+				message: getErrorMessage(caughtError),
+				title: "Could not invite caregiver",
+				type: "error",
+			});
 		} finally {
 			setIsSendingInvite(false);
 		}
@@ -124,8 +152,7 @@ export default function ManageCaregiversScreen() {
 	const handleAcceptInvite = async (invite: BabyInvite) => {
 		const role = inviteRoles[invite.id] ?? DEFAULT_INVITE_ROLE;
 		setActionInviteId(invite.id);
-		setError(null);
-		setMessage(null);
+		setNotice(null);
 
 		try {
 			const response = await acceptBabyInvite({
@@ -134,10 +161,18 @@ export default function ManageCaregiversScreen() {
 			});
 			await refreshBabies();
 			selectBaby(response.access.babyId);
-			setMessage(`Joined ${invite.baby?.name ?? "baby"}.`);
+			setNotice({
+				message: `You're now part of ${getBabyGroupLabel(invite.baby?.name)}.`,
+				title: "Welcome to the family profile",
+				type: "success",
+			});
 			await loadSharingData();
 		} catch (caughtError) {
-			setError(getErrorMessage(caughtError));
+			setNotice({
+				message: getErrorMessage(caughtError),
+				title: "Could not accept invitation",
+				type: "error",
+			});
 		} finally {
 			setActionInviteId(null);
 		}
@@ -145,17 +180,24 @@ export default function ManageCaregiversScreen() {
 
 	const handleDeclineInvite = async (invite: BabyInvite) => {
 		setActionInviteId(invite.id);
-		setError(null);
-		setMessage(null);
+		setNotice(null);
 
 		try {
 			await declineBabyInvite({
 				inviteCode: normalizeInviteCode(invite.inviteCode),
 			});
-			setMessage(`Declined invite for ${invite.baby?.name ?? "baby"}.`);
+			setNotice({
+				message: `You declined the invitation to ${getBabyGroupLabel(invite.baby?.name)}.`,
+				title: "Invitation declined",
+				type: "success",
+			});
 			await loadSharingData();
 		} catch (caughtError) {
-			setError(getErrorMessage(caughtError));
+			setNotice({
+				message: getErrorMessage(caughtError),
+				title: "Could not decline invitation",
+				type: "error",
+			});
 		} finally {
 			setActionInviteId(null);
 		}
@@ -171,7 +213,7 @@ export default function ManageCaregiversScreen() {
 
 		Alert.alert(
 			"Remove caregiver?",
-			`${name} will lose access to ${selectedBaby.name}.`,
+			`${name} will no longer be able to care for ${selectedBaby.name} in Milo.`,
 			[
 				{ style: "cancel", text: "Cancel" },
 				{
@@ -189,15 +231,22 @@ export default function ManageCaregiversScreen() {
 		}
 
 		setActionMemberId(member.id);
-		setError(null);
-		setMessage(null);
+		setNotice(null);
 
 		try {
 			await removeBabyMember(selectedBaby.id, member.userId);
 			await Promise.all([refreshBabies(), loadSharingData()]);
-			setMessage("Caregiver access removed.");
+			setNotice({
+				message: "This caregiver is no longer part of the family profile.",
+				title: "Caregiver removed",
+				type: "success",
+			});
 		} catch (caughtError) {
-			setError(getErrorMessage(caughtError));
+			setNotice({
+				message: getErrorMessage(caughtError),
+				title: "Could not remove caregiver",
+				type: "error",
+			});
 		} finally {
 			setActionMemberId(null);
 		}
@@ -210,7 +259,7 @@ export default function ManageCaregiversScreen() {
 
 		Alert.alert(
 			"Leave care group?",
-			`You will lose access to ${selectedBaby.name}.`,
+			`You will leave ${selectedBaby.name}'s family profile in Milo.`,
 			[
 				{ style: "cancel", text: "Cancel" },
 				{
@@ -228,15 +277,18 @@ export default function ManageCaregiversScreen() {
 		}
 
 		setActionMemberId("me");
-		setError(null);
-		setMessage(null);
+		setNotice(null);
 
 		try {
 			await leaveBaby(selectedBaby.id);
 			await refreshBabies();
 			router.replace("/settings");
 		} catch (caughtError) {
-			setError(getErrorMessage(caughtError));
+			setNotice({
+				message: getErrorMessage(caughtError),
+				title: "Could not leave family profile",
+				type: "error",
+			});
 		} finally {
 			setActionMemberId(null);
 		}
@@ -244,20 +296,19 @@ export default function ManageCaregiversScreen() {
 
 	return (
 		<SafeAreaView style={globalStyles.screen}>
-			<SettingsHeader
-				onBack={() => router.back()}
-				title="Manage Family Profile"
-			/>
+			<SettingsHeader onBack={() => router.back()} title="Family Profile" />
 			<ScrollView
 				contentContainerStyle={styles.content}
 				keyboardShouldPersistTaps="handled"
 			>
+				{notice ? <NoticeCard notice={notice} /> : null}
+
 				{selectedBaby ? (
 					<View style={globalStyles.card}>
 						<View style={styles.sectionHeader}>
 							<View>
 								<Text style={styles.sectionTitle}>
-									{`${selectedBaby.name}'s Family Profile`}
+									{getBabyGroupLabel(selectedBaby.name)}
 								</Text>
 							</View>
 							{isLoading ? (
@@ -285,14 +336,16 @@ export default function ManageCaregiversScreen() {
 					<View style={globalStyles.card}>
 						<Text style={styles.sectionTitle}>No baby selected</Text>
 						<Text style={styles.sectionSubtitle}>
-							Choose a baby to view caregivers.
+							Choose a baby to view their family profile.
 						</Text>
 					</View>
 				)}
 
 				{selectedBaby && isOwner ? (
 					<View style={globalStyles.card}>
-						<Text style={styles.sectionTitle}>Send invitation</Text>
+						<Text style={styles.sectionTitle}>
+							Invite someone to care for {selectedBaby.name}
+						</Text>
 						<TextInput
 							autoCapitalize="none"
 							autoCorrect={false}
@@ -300,8 +353,7 @@ export default function ManageCaregiversScreen() {
 							keyboardType="email-address"
 							onChangeText={(value) => {
 								setEmail(value);
-								setError(null);
-								setMessage(null);
+								setNotice(null);
 							}}
 							placeholder="caregiver@example.com"
 							placeholderTextColor={themeColors.textSecondary}
@@ -323,9 +375,24 @@ export default function ManageCaregiversScreen() {
 								size={18}
 							/>
 							<Text style={styles.primaryButtonText}>
-								{isSendingInvite ? "Sending..." : "Send invitation"}
+								{isSendingInvite ? "Sending..." : "Invite caregiver"}
 							</Text>
 						</Pressable>
+
+						<View style={styles.sentInviteSection}>
+							<Text style={styles.subsectionTitle}>Invited caregivers</Text>
+							{sentInvites.length === 0 ? (
+								<Text style={styles.emptyText}>
+									No one is waiting to join yet.
+								</Text>
+							) : (
+								<View style={styles.inviteList}>
+									{sentInvites.map((invite) => (
+										<SentInviteCard invite={invite} key={invite.id} />
+									))}
+								</View>
+							)}
+						</View>
 					</View>
 				) : null}
 
@@ -340,15 +407,17 @@ export default function ManageCaregiversScreen() {
 						]}
 					>
 						<Text style={styles.dangerButtonText}>
-							{actionMemberId === "me" ? "Leaving..." : "Leave Family Profile"}
+							{actionMemberId === "me" ? "Leaving..." : "Leave family profile"}
 						</Text>
 					</Pressable>
 				) : null}
 
 				<View style={globalStyles.card}>
-					<Text style={styles.sectionTitle}>Your pending invitations</Text>
+					<Text style={styles.sectionTitle}>Invitations for you</Text>
 					{invites.length === 0 ? (
-						<Text style={styles.emptyText}>No pending invitations.</Text>
+						<Text style={styles.emptyText}>
+							No family profile invitations right now.
+						</Text>
 					) : (
 						<View style={styles.inviteList}>
 							{invites.map((invite) => (
@@ -370,9 +439,6 @@ export default function ManageCaregiversScreen() {
 						</View>
 					)}
 				</View>
-
-				{message ? <Text style={styles.successText}>{message}</Text> : null}
-				{error ? <Text style={styles.errorText}>{error}</Text> : null}
 			</ScrollView>
 		</SafeAreaView>
 	);
@@ -454,10 +520,10 @@ function InviteCard({
 			<View style={styles.inviteHeader}>
 				<View>
 					<Text style={styles.inviteTitle}>
-						{invite.baby?.name ?? "Baby invite"}
+						{getBabyGroupLabel(invite.baby?.name)}
 					</Text>
 					<Text style={styles.userMeta}>
-						From{" "}
+						Invited by{" "}
 						{invite.invitedBy?.displayName || invite.invitedBy?.email || "Milo"}
 					</Text>
 				</View>
@@ -493,6 +559,57 @@ function InviteCard({
 						{isBusy ? "Working..." : "Accept"}
 					</Text>
 				</Pressable>
+			</View>
+		</View>
+	);
+}
+
+function SentInviteCard({ invite }: { invite: BabyInvite }) {
+	const { styles } = useThemeStyles();
+	const recipientName =
+		invite.recipientUser?.displayName ||
+		invite.recipientUser?.email ||
+		invite.email;
+
+	return (
+		<View style={styles.sentInviteCard}>
+			<View style={styles.sentInviteHeader}>
+				<View style={styles.userText}>
+					<Text style={styles.inviteTitle}>{recipientName}</Text>
+					<Text style={styles.userMeta}>{invite.email}</Text>
+				</View>
+				<Text style={styles.codePill}>{invite.inviteCode}</Text>
+			</View>
+			<Text style={styles.expiryText}>
+				Expires {formatDateTime(invite.expiresAt)}
+			</Text>
+		</View>
+	);
+}
+
+function NoticeCard({ notice }: { notice: Notice }) {
+	const { themeColors, styles } = useThemeStyles();
+	const iconName =
+		notice.type === "success"
+			? "checkmark-circle"
+			: notice.type === "warning"
+				? "warning"
+				: "alert-circle";
+	const iconColor =
+		notice.type === "success"
+			? "#2FAE62"
+			: notice.type === "warning"
+				? "#B45309"
+				: themeColors.error;
+
+	return (
+		<View style={[styles.noticeCard, styles[`${notice.type}NoticeCard`]]}>
+			<Ionicons color={iconColor} name={iconName} size={22} />
+			<View style={styles.noticeTextWrap}>
+				<Text style={[styles.noticeTitle, styles[`${notice.type}NoticeTitle`]]}>
+					{notice.title}
+				</Text>
+				<Text style={styles.noticeMessage}>{notice.message}</Text>
 			</View>
 		</View>
 	);
@@ -566,6 +683,10 @@ function formatRole(role?: string) {
 	return role.toLowerCase().replace(/^\w/, (letter) => letter.toUpperCase());
 }
 
+function getBabyGroupLabel(name?: string | null) {
+	return name ? `${name}'s family profile` : "this family profile";
+}
+
 function formatDateTime(value: string) {
 	return new Intl.DateTimeFormat("en-US", {
 		dateStyle: "medium",
@@ -581,22 +702,39 @@ function getErrorMessage(error: unknown) {
 	return "Something went wrong. Please try again.";
 }
 
-function getInviteDeliveryMessage(
-	delivery: Awaited<ReturnType<typeof createBabyInvite>>["emailDelivery"],
-) {
+function getInviteDeliveryNotice(
+	delivery: EmailDelivery | undefined,
+	invite: BabyInvite,
+): Notice {
 	if (!delivery) {
-		return "Invitation created.";
+		return {
+			message: `Share code ${invite.inviteCode} with ${invite.email} so they can join ${getBabyGroupLabel(invite.baby?.name)}. It expires ${formatDateTime(invite.expiresAt)}.`,
+			title: "Invite code ready",
+			type: "warning",
+		};
 	}
 
 	if (delivery.status === "sent") {
-		return "Invitation sent.";
+		return {
+			message: `${invite.email} was invited to join ${getBabyGroupLabel(invite.baby?.name)}.`,
+			title: "Caregiver invited",
+			type: "success",
+		};
 	}
 
 	if (delivery.status === "skipped") {
-		return `Invitation created. Email skipped: ${delivery.reason}`;
+		return {
+			message: `The invite was created, but email was not sent (${delivery.reason}). Share code ${invite.inviteCode} manually so ${invite.email} can join ${getBabyGroupLabel(invite.baby?.name)} before it expires ${formatDateTime(invite.expiresAt)}.`,
+			title: "Invite code ready",
+			type: "warning",
+		};
 	}
 
-	return `Invitation created. Email failed: ${delivery.error}`;
+	return {
+		message: `The invite was created, but email delivery failed (${delivery.error}). Share code ${invite.inviteCode} manually so ${invite.email} can join ${getBabyGroupLabel(invite.baby?.name)} before it expires ${formatDateTime(invite.expiresAt)}.`,
+		title: "Email delivery failed",
+		type: "warning",
+	};
 }
 
 function createStyles(themeColors: ThemeColors) {
@@ -722,6 +860,25 @@ function createStyles(themeColors: ThemeColors) {
 			flexWrap: "wrap",
 			gap: spacing.xs,
 		},
+		noticeCard: {
+			alignItems: "flex-start",
+			borderRadius: 12,
+			borderWidth: 1,
+			flexDirection: "row",
+			gap: spacing.sm,
+			padding: spacing.md,
+		},
+		noticeMessage: {
+			...typography.body,
+			color: themeColors.textSecondary,
+			marginTop: 2,
+		},
+		noticeTextWrap: {
+			flex: 1,
+		},
+		noticeTitle: {
+			...typography.label,
+		},
 		ownerPill: {
 			...typography.caption,
 			backgroundColor: "#EAF8EF",
@@ -801,6 +958,26 @@ function createStyles(themeColors: ThemeColors) {
 			...typography.label,
 			color: themeColors.textPrimary,
 		},
+		sentInviteCard: {
+			backgroundColor: themeColors.background,
+			borderColor: themeColors.border,
+			borderRadius: 12,
+			borderWidth: 1,
+			gap: spacing.sm,
+			padding: spacing.md,
+		},
+		sentInviteHeader: {
+			alignItems: "flex-start",
+			flexDirection: "row",
+			gap: spacing.sm,
+			justifyContent: "space-between",
+		},
+		sentInviteSection: {
+			borderTopColor: themeColors.border,
+			borderTopWidth: 1,
+			marginTop: spacing.lg,
+			paddingTop: spacing.lg,
+		},
 		sectionHeader: {
 			alignItems: "flex-start",
 			flexDirection: "row",
@@ -816,10 +993,35 @@ function createStyles(themeColors: ThemeColors) {
 			...typography.sectionTitle,
 			color: themeColors.textPrimary,
 		},
+		subsectionTitle: {
+			...typography.label,
+			color: themeColors.textPrimary,
+		},
+		successNoticeCard: {
+			backgroundColor: "#EAF8EF",
+			borderColor: "#BFE7CE",
+		},
+		successNoticeTitle: {
+			color: "#2FAE62",
+		},
 		successText: {
 			...typography.body,
 			color: "#2FAE62",
 			textAlign: "center",
+		},
+		warningNoticeCard: {
+			backgroundColor: "#FFFBEB",
+			borderColor: "#FDE68A",
+		},
+		warningNoticeTitle: {
+			color: "#B45309",
+		},
+		errorNoticeCard: {
+			backgroundColor: "#FEF2F2",
+			borderColor: "#FECACA",
+		},
+		errorNoticeTitle: {
+			color: themeColors.error,
 		},
 		userMeta: {
 			...typography.caption,

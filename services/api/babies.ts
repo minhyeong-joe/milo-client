@@ -111,6 +111,7 @@ export type BabyInvite = {
 	baby?: BabyInviteSummary;
 	owner?: BabyUserSummary | null;
 	invitedBy?: BabyUserSummary | null;
+	recipientUser?: BabyUserSummary | null;
 };
 
 export type BabyMember = {
@@ -222,6 +223,12 @@ export function createBabyInvite(
 		input,
 		{ auth: true },
 	);
+}
+
+export function listSentBabyInvites(babyId: string) {
+	return apiGet<ListInvitesResponse>(`/babies/${babyId}/invites`, {
+		auth: true,
+	});
 }
 
 export function listMyInvites() {
