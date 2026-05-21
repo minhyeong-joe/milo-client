@@ -78,7 +78,7 @@ export function RoutineAIInsight({
 						<Text style={styles.title}>AI Daily Insight</Text>
 					</View>
 					<Text style={styles.body}>
-						Generate a gentle summary from this day's logs.
+						{"Generate a gentle summary from this day's logs."}
 					</Text>
 					<Text style={styles.actionText}>Generate AI Insight</Text>
 				</Pressable>

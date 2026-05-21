@@ -1,7 +1,7 @@
 import type { AuthSession, AuthSessionTokens, SignUpRequest } from "@/services/api/auth";
 import { refreshAuthSession, signInUser, signUpUser } from "@/services/api/auth";
 import type { BabyRole, BabySex, CreateBabyRequest } from "@/services/api/babies";
-import { createBaby } from "@/services/api/babies";
+import { acceptBabyInvite, createBaby } from "@/services/api/babies";
 import { ApiError, configureApiClient } from "@/services/api/httpClient";
 import {
 	clearStoredSession,
@@ -11,6 +11,7 @@ import {
 import {
 	createContext,
 	type PropsWithChildren,
+	useCallback,
 	useContext,
 	useEffect,
 	useMemo,
@@ -30,6 +31,11 @@ export type CompleteSignupWithBabyInput = {
 	role: BabyRole;
 };
 
+export type CompleteSignupWithInviteInput = {
+	inviteCode: string;
+	role: BabyRole;
+};
+
 type AuthSessionContextValue = {
 	authStatus: "authenticated" | "authRequiredForSync" | "signedOut";
 	error: string | null;
@@ -39,6 +45,7 @@ type AuthSessionContextValue = {
 	signIn: (email: string, password: string) => Promise<boolean>;
 	startSignupDraft: (input: SignupDraft) => boolean;
 	completeSignupWithBaby: (input: CompleteSignupWithBabyInput) => Promise<boolean>;
+	completeSignupWithInvite: (input: CompleteSignupWithInviteInput) => Promise<boolean>;
 	clearError: () => void;
 	signOut: () => Promise<void>;
 };
@@ -156,6 +163,48 @@ export function AuthSessionProvider({ children }: PropsWithChildren) {
 		});
 	}, []);
 
+	const ensurePendingSignupSession = useCallback(async () => {
+		let nextSession = pendingSignupSessionRef.current;
+
+		if (nextSession) {
+			return nextSession;
+		}
+
+		if (!signupDraft) {
+			throw new Error("Account details are missing. Go back and create the account again.");
+		}
+
+		const signupResponse = await signUpUser({
+			displayName: signupDraft.displayName,
+			email: signupDraft.email,
+			password: signupDraft.password,
+		});
+
+		if (
+			signupResponse.emailConfirmationRequired ||
+			!signupResponse.session ||
+			!signupResponse.user
+		) {
+			throw new Error("Check your email to confirm your account before adding a baby.");
+		}
+
+		nextSession = normalizeSession(signupResponse.session, signupResponse.user);
+		pendingSignupSessionRef.current = nextSession;
+		setPendingSignupSession(nextSession);
+
+		return nextSession;
+	}, [signupDraft]);
+
+	const commitPendingSignupSession = useCallback(async (nextSession: AuthSession) => {
+		await saveStoredSession(nextSession);
+		sessionRef.current = nextSession;
+		pendingSignupSessionRef.current = null;
+		setAuthRequiresSyncLogin(false);
+		setSession(nextSession);
+		setPendingSignupSession(null);
+		setSignupDraft(null);
+	}, []);
+
 	useEffect(() => {
 		let isMounted = true;
 
@@ -243,42 +292,28 @@ export function AuthSessionProvider({ children }: PropsWithChildren) {
 				setIsLoading(true);
 
 				try {
-					let nextSession = pendingSignupSessionRef.current;
-
-					if (!nextSession) {
-						if (!signupDraft) {
-							setError("Account details are missing. Go back and create the account again.");
-							return false;
-						}
-
-						const signupResponse = await signUpUser({
-							displayName: signupDraft.displayName,
-							email: signupDraft.email,
-							password: signupDraft.password,
-						});
-
-						if (
-							signupResponse.emailConfirmationRequired ||
-							!signupResponse.session ||
-							!signupResponse.user
-						) {
-							setError("Check your email to confirm your account before adding a baby.");
-							return false;
-						}
-
-						nextSession = normalizeSession(signupResponse.session, signupResponse.user);
-						pendingSignupSessionRef.current = nextSession;
-						setPendingSignupSession(nextSession);
-					}
+					const nextSession = await ensurePendingSignupSession();
 
 					await createBaby(buildCreateBabyRequest(input));
-					await saveStoredSession(nextSession);
-					sessionRef.current = nextSession;
-					pendingSignupSessionRef.current = null;
-					setAuthRequiresSyncLogin(false);
-					setSession(nextSession);
-					setPendingSignupSession(null);
-					setSignupDraft(null);
+					await commitPendingSignupSession(nextSession);
+
+					return true;
+				} catch (caughtError) {
+					setError(getErrorMessage(caughtError));
+					return false;
+				} finally {
+					setIsLoading(false);
+				}
+			},
+			completeSignupWithInvite: async (input) => {
+				setError(null);
+				setIsLoading(true);
+
+				try {
+					const nextSession = await ensurePendingSignupSession();
+
+					await acceptBabyInvite(input);
+					await commitPendingSignupSession(nextSession);
 
 					return true;
 				} catch (caughtError) {
@@ -298,7 +333,17 @@ export function AuthSessionProvider({ children }: PropsWithChildren) {
 				setSignupDraft(null);
 			},
 		}),
-		[authRequiresSyncLogin, error, isLoading, isReady, pendingSignupSession, session, signupDraft],
+		[
+			authRequiresSyncLogin,
+			commitPendingSignupSession,
+			ensurePendingSignupSession,
+			error,
+			isLoading,
+			isReady,
+			pendingSignupSession,
+			session,
+			signupDraft,
+		],
 	);
 
 	return (

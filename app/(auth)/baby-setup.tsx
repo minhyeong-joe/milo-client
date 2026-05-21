@@ -6,7 +6,14 @@ import {
 	formatBabyProfileDateKey,
 } from "@/components/baby/BabyProfileFields";
 import { useAuthSession } from "@/context/AuthSessionContext";
-import type { BabyRole, BabySex } from "@/services/api/babies";
+import { useBabySelection } from "@/context/BabySelectionContext";
+import {
+	acceptBabyInvite,
+	createBaby,
+	normalizeInviteCode,
+	type BabyRole,
+	type BabySex,
+} from "@/services/api/babies";
 import { BABY_NAME_MAX_LENGTH } from "@/services/validation/inputLimits";
 import { spacing, typography, type ThemeColors } from "@/styles/globalStyles";
 import { useAppTheme } from "@/context/AppPreferencesContext";
@@ -39,7 +46,15 @@ function useThemeStyles() {
 export default function BabySetupScreen() {
 	const router = useRouter();
 	const { globalStyles, styles } = useThemeStyles();
-	const { clearError, completeSignupWithBaby, error, isLoading } = useAuthSession();
+	const {
+		clearError,
+		completeSignupWithBaby,
+		completeSignupWithInvite,
+		error,
+		isLoading,
+		session,
+	} = useAuthSession();
+	const { refreshBabies, selectBaby } = useBabySelection();
 	const [setupMode, setSetupMode] = useState<SetupMode>("addBaby");
 	const [babyName, setBabyName] = useState("");
 	const [birthdate, setBirthdate] = useState(() => new Date());
@@ -51,14 +66,23 @@ export default function BabySetupScreen() {
 
 	const canContinue = useMemo(() => {
 		if (setupMode === "inviteCode") {
-			return false;
+			return normalizeInviteCode(inviteCode).length === 8;
 		}
 
 		const trimmedName = babyName.trim();
 		return trimmedName.length > 0 && trimmedName.length <= BABY_NAME_MAX_LENGTH;
-	}, [babyName, setupMode]);
+	}, [babyName, inviteCode, setupMode]);
 
 	const continueToHome = async () => {
+		if (setupMode === "inviteCode") {
+			await continueWithInvite();
+			return;
+		}
+
+		await continueWithNewBaby();
+	};
+
+	const continueWithNewBaby = async () => {
 		const trimmedName = babyName.trim();
 
 		if (!trimmedName) {
@@ -72,11 +96,64 @@ export default function BabySetupScreen() {
 		}
 
 		setSetupError(null);
+
+		if (session) {
+			try {
+				const response = await createBaby({
+					birthdate: formatBabyProfileDateKey(birthdate),
+					name: trimmedName,
+					role,
+					sex,
+				});
+				await refreshBabies();
+				selectBaby(response.baby.id);
+				router.replace("/home");
+			} catch (caughtError) {
+				setSetupError(getSetupErrorMessage(caughtError));
+			}
+			return;
+		}
+
 		const isComplete = await completeSignupWithBaby({
 			birthdate: formatBabyProfileDateKey(birthdate),
 			name: trimmedName,
 			role,
 			sex,
+		});
+
+		if (isComplete) {
+			router.replace("/home");
+		}
+	};
+
+	const continueWithInvite = async () => {
+		const normalizedInviteCode = normalizeInviteCode(inviteCode);
+
+		if (normalizedInviteCode.length !== 8) {
+			setSetupError("Enter the 8-character invite code.");
+			return;
+		}
+
+		setSetupError(null);
+
+		if (session) {
+			try {
+				const response = await acceptBabyInvite({
+					inviteCode: normalizedInviteCode,
+					role,
+				});
+				await refreshBabies();
+				selectBaby(response.access.babyId);
+				router.replace("/home");
+			} catch (caughtError) {
+				setSetupError(getSetupErrorMessage(caughtError));
+			}
+			return;
+		}
+
+		const isComplete = await completeSignupWithInvite({
+			inviteCode: normalizedInviteCode,
+			role,
 		});
 
 		if (isComplete) {
@@ -168,13 +245,17 @@ export default function BabySetupScreen() {
 								<FormField
 									autoCapitalize="characters"
 									label="Invitation code"
-									onChangeText={setInviteCode}
-									placeholder="ABCD-1234"
+									maxLength={8}
+									onChangeText={(value) => {
+										setInviteCode(normalizeInviteCode(value));
+										setSetupError(null);
+									}}
+									placeholder="2YCP53IC"
 									value={inviteCode}
 								/>
 								<RoleSelector role={role} onChange={setRole} />
 								<Text style={styles.helpText}>
-									Invite access is coming later. Add a baby to continue for now.
+									Choose your role for this baby, then join with the invite code.
 								</Text>
 							</>
 						)}
@@ -189,7 +270,7 @@ export default function BabySetupScreen() {
 							]}
 						>
 							<Text style={styles.primaryButtonText}>
-								{isLoading ? "Creating account..." : "Continue to Home"}
+								{isLoading ? "Working..." : "Continue to Home"}
 							</Text>
 						</Pressable>
 
@@ -297,6 +378,14 @@ function RoleButton({
 			<Text style={[styles.roleText, active && styles.roleTextActive]}>{label}</Text>
 		</Pressable>
 	);
+}
+
+function getSetupErrorMessage(error: unknown) {
+	if (error instanceof Error) {
+		return error.message;
+	}
+
+	return "Something went wrong. Please try again.";
 }
 
 function createStyles(themeColors: ThemeColors) {

@@ -18,12 +18,11 @@ function useThemeStyles() {
 
 export default function BabyTimeZoneScreen() {
 	const router = useRouter();
-	const { globalStyles, styles, themeColors } = useThemeStyles();
+	const { globalStyles, styles } = useThemeStyles();
 	const { displayTimeZonePreference, setDisplayTimeZonePreference } =
 		useAppPreferences();
 	const { selectedBaby, updateSelectedBabyProfile } = useBabySelection();
-	const isOwnerCapable =
-		selectedBaby?.role === "FATHER" || selectedBaby?.role === "MOTHER";
+	const isOwnerCapable = selectedBaby?.isOwner === true;
 	const selectedBabyTimeZone = selectedBaby?.timezone ?? getDeviceTimeZone();
 
 	const handleBabyTimeZoneChange = async (timeZone: string) => {

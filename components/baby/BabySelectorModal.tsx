@@ -4,6 +4,7 @@ import { spacing, type ThemeColors } from "@/styles/globalStyles";
 import { useAppTheme } from "@/context/AppPreferencesContext";
 import { formatBabyAge } from "@/utils/routineDisplay";
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import {
 	FlatList,
 	Image,
@@ -36,6 +37,7 @@ export function BabySelectorModal({
 	selectedBaby: BabyListItem | null;
 	visible: boolean;
 }) {
+	const router = useRouter();
 	const { globalStyles, themeColors, styles } = useThemeStyles();
 	const currentDate = new Date();
 
@@ -93,6 +95,21 @@ export function BabySelectorModal({
 							);
 						}}
 					/>
+					<Pressable
+						accessibilityRole="button"
+						onPress={() => {
+							onClose();
+							router.push("/baby-setup");
+						}}
+						style={({ pressed }) => [
+							styles.addBabyRow,
+							pressed && styles.addBabyRowPressed,
+						]}
+					>
+						<View style={styles.addIconCircle}>
+							<Ionicons color={themeColors.primary} name="add" size={22} />
+						</View>
+					</Pressable>
 				</Pressable>
 			</Pressable>
 		</Modal>
@@ -111,62 +128,84 @@ export function BabySelectorAvatar({ baby }: { baby: BabyListItem }) {
 
 function createStyles(themeColors: ThemeColors) {
 	return StyleSheet.create({
-	avatar: {
-		alignItems: "center",
-		backgroundColor: "#D9BFAE",
-		borderRadius: 28,
-		height: 56,
-		justifyContent: "center",
-		overflow: "hidden",
-		width: 56,
-	},
-	modalBackdrop: {
-		backgroundColor: "rgba(21, 24, 39, 0.22)",
-		flex: 1,
-		justifyContent: "flex-start",
-		paddingHorizontal: spacing.md,
-		paddingTop: 92,
-	},
-	profileRow: {
-		gap: spacing.md,
-	},
-	selectorAge: {
-		color: themeColors.textSecondary,
-		fontSize: 13,
-		fontWeight: "600",
-		marginTop: 2,
-	},
-	selectorItem: {
-		alignItems: "center",
-		borderRadius: 8,
-		flexDirection: "row",
-		justifyContent: "space-between",
-		paddingHorizontal: spacing.md,
-		paddingVertical: spacing.md,
-	},
-	selectorItemSelected: {
-		backgroundColor: themeColors.secondary,
-	},
-	selectorName: {
-		color: themeColors.textPrimary,
-		fontSize: 16,
-		fontWeight: "800",
-	},
-	selectorPanel: {
-		backgroundColor: themeColors.surface,
-		borderColor: themeColors.border,
-		borderRadius: 8,
-		borderWidth: 1,
-		maxHeight: 320,
-		padding: spacing.sm,
-	},
-	selectorTitle: {
-		color: themeColors.textSecondary,
-		fontSize: 12,
-		fontWeight: "800",
-		paddingHorizontal: spacing.md,
-		paddingVertical: spacing.sm,
-		textTransform: "uppercase",
-	},
-});
+		addBabyRow: {
+			alignItems: "center",
+			borderTopColor: themeColors.border,
+			borderTopWidth: StyleSheet.hairlineWidth,
+			flexDirection: "row",
+			justifyContent: "space-between",
+			marginTop: spacing.xs,
+			paddingHorizontal: spacing.md,
+			paddingVertical: spacing.md,
+		},
+		addBabyRowPressed: {
+			opacity: 0.72,
+		},
+		addIconCircle: {
+			alignItems: "center",
+			backgroundColor: "#F1ECFF",
+			borderRadius: 20,
+			height: 40,
+			justifyContent: "center",
+			width: 40,
+			marginHorizontal: "auto",
+		},
+		avatar: {
+			alignItems: "center",
+			backgroundColor: "#D9BFAE",
+			borderRadius: 28,
+			height: 56,
+			justifyContent: "center",
+			overflow: "hidden",
+			width: 56,
+		},
+		modalBackdrop: {
+			backgroundColor: "rgba(21, 24, 39, 0.22)",
+			flex: 1,
+			justifyContent: "flex-start",
+			paddingHorizontal: spacing.md,
+			paddingTop: 92,
+		},
+		profileRow: {
+			gap: spacing.md,
+		},
+		selectorAge: {
+			color: themeColors.textSecondary,
+			fontSize: 13,
+			fontWeight: "600",
+			marginTop: 2,
+		},
+		selectorItem: {
+			alignItems: "center",
+			borderRadius: 8,
+			flexDirection: "row",
+			justifyContent: "space-between",
+			paddingHorizontal: spacing.md,
+			paddingVertical: spacing.md,
+		},
+		selectorItemSelected: {
+			backgroundColor: themeColors.secondary,
+		},
+		selectorName: {
+			color: themeColors.textPrimary,
+			fontSize: 16,
+			fontWeight: "800",
+		},
+		selectorPanel: {
+			backgroundColor: themeColors.surface,
+			borderColor: themeColors.border,
+			borderRadius: 8,
+			borderWidth: 1,
+			maxHeight: 320,
+			padding: spacing.sm,
+		},
+		selectorTitle: {
+			color: themeColors.textSecondary,
+			fontSize: 12,
+			fontWeight: "800",
+			paddingHorizontal: spacing.md,
+			paddingVertical: spacing.sm,
+			textTransform: "uppercase",
+		},
+	});
 }

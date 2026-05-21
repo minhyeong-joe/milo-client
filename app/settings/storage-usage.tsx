@@ -23,10 +23,8 @@ export default function StorageUsageScreen() {
 	const router = useRouter();
 	const { globalStyles, styles } = useThemeStyles();
 	const { babies, selectedBaby } = useBabySelection();
-	const isOwnerCapable =
-		selectedBaby?.role === "FATHER" || selectedBaby?.role === "MOTHER";
+	const isOwnerCapable = selectedBaby?.isOwner === true;
 	const remainingGb = STORAGE_LIMIT_GB - STORAGE_USED_GB;
-	const usedPercent = Math.round((STORAGE_USED_GB / STORAGE_LIMIT_GB) * 100);
 	const breakdown = getStorageBreakdown({
 		babies,
 		isOwnerCapable,

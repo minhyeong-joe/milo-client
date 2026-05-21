@@ -35,8 +35,7 @@ export default function SettingsScreen() {
 	const { languagePreference } = useAppPreferences();
 	const { babies, selectBaby, selectedBaby } = useBabySelection();
 	const [isSelectorOpen, setIsSelectorOpen] = useState(false);
-	const isOwnerCapable =
-		selectedBaby?.role === "FATHER" || selectedBaby?.role === "MOTHER";
+	const isOwner = selectedBaby?.isOwner === true;
 
 	return (
 		<SafeAreaView edges={["top", "left", "right"]} style={globalStyles.screen}>
@@ -78,39 +77,38 @@ export default function SettingsScreen() {
 						/>
 					</Pressable>
 					<SettingsRow
-						disabled={!!selectedBaby && !isOwnerCapable}
+						disabled={!selectedBaby}
 						icon="create-outline"
 						iconBackground="#F1ECFF"
 						iconColor={themeColors.primary}
 						onPress={() => router.push("/baby/edit-profile")}
 						subtitle={
-							isOwnerCapable || !selectedBaby
+							selectedBaby
 								? "Name, birthday, photo"
-								: "Owner only"
+								: "Choose a baby first"
 						}
 						title="Edit Baby Profile"
 					/>
 					<SettingsRow
-						disabled={!!selectedBaby && !isOwnerCapable}
+						disabled={!selectedBaby || !isOwner}
 						icon="time-outline"
 						iconBackground="#F1ECFF"
 						iconColor={themeColors.primary}
 						onPress={() => router.push("/settings/baby-timezone")}
 						subtitle={`${selectedBaby?.timezone} ${
-							isOwnerCapable || !selectedBaby ? "" : " (Owner only)"
+							isOwner || !selectedBaby ? "" : " (Owner only)"
 						}`}
 						title="Baby Timezone"
 					/>
 					<SettingsRow
-						disabled={!!selectedBaby && !isOwnerCapable}
 						icon="people-outline"
 						iconBackground="#EAF8EF"
 						iconColor="#2FAE62"
 						onPress={() => router.push("/settings/caregivers")}
 						subtitle={
-							isOwnerCapable || !selectedBaby
+							selectedBaby
 								? "Access and invitations"
-								: "Owner only"
+								: "Choose a baby first"
 						}
 						title="Manage Caregivers"
 					/>
